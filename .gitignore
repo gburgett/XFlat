@@ -5,3 +5,4 @@
 *.war
 *.ear
 /java/XFlat/nbproject/private/
+/java/XFlat/build/

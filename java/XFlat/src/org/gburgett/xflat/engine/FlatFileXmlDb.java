@@ -4,12 +4,12 @@
  */
 package org.gburgett.xflat.engine;
 
-import com.SimplyTrackable.MoodManagerClient.Disk.JdomDiskLoader;
 import org.gburgett.xflat.db.XmlKeyObjectDb;
 import org.gburgett.xflat.query.XpathQuery;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,15 +20,11 @@ import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.Attribute;
 import org.jdom.Namespace;
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
-import propel.core.utils.Linq;
 
 /**
  * Implements an {@link XmlKeyObjectDb} using a flat file.
  * @author Gordon
  */
-@lombok.ExtensionMethod({Linq.class})
 public class FlatFileXmlDb implements XmlKeyObjectDb {
 
     public static Namespace dbNs = Namespace.getNamespace("db", "http://www.simplytrackable.com/xmldb");
@@ -67,7 +63,7 @@ public class FlatFileXmlDb implements XmlKeyObjectDb {
         return cachedDoc;
     }
 
-    private DateTime lastFlushed;
+    private Date nextFlush = new Date();
     /**
      * Flushes the cached document to disk.
      * Does not flush if last flushed in the past 10 seconds and force is not on.
@@ -78,12 +74,14 @@ public class FlatFileXmlDb implements XmlKeyObjectDb {
         if(cachedDoc == null)
             return;
 
-        if(!force && lastFlushed.plus(Duration.standardSeconds(10)).isAfterNow()){
+        if(!force && new Date().before(nextFlush)){
             //don't flush more than every 10 secs.
             return;
         }
 
         documentLoader.saveTo(flatFile, cachedDoc);
+        //10s in the future
+        nextFlush = new Date(System.currentTimeMillis() + 10000);
     }
 
     /**
