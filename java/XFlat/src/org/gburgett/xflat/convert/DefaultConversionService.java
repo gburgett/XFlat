@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.gburgett.xflat.convert.converters.StringConverters;
 
 /**
  *
@@ -20,6 +21,9 @@ public class DefaultConversionService implements ConversionService {
     
     private ReadWriteLock converterLock = new ReentrantReadWriteLock();
 
+    public DefaultConversionService(){
+        StringConverters.RegisterTo(this);
+    }
     
     @Override
     public boolean canConvert(Class<?> source, Class<?> target) {
@@ -38,7 +42,7 @@ public class DefaultConversionService implements ConversionService {
     @Override
     public <T> T convert(Object source, Class<T> target) {
         
-        Converter<?, T> converter;
+        Converter<?, ?> converter;
         
         converterLock.readLock().lock();
         try{
@@ -73,56 +77,63 @@ public class DefaultConversionService implements ConversionService {
     }
 
     @Override
-    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Converter<S, T> converter) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Converter<? super S, ? extends T> converter) {
+        ConverterEntry<T> entry;
+        
         converterLock.readLock().lock();
         try{
-            ConverterEntry<T> entry = (ConverterEntry<T>)this.converters.get(targetType);
-            if(entry == null){
-                converterLock.writeLock().lock();
-                try{
-                    //doublecheck after locking
-                    entry = (ConverterEntry<T>)this.converters.get(targetType);
-                    if(entry == null){
-                        entry = new ConverterEntry(targetType);
-                        this.converters.put(targetType, entry);
-                    }
-                }finally{
-                    converterLock.writeLock().unlock();
-                }
-            }
             
-            entry.putConverter(sourceType, converter);
+            entry = (ConverterEntry<T>)this.converters.get(targetType);
+            
         }finally{
             converterLock.readLock().unlock();
         }
+        
+        if(entry == null){
+            converterLock.writeLock().lock();
+            try{
+                //doublecheck after locking
+                entry = (ConverterEntry<T>)this.converters.get(targetType);
+                if(entry == null){
+                    entry = new ConverterEntry(targetType);
+                    this.converters.put(targetType, entry);
+                }
+            }finally{
+                converterLock.writeLock().unlock();
+            }
+        }
+            
+        //concurrency managed by the entry
+        entry.putConverter(sourceType, converter);
     }
 
     @Override
     public void removeConverter(Class<?> sourceType, Class<?> targetType) {
+        ConverterEntry<?> entry;
         converterLock.readLock().lock();
         try{
-            ConverterEntry<?> entry = this.converters.get(targetType);
-            if(entry == null)
-                return;
-
-            boolean isEmpty = entry.removeConverter(sourceType);
-            if(isEmpty){
-                converterLock.writeLock().lock();
-                try{
-                    //doublecheck inside lock
-                    if(entry.isEmpty()){
-                        this.converters.remove(targetType);
-                    }
-                }finally{
-                    converterLock.writeLock().unlock();
-                }
-            }
+            entry = this.converters.get(targetType);
         }finally{
             converterLock.readLock().unlock();
         }
+        
+        if(entry == null)
+            return;
+
+        //concurrency managed by the entry
+        boolean isEmpty = entry.removeConverter(sourceType);
+        if(isEmpty){
+            converterLock.writeLock().lock();
+            try{
+                //doublecheck inside lock
+                if(entry.isEmpty()){
+                    this.converters.remove(targetType);
+                }
+            }finally{
+                converterLock.writeLock().unlock();
+            }
+        }
     }
-    
-    
     
     private static class ConverterEntry<T>
     {   
@@ -131,8 +142,9 @@ public class DefaultConversionService implements ConversionService {
             return targetClass;
         }
         
-        private ConcurrentHashMap<Class<?>, Converter<?, T>> converters = new ConcurrentHashMap<>();
+        private Map<Class<?>, Converter<?, ?>> converters = new HashMap<>();
         
+        private Converter<?, ?> nullConverter;
         
         public ConverterEntry(Class<T> targetClass){
             this.targetClass = targetClass;
@@ -145,18 +157,18 @@ public class DefaultConversionService implements ConversionService {
          * @param clazz The source class
          * @return A converter for the source class to this entry's target class
          */
-        public <S> Converter<S, T> getConverter(Class<S> clazz){
-            Converter<?, T> ret = converters.get(clazz);
+        public synchronized <S> Converter<?, ?> getConverter(Class<S> clazz){
+            Converter<?, ?> ret = converters.get(clazz);
             
-            return (Converter<S, T>)ret;
+            return ret;
         }
         
         /**
          * Gets the converter for a null object.
          * @return 
          */
-        public Converter<?, T> getNullConverter(){
-            return converters.get(null);
+        public synchronized Converter<?, ?> getNullConverter(){
+            return nullConverter;
         }
         
         /**
@@ -164,7 +176,7 @@ public class DefaultConversionService implements ConversionService {
          * @param clazz
          * @return 
          */
-        public boolean hasConverter(Class<?> clazz){
+        public synchronized boolean hasConverter(Class<?> clazz){
             return converters.containsKey(clazz);
         }
         
@@ -174,7 +186,12 @@ public class DefaultConversionService implements ConversionService {
          * @param clazz
          * @param converter 
          */
-        public <S> void putConverter(Class<S> clazz, Converter<S, T> converter){
+        public synchronized <S> void putConverter(Class<S> clazz, Converter<? super S, ? extends T> converter){
+            if(clazz == null){
+                nullConverter = converter;
+                return;
+            }
+            
             this.converters.put(clazz, converter);
         }
         
@@ -182,13 +199,18 @@ public class DefaultConversionService implements ConversionService {
          * Removes the converter associated with the given class
          * @param clazz 
          */
-        public boolean removeConverter(Class<?> clazz){
+        public synchronized boolean removeConverter(Class<?> clazz){
+            if(clazz == null){
+                nullConverter = null;
+                return this.converters.isEmpty();
+            }
+                
             this.converters.remove(clazz);
-            return this.converters.isEmpty();
+            return this.converters.isEmpty() && nullConverter == null;
         }
         
-        public boolean isEmpty(){
-            return this.converters.isEmpty();
+        public synchronized boolean isEmpty(){
+            return this.converters.isEmpty() && nullConverter == null;
         }
     }
 }

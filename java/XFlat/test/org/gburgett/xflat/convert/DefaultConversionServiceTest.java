@@ -9,6 +9,9 @@ import org.junit.Test;
 import static org.mockito.Mockito.*;
 import static org.mockito.Matchers.*;
 import static org.junit.Assert.*;
+import test.Bar;
+import test.Foo;
+import test.SubFoo;
 
 
 /**
@@ -99,4 +102,48 @@ public class DefaultConversionServiceTest {
         assertNotNull(converted);
         assertEquals("Should have invoked converter", new Date(17), converted);
     }//end testAddConverter_convertInvokesConverter
+    
+    @Test
+    public void testConvert_ConverterAcceptsSuperclass_ConvertsCorrectly() throws Exception {
+        System.out.println("testConvert_ConverterAcceptsSuperclass_ConvertsCorrectly");
+        
+        final Bar toReturn = new Bar();
+        toReturn.barString = "test";
+        Converter<Foo, Bar> fooBarConverter = new Converter<Foo, Bar>(){
+            @Override
+            public Bar convert(Foo source) {
+                return toReturn;
+            }
+        };
+        
+        DefaultConversionService instance = new DefaultConversionService();
+        instance.addConverter(SubFoo.class, Bar.class, fooBarConverter);
+        
+        //ACT
+        Bar converted = instance.convert(new SubFoo(), Bar.class);
+        
+        //ASSERT
+        assertSame("Should have gotten back the bar", toReturn, converted);
+    }//end testConvert_ConverterAcceptsSuperclass_ConvertsCorrectly
+    
+    @Test
+    public void testConvert_ConverterReturnsSubclass_ConvertsCorrectly() throws Exception {
+        System.out.println("testConvert_ConverterReturnsSubclass_ConvertsCorrectly");
+        
+        final SubFoo toReturn = new SubFoo();
+        Converter<Bar, Foo> converter = new Converter<Bar, Foo>(){
+            @Override
+            public Foo convert(Bar source) {
+                return toReturn;
+            }
+        };
+        DefaultConversionService instance = new DefaultConversionService();
+        instance.addConverter(Bar.class, Foo.class, converter);
+        
+        //ACT
+        Foo converted = instance.convert(new Bar(), Foo.class);
+        
+        //ASSERT
+        assertSame("Should have gotten the subFoo", toReturn, converted);
+    }//end testConvert_ConverterReturnsSubclass_ConvertsCorrectly
 }

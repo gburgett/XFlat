@@ -44,7 +44,7 @@ public interface ConversionService {
      * @param converter The converter that performs the conversion.
      */
     public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, 
-            Converter<S, T> converter);
+            Converter<? super S, ? extends T> converter);
     
     /**
      * Removes the registered converter for the source to target type.
