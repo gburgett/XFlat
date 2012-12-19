@@ -8,6 +8,7 @@ import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.query.XpathQuery;
+import org.gburgett.xflat.query.XpathUpdate;
 import org.jdom.Element;
 
 /**
@@ -59,8 +60,23 @@ public interface Engine {
      * @param data The data that replaces the old data.
      * @throws KeyNotFoundException if the row does not exist.
      */
-    public void updateRow(String id, Element data)
+    public void replaceRow(String id, Element data)
             throws KeyNotFoundException;
+    
+    /**
+     * Applies an update to the one row specified by the ID.
+     * @param id The ID of the row to update.
+     * @param update The update to apply.
+     */
+    public void update(String id, XpathUpdate update)
+            throws KeyNotFoundException;
+    
+    /**
+     * Applies the given update to all rows matching the query.
+     * @param query The query to match.
+     * @param update The update to apply.
+     */
+    public void update(XpathQuery query, XpathUpdate update);
     
     /**
      * Updates or inserts the given row.  If the row exists,
@@ -68,7 +84,7 @@ public interface Engine {
      * the row is inserted.
      * @param id The Id of the row to upsert.
      * @param data The data to replace or insert.
-     * @returns true if an existing row was updated, false if a row was inserted.
+     * @returns false if an existing row was updated, true if a row was inserted.
      */
     public boolean upsertRow(String id, Element data);
     
