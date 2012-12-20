@@ -9,7 +9,7 @@ import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
-import org.jdom.Element;
+import org.jdom2.Element;
 
 /**
  * The base interface for an XFlat table engine.

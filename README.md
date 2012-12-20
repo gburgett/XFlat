@@ -62,3 +62,23 @@ XFlat has the capability to "shard" tables.  Sharding is splitting the table's c
 by some indexed value (most often ID).  Queries on that index then know which file to open in order to get at the
 correct data.  This is only useful when tables grow very large.
 
+====
+
+Required dependencies:
+
+* JDOM 2
+  * jdom-2.0.4.jar
+  
+* Hamcrest matchers 1.3
+  * hamcrest-core-1.3.jar
+  * hamcrest-library-1.3.jar 
+   
+* Apache Commons Logging 1.1
+  * commons-logging-1.1.1.jar
+
+Optional dependencies:
+
+* Jaxen-1.1.4 - for compiling XPath strings into expressions
+  * jaxen-1.1.4.jar
+  
+* JAXB reference implementation 1.0 - for automatic POJO mapping

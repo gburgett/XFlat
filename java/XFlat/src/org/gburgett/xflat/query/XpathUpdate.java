@@ -7,13 +7,13 @@ package org.gburgett.xflat.query;
 import java.util.ArrayList;
 import java.util.List;
 import org.gburgett.xflat.convert.ConversionService;
-import org.jdom.Attribute;
-import org.jdom.Content;
-import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.Parent;
-import org.jdom.Text;
-import org.jdom.xpath.XPath;
+import org.jdom2.Attribute;
+import org.jdom2.Content;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
+import org.jdom2.Parent;
+import org.jdom2.Text;
+import org.jdom2.xpath.XPathExpression;
 
 /**
  *
@@ -46,7 +46,7 @@ public class XpathUpdate {
      * @param path The path selecting an element (or elements) to set.
      * @return A builder object that can be chained to provide a value for the update.
      */
-    public static Builder set(XPath path){
+    public static Builder set(XPathExpression<Object> path){
         XpathUpdate ret = new XpathUpdate();
         
         return ret.new Builder(path);
@@ -58,13 +58,13 @@ public class XpathUpdate {
      * @param path
      * @return 
      */
-    public Builder and(XPath path){
+    public Builder and(XPathExpression<Object> path){
         return new Builder(path);
     }
     
     public static class Update{
-        private XPath path;
-        public XPath getPath(){
+        private XPathExpression<Object> path;
+        public XPathExpression<Object> getPath(){
             return path;
         }
         
@@ -73,7 +73,7 @@ public class XpathUpdate {
             return value;
         }
         
-        private Update(XPath path, Object value){
+        private Update(XPathExpression<Object> path, Object value){
             this.path = path;
             this.value = value;
         }
@@ -81,7 +81,7 @@ public class XpathUpdate {
     
     public class Builder {
     
-        private XPath path;
+        private XPathExpression<Object> path;
         
         public XpathUpdate to(Object value){
             Update update = new Update(path, value);
@@ -90,7 +90,7 @@ public class XpathUpdate {
             return XpathUpdate.this;
         }
         
-        private Builder(XPath path){
+        private Builder(XPathExpression<Object> path){
             this.path = path;
         }
     }
@@ -120,7 +120,7 @@ public class XpathUpdate {
                 asContent = (Content) update.value;
             }
             
-            for(Object node : update.path.selectNodes(rowData)){
+            for(Object node : update.path.evaluate(rowData)){
                 if(node == null)
                     continue;
                 

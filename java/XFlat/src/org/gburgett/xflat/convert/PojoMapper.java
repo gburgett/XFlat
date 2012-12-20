@@ -4,7 +4,7 @@
  */
 package org.gburgett.xflat.convert;
 
-import org.jdom.Content;
+import org.jdom2.Content;
 
 /**
  * The interface for a PojoMapper.  The implementation is loaded dynamically

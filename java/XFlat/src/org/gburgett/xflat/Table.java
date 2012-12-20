@@ -10,7 +10,7 @@ import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
-import org.jdom.Element;
+import org.jdom2.Element;
 
 /**
  * Represents a table in the database.  Converts from the POJO type to JDOM

@@ -19,5 +19,6 @@ public interface Converter<S, T> {
      * @return the converted object, which must be an instance of T
      * @throws IllegalArgumentException - if the source could not be converted to the desired target type
      */
-    public T convert(S source);
+    public T convert(S source)
+            throws ConversionException;
 }

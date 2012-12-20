@@ -6,10 +6,8 @@ package org.gburgett.xflat.convert;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.gburgett.xflat.convert.converters.StringConverters;
 
 /**
  *
@@ -22,7 +20,6 @@ public class DefaultConversionService implements ConversionService {
     private ReadWriteLock converterLock = new ReentrantReadWriteLock();
 
     public DefaultConversionService(){
-        StringConverters.RegisterTo(this);
     }
     
     @Override
@@ -40,8 +37,7 @@ public class DefaultConversionService implements ConversionService {
     }
 
     @Override
-    public <T> T convert(Object source, Class<T> target) {
-        
+    public <T> T convert(Object source, Class<T> target) {        
         Converter<?, ?> converter;
         
         converterLock.readLock().lock();

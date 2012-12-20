@@ -15,7 +15,7 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.PojoMapper;
 import org.gburgett.xflat.engine.Engine;
-import org.jdom.Content;
+import org.jdom2.Content;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 /**

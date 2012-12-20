@@ -4,9 +4,9 @@
  */
 package org.gburgett.xflat.convert.converters;
 
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.Date;
+import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.Converter;
 
@@ -21,60 +21,75 @@ public class StringConverters {
      * @param service 
      */
     public static void RegisterTo(ConversionService service){
-        service.addConverter(String.class, Integer.class, new StringToIntegerConverter());
-        service.addConverter(String.class, Boolean.class, new StringToBooleanConverter());
-        service.addConverter(String.class, Double.class, new StringToDoubleConverter());
-        service.addConverter(String.class, Float.class, new StringToFloatConverter());
-        service.addConverter(String.class, Long.class, new StringToLongConverter());
-        service.addConverter(String.class, Date.class, new StringToDateConverter());
+        service.addConverter(String.class, Integer.class, StringToIntegerConverter);
+        service.addConverter(String.class, Boolean.class, StringToBooleanConverter);
+        service.addConverter(String.class, Double.class, StringToDoubleConverter);
+        service.addConverter(String.class, Float.class, StringToFloatConverter);
+        service.addConverter(String.class, Long.class, StringToLongConverter);
+        service.addConverter(String.class, Date.class, StringToDateConverter);
         
-        Converter<Object, String> ots = new ObjectToStringConverter();
-        service.addConverter(Integer.class, String.class, ots);
-        service.addConverter(Boolean.class, String.class, ots);
-        service.addConverter(Double.class, String.class, ots);
-        service.addConverter(Float.class, String.class, ots);
-        service.addConverter(Long.class, String.class, ots);
-        service.addConverter(null, String.class, ots);
+        service.addConverter(Integer.class, String.class, ObjectToStringConverter);
+        service.addConverter(Boolean.class, String.class, ObjectToStringConverter);
+        service.addConverter(Double.class, String.class, ObjectToStringConverter);
+        service.addConverter(Float.class, String.class, ObjectToStringConverter);
+        service.addConverter(Long.class, String.class, ObjectToStringConverter);
+        service.addConverter(null, String.class, ObjectToStringConverter);
         
-        service.addConverter(Date.class, String.class, new DateToStringConverter());
+        service.addConverter(Date.class, String.class, DateToStringConverter);
     }
     
-    public static class StringToIntegerConverter implements Converter<String, Integer>{
+    public static final Converter<String, Integer> StringToIntegerConverter = new Converter<String, Integer>(){
         @Override
         public Integer convert(String source) {
-            return Integer.valueOf(source);
+            try{
+                return Integer.valueOf(source);
+            }catch(NumberFormatException ex){
+                throw new ConversionException("Error parsing Integer", ex);
+            }
         }
-    }
+    };
     
-    public static class StringToBooleanConverter implements Converter<String, Boolean>{
+    public static final Converter<String, Boolean> StringToBooleanConverter = new Converter<String, Boolean>(){
         @Override
         public Boolean convert(String source) {
             return Boolean.valueOf(source);
         }
-    }
+    };
     
-    public static class StringToLongConverter implements Converter<String, Long>{
+    public static final Converter<String, Long> StringToLongConverter = new Converter<String, Long>() {
         @Override
         public Long convert(String source) {
-            return Long.valueOf(source);
+            try{
+                return Long.valueOf(source);
+            }catch(NumberFormatException ex){
+                throw new ConversionException("Error parsing Long", ex);
+            }
         }
-    }
+    };
     
-    public static class StringToFloatConverter implements Converter<String, Float>{
+    public static final Converter<String, Float> StringToFloatConverter = new Converter<String, Float>(){
         @Override
         public Float convert(String source) {
-            return Float.valueOf(source);
+            try{
+                return Float.valueOf(source);
+            }catch(NumberFormatException ex){
+                throw new ConversionException("Error parsing float", ex);
+            }
         }
-    }
+    };
     
-    public static class StringToDoubleConverter implements Converter<String, Double>{
+    public static final Converter<String, Double> StringToDoubleConverter = new Converter<String, Double>(){
         @Override
         public Double convert(String source) {
-            return Double.valueOf(source);
+            try{
+                return Double.valueOf(source);
+            }catch(NumberFormatException ex){
+                throw new ConversionException("Error parsing double", ex);
+            }
         }
-    }
+    };
     
-    public static class ObjectToStringConverter implements Converter<Object, String>{
+    public static final Converter<Object, String> ObjectToStringConverter = new Converter<Object, String>(){
         @Override
         public String convert(Object source) {
             if(source == null)
@@ -82,7 +97,7 @@ public class StringConverters {
             
             return source.toString();
         }
-    }
+    };
     
     static final ThreadLocal<java.text.DateFormat> format =
             new ThreadLocal<java.text.DateFormat>(){
@@ -92,21 +107,21 @@ public class StringConverters {
                     return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
                 }
             };
-    public static class StringToDateConverter implements Converter<String, Date>{
+    public static final Converter<String, Date> StringToDateConverter = new Converter<String, Date>(){
         @Override
         public Date convert(String source) {
             try{
                 return format.get().parse(source);
             }catch(ParseException ex){
-                return null;
+                throw new ConversionException("error parsing date", ex);
             }
         }
-    }
+    };
     
-    public static class DateToStringConverter implements Converter<Date, String> {
+    public static final Converter<Date, String> DateToStringConverter = new Converter<Date, String>() {
         @Override
         public String convert(Date source) {
             return format.get().format(source);
         }
-    }
+    };
 }

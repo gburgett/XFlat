@@ -11,8 +11,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jdom.Document;
-import org.jdom.JDOMException;
+import org.jdom2.Document;
+import org.jdom2.JDOMException;
 
 /**
  *
@@ -25,7 +25,7 @@ public class JdomDiskLoader {
     {
         if(file.exists()){
             //build the document object from memory
-            return new org.jdom.input.SAXBuilder()
+            return new org.jdom2.input.SAXBuilder()
                     .build(file);
         }//end if exists
 
@@ -56,10 +56,10 @@ public class JdomDiskLoader {
             file.createNewFile();
         }
 
-        org.jdom.output.XMLOutputter outputter;
+        org.jdom2.output.XMLOutputter outputter;
         try(OutputStream outputStream = new java.io.FileOutputStream(file)) {
                 //can change the output formatter to eliminate whitespace
-            outputter = new org.jdom.output.XMLOutputter(org.jdom.output.Format.getPrettyFormat());
+            outputter = new org.jdom2.output.XMLOutputter(org.jdom2.output.Format.getPrettyFormat());
             outputter.output(doc, outputStream);
         }
 

@@ -16,7 +16,7 @@ public class ConversionException extends RuntimeException {
      * Creates a new instance of
      * <code>ConversionException</code> without detail message.
      */
-    public ConversionException() {
+    public ConversionException(String msg, Throwable cause) {
     }
 
     /**

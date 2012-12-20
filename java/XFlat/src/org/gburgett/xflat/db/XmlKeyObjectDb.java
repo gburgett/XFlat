@@ -5,14 +5,14 @@
 package org.gburgett.xflat.db;
 
 import org.gburgett.xflat.query.XpathQuery;
-import org.jdom.Element;
-import org.jdom.xpath.XPath;
+import org.jdom2.Element;
 
 /**
  * Represents a simple DB-like structure that stores key-value pairs of
  * string keys and Xml Elements.  Can be queried using Hamcrest matchers.
  * @author Gordon
  */
+@Deprecated
 public interface XmlKeyObjectDb {
 
     //<editor-fold desc="Read" >
