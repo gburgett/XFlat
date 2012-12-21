@@ -518,8 +518,8 @@ public class XpathQueryTests {
     //<editor-fold desc="greater than">
     
     @Test
-    public void testGreaterThan_Float_AttributeIsLessThan_Matches() throws Exception {
-        System.out.println("testGreaterThan_Float_AttributeIsLessThan_Matches");
+    public void testGreaterThan_Float_AttributeIsLessThan_DoesntMatch() throws Exception {
+        System.out.println("testGreaterThan_Float_AttributeIsLessThan_DoesntMatch");
         
         Element row = new Element("row");
         Element data = new Element("data");
@@ -528,34 +528,7 @@ public class XpathQueryTests {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.lt(path, (float)21.7);
-        query.setConversionService(conversionService);
-        
-        System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
-        System.out.println(query);
-        
-        //act
-        boolean matches = query.getRowMatcher().matches(row);
-        
-        //assert
-        assertTrue(matches);
-        assertEquals("Should be correct query type", QueryType.LT, query.getQueryType());
-        assertEquals("Should be correct value", (float)21.7, query.getValue());
-        assertEquals("Should be correct value ", Float.class, query.getValueType());
-    }//end testGreaterThan_Float_AttributeIsLessThan_Matches
-    
-    @Test
-    public void testGreaterThan_Float_ElementValueIsGreaterThan_DoesntMatch() throws Exception {
-        System.out.println("testGreaterThan_Float_ElementValueIsGreaterThan_DoesntMatch");
-        
-        Element row = new Element("row");
-        Element data = new Element("data");
-        
-        data.setText("30.1");
-        row.addContent(data);
-        
-        XPathExpression<Object> path = xpath.compile("data");
-        XpathQuery query = XpathQuery.lt(path, 30.09);
+        XpathQuery query = XpathQuery.gt(path, (float)21.7);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -566,6 +539,33 @@ public class XpathQueryTests {
         
         //assert
         assertFalse(matches);
+        assertEquals("Should be correct query type", QueryType.GT, query.getQueryType());
+        assertEquals("Should be correct value", (float)21.7, query.getValue());
+        assertEquals("Should be correct value ", Float.class, query.getValueType());
+    }//end testGreaterThan_Float_AttributeIsLessThan_DoesntMatch
+    
+    @Test
+    public void testGreaterThan_Float_ElementValueIsGreaterThan_Matches() throws Exception {
+        System.out.println("testGreaterThan_Float_ElementValueIsGreaterThan_Matches");
+        
+        Element row = new Element("row");
+        Element data = new Element("data");
+        
+        data.setText("30.1");
+        row.addContent(data);
+        
+        XPathExpression<Object> path = xpath.compile("data");
+        XpathQuery query = XpathQuery.gt(path, 30.09);
+        query.setConversionService(conversionService);
+        
+        System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
+        System.out.println(query);
+        
+        //act
+        boolean matches = query.getRowMatcher().matches(row);
+        
+        //assert
+        assertTrue(matches);
     }//end testGreaterThan_Float_ElementValueIsGreaterThan_DoesntMatch
     
     @Test
@@ -579,7 +579,7 @@ public class XpathQueryTests {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.lt(path, 21.84);
+        XpathQuery query = XpathQuery.gt(path, 21.84);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
