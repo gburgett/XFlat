@@ -16,7 +16,9 @@ import org.jdom2.Text;
 import org.jdom2.xpath.XPathExpression;
 
 /**
- *
+ * Specifies an update operation which sets the value of a matched
+ * existing DOM element.
+ * The new value must be convertible to {@link Content} or String.
  * @author gordon
  */
 public class XpathUpdate {
@@ -46,10 +48,19 @@ public class XpathUpdate {
      * @param path The path selecting an element (or elements) to set.
      * @return A builder object that can be chained to provide a value for the update.
      */
-    public static Builder set(XPathExpression<Object> path){
+    public static <T> XpathUpdate set(XPathExpression<T> path, Object value){
         XpathUpdate ret = new XpathUpdate();
         
-        return ret.new Builder(path);
+        Update<T> u = new Update<>(path, value, UpdateType.SET);
+        ret.updates.add(u);
+        
+        return ret;
+    }
+    
+    public static <T> XpathUpdate unset(XPathExpression<T> path){
+        XpathUpdate ret = new XpathUpdate();
+        ret.updates.add(new Update<>(path, null, UpdateType.UNSET));
+        return ret;
     }
     
     /**
@@ -58,13 +69,21 @@ public class XpathUpdate {
      * @param path
      * @return 
      */
-    public Builder and(XPathExpression<Object> path){
-        return new Builder(path);
+    public <T> XpathUpdate andSet(XPathExpression<T> path, Object value){
+        Update<T> u = new Update<>(path, value, UpdateType.SET);
+        this.updates.add(u);
+        
+        return this;
     }
     
-    public static class Update{
-        private XPathExpression<Object> path;
-        public XPathExpression<Object> getPath(){
+    public <T> XpathUpdate andUnset(XPathExpression<T> path){
+        this.updates.add(new Update<>(path, null, UpdateType.UNSET));
+        return this;
+    }
+    
+    public static class Update <T>{
+        private XPathExpression<T> path;
+        public XPathExpression<T> getPath(){
             return path;
         }
         
@@ -73,28 +92,18 @@ public class XpathUpdate {
             return value;
         }
         
-        private Update(XPathExpression<Object> path, Object value){
+        private UpdateType updateType;
+        public UpdateType getUpdateType() {
+            return this.updateType;
+        }
+        
+        private Update(XPathExpression<T> path, Object value, UpdateType type){
             this.path = path;
             this.value = value;
+            this.updateType = type;
         }
     }
     
-    public class Builder {
-    
-        private XPathExpression<Object> path;
-        
-        public XpathUpdate to(Object value){
-            Update update = new Update(path, value);
-            XpathUpdate.this.updates.add(update);
-            
-            return XpathUpdate.this;
-        }
-        
-        private Builder(XPathExpression<Object> path){
-            this.path = path;
-        }
-    }
-
 
     /**
      * Applies the update operations to the given DOM Element representing
@@ -103,10 +112,11 @@ public class XpathUpdate {
      * @return true if any updates were applied.
      * @throws JDOMException 
      */
-    public boolean apply(Element rowData)
+    public int apply(Element rowData)
             throws JDOMException
     {
-        boolean anyUpdates = false;
+        int updateCount = 0;
+        
         for(Update update : this.updates){
             //the update's value will be one or the other, don't know which
             Content asContent = null;
@@ -124,44 +134,61 @@ public class XpathUpdate {
                 if(node == null)
                     continue;
                 
-                if(!(node instanceof Content)){
+                Parent parent;
+                Element parentElement;
+                
+                if(update.getUpdateType() == UpdateType.UNSET){
+                    if(node instanceof Attribute){
+                        parentElement = ((Attribute)node).getParent();
+                        if(parentElement != null){
+                            parentElement.removeAttribute((Attribute)node);
+                            updateCount++;
+                        }
+                    }
+                    else if(node instanceof Content){
+                        parent = ((Content)node).getParent();
+                        //remove this node from its parent element
+                        if(parent != null){
+                            parent.removeContent((Content)node);
+                            updateCount++;
+                        }
+                    }
+                    
                     continue;
                 }
                 
-                Content contentNode = (Content)node;
-                Parent parent;
-                
-                if(update.value == null){
-                    //remove this node from its parent element
-                    parent = contentNode.getParent();
-                    if(parent != null){
-                        parent.removeContent(contentNode);
-                        anyUpdates = true;
-                        continue;
-                    }
-                }
+                //it's a set
                 
                 if(node instanceof Attribute){
-                    //for attributes we just set the string value
-                    if(asString == null){
-                        asString = getStringValue(update.value);
+                    //for attributes we set the value to empty string
+                    //this way it can still be selected by xpath for future updates
+                    if(update.value == null){
+                        ((Attribute)node).setValue("");
+                        updateCount++;
+                    }
+                    else {
+                        if(asString == null){
+                            asString = getStringValue(update.value);
+                        }
+                        
+                        //if we fail conversion then do nothing.
+                        if(asString != null){
+                            ((Attribute)node).setValue(asString);
+                            updateCount++;
+                        }
                     }
                     
-                    //if we fail conversion then do nothing.
-                    if(asString != null)
-                        ((Attribute)node).setValue(asString);
-                    
-                    anyUpdates = true;
                     continue;
                 }
-                
-                Element parentElement = contentNode.getParentElement();
-                if(parentElement == null){
+                else if(!(node instanceof Content)){
                     //can't do anything
                     continue;
                 }
                 
-                if(asContent == null){
+                Content contentNode = (Content)node;
+                
+                //need to convert
+                if(update.value != null && asContent == null){
                     asContent = getContentValue(update.value);
                     if(asContent == null){
                         //failed conversion, try text
@@ -173,17 +200,53 @@ public class XpathUpdate {
                     }
                 }
                 
-                if(asContent != null){
+                if(node instanceof Element){
+                    //for elements we also set the value, but the value could be Content
+                    if(update.value == null){
+                        ((Element)node).removeContent();
+                        updateCount++;
+                    }
+                    else if(asContent != null){
+                        if(asContent.getParent() != null){
+                            //we used the content before, need to clone it
+                            asContent = asContent.clone();
+                        }
+                        
+                        ((Element)node).setContent(asContent);
+                        updateCount++;
+                    }
+                    continue;
+                }
+                
+                //at this point the node is Text, CDATA or something else.
+                //The strategy now is to replace the value in its parent.
+                parentElement = contentNode.getParentElement();
+                if(parentElement == null){
+                    //can't do anything
+                    continue;
+                }
+                
+                if(update.value == null || asContent != null){
                     //replace this content in the parent element
                     int index = parentElement.indexOf(contentNode);
                     parentElement.removeContent(index);
-                    parentElement.addContent(index, asContent);
-                    anyUpdates = true;
+                    if(update.value != null){
+                        //if it was null then act like an unset, otherwise
+                        //its a replace
+                        
+                        if(asContent.getParent() != null){
+                            //we used the content before, need to clone it
+                            asContent = asContent.clone();
+                        }
+                        
+                        parentElement.addContent(index, asContent);
+                    }
+                    updateCount++;
                 }
             }
         }
         
-        return anyUpdates;
+        return updateCount;
     }
     
     private String getStringValue(Object value){
@@ -214,5 +277,10 @@ public class XpathUpdate {
         }
         
         return this.conversionService.convert(value, Content.class);
+    }
+
+    public enum UpdateType{
+        SET,
+        UNSET
     }
 }
