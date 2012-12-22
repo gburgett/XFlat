@@ -5,9 +5,6 @@
 package org.gburgett.xflat;
 
 import java.util.List;
-import org.gburgett.xflat.Cursor;
-import org.gburgett.xflat.DuplicateKeyException;
-import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.jdom2.Element;
@@ -70,8 +67,10 @@ public interface Table<T> {
      * Replaces the first value matched by the query with the new value.
      * @param query The query to match.
      * @param newValue The new value to replace the row.
+     * @returns true if the query matched any rows, false otherwise.  If false,
+     * the new value was not inserted.
      */
-    public void replaceOne(XpathQuery query, T newValue);
+    public boolean replaceOne(XpathQuery query, T newValue);
     
     /**
      * Updates or inserts the row by ID.
@@ -92,8 +91,9 @@ public interface Table<T> {
      * Applies an update to all data matching a given query.
      * @param query The query to match.
      * @param update The update to apply to each matching row.
+     * @returns the number of rows that were updated.
      */
-    public void update(XpathQuery query, XpathUpdate update);
+    public int update(XpathQuery query, XpathUpdate update);
     
     
     //DELETE
@@ -107,6 +107,7 @@ public interface Table<T> {
     /**
      * Deletes all rows matching the given query.
      * @param query The query selecting elements to delete.
+     * @returns the number of rows that were deleted.
      */
-    public void deleteAll(XpathQuery query);
+    public int deleteAll(XpathQuery query);
 }

@@ -8,6 +8,7 @@ import java.util.List;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
+import org.gburgett.xflat.Table;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 
@@ -16,12 +17,12 @@ import org.gburgett.xflat.query.XpathUpdate;
  * using the database's conversion service.
  * @author gordon
  */
-public class ConvertingTable<T> extends TableBase<T> {
+public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     ConvertingTable(Database db, Class<T> type, String name){
         super(db, type, name);
     }
-    
+
     @Override
     public void insert(T row) throws DuplicateKeyException {
         throw new UnsupportedOperationException("Not supported yet.");
@@ -53,7 +54,7 @@ public class ConvertingTable<T> extends TableBase<T> {
     }
 
     @Override
-    public void replaceOne(XpathQuery query, T newValue) {
+    public boolean replaceOne(XpathQuery query, T newValue) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -68,7 +69,7 @@ public class ConvertingTable<T> extends TableBase<T> {
     }
 
     @Override
-    public void update(XpathQuery query, XpathUpdate update) {
+    public int update(XpathQuery query, XpathUpdate update) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -78,9 +79,8 @@ public class ConvertingTable<T> extends TableBase<T> {
     }
 
     @Override
-    public void deleteAll(XpathQuery query) {
+    public int deleteAll(XpathQuery query) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
-
-    
+      
 }

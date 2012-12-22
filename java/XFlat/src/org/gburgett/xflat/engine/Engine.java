@@ -75,8 +75,9 @@ public interface Engine {
      * Applies the given update to all rows matching the query.
      * @param query The query to match.
      * @param update The update to apply.
+     * @returns the number of rows that were updated
      */
-    public void update(XpathQuery query, XpathUpdate update);
+    public int update(XpathQuery query, XpathUpdate update);
     
     /**
      * Updates or inserts the given row.  If the row exists,
@@ -97,4 +98,11 @@ public interface Engine {
      */
     public void deleteRow(String id)
             throws KeyNotFoundException;
+    
+    /**
+     * Deletes all rows matching the given query.
+     * @param query The query that matches database rows.
+     * @return the number of rows that were deleted.
+     */
+    public int deleteAll(XpathQuery query);
 }

@@ -13,7 +13,7 @@ import org.gburgett.xflat.engine.Engine;
  *
  * @author gordon
  */
-public abstract class TableBase<T> implements Table<T> {
+public abstract class TableBase<T> {
     
     private Database database;
     protected Database getDatabase(){
