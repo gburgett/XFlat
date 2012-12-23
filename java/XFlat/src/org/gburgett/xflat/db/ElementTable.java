@@ -127,9 +127,9 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
 
     @Override
-    public void update(Object id, XpathUpdate update) throws KeyNotFoundException {
+    public boolean update(Object id, XpathUpdate update) throws KeyNotFoundException {
         String sId = getId(id);
-        this.getEngine().update(sId, update);
+        return this.getEngine().update(sId, update);
     }
 
     @Override

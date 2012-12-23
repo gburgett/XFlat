@@ -83,8 +83,11 @@ public interface Table<T> {
      * Applies an update to the data in a given row.
      * @param id The ID of the row to match.
      * @param update The update to apply.
+     * @return true if the update actually applied, false if the row was found
+     * but the update did not select an existing document element.
+     * @throws KeyNotFoundException if the row does not exist.
      */
-    public void update(Object id, XpathUpdate update)
+    public boolean update(Object id, XpathUpdate update)
             throws KeyNotFoundException;
     
     /**

@@ -5,6 +5,8 @@
 package org.gburgett.xflat.db;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -43,22 +45,31 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             idMap = new WeakHashMap<>();
         }
     }
-    
-    private void maybeKeepId(T row, String id){
-        if(idMap != null){
-            idMap.put(row, id);
-        }
-    }
-    
-    private String maybeGetId(T row){
-        if(idMap != null){
-            return idMap.get(row);
-        }
-        return null;
-    }
-    
+        
+    //<editor-fold desc="helpers">
     private String getId(Element rowData){
         return rowData.getAttributeValue("id", Database.xFlatNs);
+    }
+    
+    private String getId(T data){
+        if(this.accessor.hasId()){
+            Object id;
+            try {
+                 id = this.accessor.getIdValue(data);
+            } catch (IllegalAccessException | InvocationTargetException ex) {
+                throw new XflatException("Cannot access ID on data", ex);
+            }
+            if(id == null)
+                return null;
+            
+            return this.getIdGenerator().idToString(id);
+        }
+        else if(this.idMap != null){
+            //hopefully we cached it
+            return this.idMap.get(data);
+        }
+        
+        return null;
     }
     
     private void setId(Element rowData, String sId){
@@ -66,25 +77,14 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     private Element convert(T data){
+        return convert(data, getId(data));
+    }
+    
+    private Element convert(T data, String id){
         Element ret = this.conversionService.convert(data, Element.class);
-        if(this.accessor.hasId()){
-            Object id;
-            try {
-                id = this.accessor.getIdValue(data);
-            } catch (IllegalAccessException | InvocationTargetException ex) {
-                throw new XflatException("Cannot convert data: ID cannot be retrieved", ex);
-            }
-            if(id != null){
-                String sId = this.getIdGenerator().idToString(id);
-                setId(ret, sId);
-            }
-        }
-        else if(this.idMap != null){
-            //did we cache the ID?
-            String sId = this.idMap.get(data);
-            if(sId != null){
-                ret.setAttribute("id", sId, Database.xFlatNs);
-            }
+        
+        if (id != null){
+            setId(ret, id);
         }
         
         return ret;
@@ -136,6 +136,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             return id;
         }
     }
+    //</editor-fold>
     
     @Override
     public void insert(T row) throws DuplicateKeyException {
@@ -152,57 +153,180 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     @Override
     public T find(Object id) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        String sId = this.getIdGenerator().idToString(id);
+        Element data = this.getEngine().readRow(sId);
+        T ret = convert(data);
+        return ret;
     }
 
     @Override
     public T findOne(XpathQuery query) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Element e = findOneElement(query);
+        return convert(e);
     }
 
+    private Element findOneElement(XpathQuery query){
+        try(Cursor<Element> elements = this.getEngine().queryTable(query)){
+            Iterator<Element> it = elements.iterator();
+            if(!it.hasNext()){
+                return null;
+            }
+            
+            return it.next();
+        }
+        catch(Exception ex){
+            throw new XflatException("Unable to close cursor", ex);
+        }
+    }
+    
     @Override
     public Cursor<T> find(XpathQuery query) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return new ConvertingCursor(this.getEngine().queryTable(query));
     }
 
     @Override
     public List<T> findAll(XpathQuery query) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        List<T> ret = new ArrayList<>();
+        
+        try(Cursor<Element> data = this.getEngine().queryTable(query)){
+            for(Element e : data){
+                ret.add(convert(e));
+            }
+        }
+        catch(Exception ex){
+            throw new XflatException("Unable to close cursor", ex);
+        }
+        
+        return ret;
     }
 
     @Override
     public void replace(T newValue) throws KeyNotFoundException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        String id = getId(newValue);
+        if(id == null){
+            throw new KeyNotFoundException("Object has no ID");
+        }
+        
+        Element data = convert(newValue, id);
+        this.getEngine().insertRow(id, data);
     }
 
     @Override
     public boolean replaceOne(XpathQuery query, T newValue) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Element existing = this.findOneElement(query);
+        if(existing == null){
+            return false;
+        }
+        
+        Element data = convert(newValue);
+        return recursiveReplaceOne(query, data, existing);
+    }
+    
+    private boolean recursiveReplaceOne(XpathQuery query, Element data, Element existing){
+        if(existing == null){
+            return false;
+        }
+        
+        String id = getId(existing);
+        setId(data, id);
+        try{
+            this.getEngine().replaceRow(id, data);
+            
+            return true;
+        }
+        catch(KeyNotFoundException ex){
+            //concurrent modification, try again
+            existing = this.findOneElement(query);
+            return recursiveReplaceOne(query, data, existing);
+        }
     }
 
     @Override
     public boolean upsert(T newValue) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Element data = convert(newValue);
+        String id = getId(data);
+        if(id == null){
+            //insert
+            id = generateId(newValue);
+            setId(data, id);
+            this.getEngine().insertRow(id, data);
+            
+            return true;    //inserted
+        }
+        else{
+            return this.getEngine().upsertRow(id, data);
+        }
     }
 
     @Override
-    public void update(Object id, XpathUpdate update) throws KeyNotFoundException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public boolean update(Object id, XpathUpdate update) throws KeyNotFoundException {
+        if(id == null){
+            throw new IllegalArgumentException("Id cannot be null");
+        }
+        String sId = this.getIdGenerator().idToString(id);
+        
+        return this.getEngine().update(sId, update);
     }
 
     @Override
     public int update(XpathQuery query, XpathUpdate update) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return this.getEngine().update(query, update);
     }
 
     @Override
     public void delete(Object id) throws KeyNotFoundException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        if(id == null){
+            throw new IllegalArgumentException("id cannot be null");
+        }
+        String sId = this.getIdGenerator().idToString(id);
+        
+        this.getEngine().deleteRow(sId);
     }
 
     @Override
     public int deleteAll(XpathQuery query) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return this.getEngine().deleteAll(query);
     }
       
+    
+    private class ConvertingCursor implements Cursor<T>{
+        Cursor<Element> rowCursor;
+        
+        public ConvertingCursor(Cursor<Element> rowCursor){
+            this.rowCursor = rowCursor;
+        }
+
+        @Override
+        public Iterator<T> iterator() {
+            return new ConvertingCursorIterator(this.rowCursor.iterator());
+        }
+
+        @Override
+        public void close() throws Exception {
+            this.rowCursor.close();
+        }
+    }
+    
+    private class ConvertingCursorIterator implements Iterator<T>{
+        Iterator<Element> rowIterator;
+        
+        public ConvertingCursorIterator(Iterator<Element> rowIterator){
+            this.rowIterator = rowIterator;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return rowIterator.hasNext();
+        }
+
+        @Override
+        public T next() {
+            return convert(rowIterator.next());
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException("Remove not supported on cursors.");
+        }
+    }
 }

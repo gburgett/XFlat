@@ -67,15 +67,16 @@ public interface Engine {
      * Applies an update to the one row specified by the ID.
      * @param id The ID of the row to update.
      * @param update The update to apply.
+     * @return true if the update actually applied.
      */
-    public void update(String id, XpathUpdate update)
+    public boolean update(String id, XpathUpdate update)
             throws KeyNotFoundException;
     
     /**
      * Applies the given update to all rows matching the query.
      * @param query The query to match.
      * @param update The update to apply.
-     * @returns the number of rows that were updated
+     * @return the number of rows that were updated
      */
     public int update(XpathQuery query, XpathUpdate update);
     
@@ -85,7 +86,7 @@ public interface Engine {
      * the row is inserted.
      * @param id The Id of the row to upsert.
      * @param data The data to replace or insert.
-     * @returns false if an existing row was updated, true if a row was inserted.
+     * @return false if an existing row was updated, true if a row was inserted.
      */
     public boolean upsertRow(String id, Element data);
     

@@ -5,7 +5,6 @@
 package org.gburgett.xflat.db;
 
 import java.util.concurrent.atomic.AtomicReference;
-import org.gburgett.xflat.Table;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.engine.Engine;
 
@@ -44,6 +43,7 @@ public abstract class TableBase<T> {
     
     protected TableBase(Database db, Class<T> tableType, String tableName){
         this.database = db;
+        this.engine = new AtomicReference<>();
     }
     
     /**
