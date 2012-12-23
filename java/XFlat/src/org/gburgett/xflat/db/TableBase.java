@@ -30,6 +30,14 @@ public abstract class TableBase<T> {
         return this.tableName;
     }
     
+    private IdGenerator idGenerator;
+    public void setIdGenerator(IdGenerator idGenerator) {
+        this.idGenerator = idGenerator;
+    }
+    protected IdGenerator getIdGenerator(){
+        return this.idGenerator;
+    }
+    
     private AtomicReference<Engine> engine;
     private final Object syncRoot = new Object();
     
