@@ -44,6 +44,7 @@ public abstract class TableBase<T> {
     protected TableBase(Database db, Class<T> tableType, String tableName){
         this.database = db;
         this.engine = new AtomicReference<>();
+        this.tableType = tableType;
     }
     
     /**

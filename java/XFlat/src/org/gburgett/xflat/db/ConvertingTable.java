@@ -10,6 +10,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
@@ -39,7 +41,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     ConvertingTable(Database db, Class<T> type, String name){
         super(db, type, name);
         
-        this.accessor = new IdAccessor(type);
+        this.accessor = IdAccessor.forClass(type);
         if(!this.accessor.hasId()){
             //we need to keep a reference to the ID in a weak cache
             idMap = new WeakHashMap<>();
@@ -155,6 +157,10 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     public T find(Object id) {
         String sId = this.getIdGenerator().idToString(id);
         Element data = this.getEngine().readRow(sId);
+        if(data == null){
+            return null;
+        }
+        
         T ret = convert(data);
         return ret;
     }
@@ -162,6 +168,10 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     @Override
     public T findOne(XpathQuery query) {
         Element e = findOneElement(query);
+        if(e == null){
+            return null;
+        }
+        
         return convert(e);
     }
 
@@ -208,23 +218,35 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         }
         
         Element data = convert(newValue, id);
-        this.getEngine().insertRow(id, data);
+        this.getEngine().replaceRow(id, data);
     }
 
     @Override
     public boolean replaceOne(XpathQuery query, T newValue) {
+        
         Element existing = this.findOneElement(query);
         if(existing == null){
             return false;
         }
-        
+
         Element data = convert(newValue);
-        return recursiveReplaceOne(query, data, existing);
+        String replacedId = recursiveReplaceOne(query, data, existing);
+        if(replacedId == null){
+            return false;
+        }
+        
+        try {    
+            this.accessor.setIdValue(newValue, this.getIdGenerator().stringToId(replacedId, this.accessor.getIdType()));
+        } catch (IllegalAccessException | InvocationTargetException ex) {
+            throw new XflatException("Unable to update object ID", ex);
+        }
+        
+        return true;
     }
     
-    private boolean recursiveReplaceOne(XpathQuery query, Element data, Element existing){
+    private String recursiveReplaceOne(XpathQuery query, Element data, Element existing){
         if(existing == null){
-            return false;
+            return null;
         }
         
         String id = getId(existing);
@@ -232,7 +254,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         try{
             this.getEngine().replaceRow(id, data);
             
-            return true;
+            return id;
         }
         catch(KeyNotFoundException ex){
             //concurrent modification, try again
