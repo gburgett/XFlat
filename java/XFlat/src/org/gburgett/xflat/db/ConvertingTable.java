@@ -309,7 +309,6 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     public int deleteAll(XpathQuery query) {
         return this.getEngine().deleteAll(query);
     }
-      
     
     private class ConvertingCursor implements Cursor<T>{
         Cursor<Element> rowCursor;

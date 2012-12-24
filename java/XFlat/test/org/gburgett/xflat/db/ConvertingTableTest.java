@@ -15,6 +15,7 @@ import org.gburgett.xflat.convert.converters.JDomConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.engine.Engine;
 import org.gburgett.xflat.query.XpathQuery;
+import org.gburgett.xflat.query.XpathUpdate;
 import org.hamcrest.Matchers;
 import org.jdom2.Element;
 import org.jdom2.xpath.XPathFactory;
@@ -518,6 +519,203 @@ public class ConvertingTableTest {
         assertEquals("Should have set ID on object", "test id 2",
                 newFoo.getId());
     }//end testReplaceOne_ConcurrentRemove_FindsSecond
+    
+    @Test
+    public void testUpsert_Foo_NoId_InsertsWithNewId() throws Exception {
+        System.out.println("testUpsert_Foo_NoId_InsertsWithNewId");
+        
+        when(idGenerator.idToString(anyObject()))
+                .thenAnswer(byCallingToString());
+        when(idGenerator.stringToId(any(String.class), eq(String.class)))
+                .thenAnswer(byReturningFirstParam());
+        
+        String id = "test id";
+        when(idGenerator.generateNewId(String.class))
+                .thenReturn(id);
+        
+        Foo toUpsert = new Foo();
+        toUpsert.fooInt = 51;
+        
+        //ACT
+        boolean didInsert = this.getFooInstance().upsert(toUpsert);
+        
+        //ASSERT
+        assertTrue("Should have inserted new foo", didInsert);
+        
+        ArgumentCaptor<Element> data = ArgumentCaptor.forClass(Element.class);
+        verify(engine).insertRow(eq(id), data.capture());
+        
+        assertEquals("Should have inserted correct data", "51",
+                data.getValue().getChild("fooInt").getText());
+        
+    }//end testUpsert_Foo_NoId_InsertsWithNewId
+    
+    @Test
+    public void testUpsert_Foo_HasId_UpsertsWithId() throws Exception {
+        System.out.println("testUpsert_Foo_HasId_UpsertsWithId");
+        
+        when(idGenerator.idToString(anyObject()))
+                .thenAnswer(byCallingToString());
+        when(idGenerator.stringToId(any(String.class), eq(String.class)))
+                .thenAnswer(byReturningFirstParam());
+        
+        String id = "test id";
+        
+        Foo toUpsert = new Foo();
+        toUpsert.fooInt = 51;
+        toUpsert.setId(id);
+        
+        //ACT
+        boolean didInsert = this.getFooInstance().upsert(toUpsert);
+        
+        //ASSERT
+        assertFalse("Should have gotten default from upsertRow", didInsert);
+        
+        ArgumentCaptor<Element> data = ArgumentCaptor.forClass(Element.class);
+        verify(engine).upsertRow(eq(id), data.capture());
+        
+        assertEquals("Should have inserted correct data", "51",
+                data.getValue().getChild("fooInt").getText());
+        
+        verify(idGenerator, never()).generateNewId(any(Class.class));
+    }//end testUpsert_Foo_HasId_UpsertsWithId
+    
+    @Test
+    public void testUpsert_Bar_NewInstance_GeneratesNewIdAndRemembersIt() throws Exception {
+        System.out.println("testUpsert_Bar_NewInstance_GeneratesNewIdAndRemembersIt");
+        
+        Bar toUpsert = new Bar();
+        toUpsert.barString = "test data";
+        
+        String id = "test id";
+        when(idGenerator.generateNewId(String.class))
+                .thenReturn(id, "second invocation");
+        
+        //ACT
+        ConvertingTable<Bar> instance = this.getBarInstance();
+        boolean didInsert = instance.upsert(toUpsert);
+        
+        //ASSERT
+        assertTrue("Should have inserted new foo", didInsert);
+        
+        ArgumentCaptor<Element> data = ArgumentCaptor.forClass(Element.class);
+        verify(engine).insertRow(eq(id), data.capture());
+        
+        assertEquals("Should have inserted correct data", "test data",
+                data.getValue().getChild("barString").getText());
+        
+        //verify we remembered the ID
+        instance.replace(toUpsert);
+        verify(engine).replaceRow(eq(id), any(Element.class));
+        
+        //verify we only generated the ID once
+        verify(idGenerator, times(1)).generateNewId(String.class);
+        
+    }//end testUpsert_Bar_NewInstance_GeneratesNewIdAndRemembersIt
+    
+    
+    @Test
+    public void testUpsert_Bar_RememberedInstance_Upserts() throws Exception {
+        System.out.println("testUpsert_Bar_RememberedInstance_Upserts");
+        
+        Bar toUpsert = new Bar();
+        toUpsert.barString = "test data";
+        
+        String id = "test id";
+        when(idGenerator.generateNewId(String.class))
+                .thenReturn(id, "second invocation");
+        
+        ConvertingTable<Bar> instance = this.getBarInstance();
+        instance.insert(toUpsert);
+        
+        toUpsert.barString = "new data";
+        
+        //ACT
+        boolean didInsert = instance.upsert(toUpsert);
+        
+        //ASSERT
+        assertFalse("should get default value from calling stub upsert", didInsert);
+        
+        ArgumentCaptor<Element> captor = ArgumentCaptor.forClass(Element.class);
+        verify(engine).upsertRow(eq(id), captor.capture());
+        
+        assertEquals("Should update with correct data", "new data", 
+                captor.getValue().getChild("barString").getText());
+        
+        verify(idGenerator, times(1)).generateNewId(any(Class.class));
+        
+    }//end testUpsert_Bar_RememberedInstance_Upserts
+        
+    @Test
+    public void testUpdate_Id_ConvertsId() throws Exception {
+        System.out.println("testUpdate_Id_ConvertsId");
+        
+        String id = "test id";
+        Object oId = new Object();
+        when(idGenerator.idToString(oId))
+                .thenReturn(id);
+        
+        XpathUpdate update = XpathUpdate.set(xpath.compile("fooInt"), 32);
+        
+        when(engine.update(id, update))
+                .thenReturn(Boolean.TRUE);
+        
+        //ACT
+        boolean didUpdate = this.getFooInstance().update(oId, update);
+        
+        //ASSERT
+        assertTrue("Should have invoked update to get true result", didUpdate);
+        verify(engine).update(id, update);
+        
+    }//end testUpdate_Id_ConvertsId
+    
+    @Test
+    public void testUpdate_Query_Passthrough() throws Exception {
+        System.out.println("testUpdate_Query_Passthrough");
+        
+        XpathQuery query = XpathQuery.eq(xpath.compile("fooInt"), 17);
+        XpathUpdate update = XpathUpdate.set(xpath.compile("fooInt"), 35);
+        
+        when(engine.update(query, update))
+                .thenReturn(32);
+        
+        //ACT
+        int rowsUpdated = this.getFooInstance().update(query, update);
+        
+        //ASSERT
+        assertEquals("Should have gotten the result of our stubbed call",
+                32, rowsUpdated);
+        
+    }//end testUpdate_Query_Passthrough
+    
+    @Test
+    public void testDelete_Id_ConvertsId() throws Exception {
+        System.out.println("testDelete_Id_ConvertsId");
+        
+        String id = "test id";
+        Object oId = new Object();
+        when(idGenerator.idToString(oId))
+                .thenReturn(id);
+        
+        //ACT
+        this.getFooInstance().delete(oId);
+        
+        //ASSERT
+        verify(engine).deleteRow(id);
+    }//end testDelete_Id_ConvertsId
+    
+    @Test
+    public void testDeleteAll_Passthrough() throws Exception {
+        System.out.println("testDeleteAll_Passthrough");
+        
+        XpathQuery query = XpathQuery.eq(xpath.compile("foo/fooInt"), 17);
+        
+        //ACT
+        this.getFooInstance().deleteAll(query);
+        
+        //ASSERT
+        verify(engine).deleteAll(query);
+    }//end testDeleteAll_Passthrough
     
     private Answer<String> byCallingToString(){
         return new Answer<String>(){
