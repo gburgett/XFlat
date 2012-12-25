@@ -13,7 +13,6 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDomConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
-import org.gburgett.xflat.engine.Engine;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.hamcrest.Matchers;

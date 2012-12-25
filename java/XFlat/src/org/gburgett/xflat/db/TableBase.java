@@ -6,7 +6,6 @@ package org.gburgett.xflat.db;
 
 import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.engine.Engine;
 
 /**
  *

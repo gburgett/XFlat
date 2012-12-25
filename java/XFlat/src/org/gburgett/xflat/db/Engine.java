@@ -2,7 +2,7 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.gburgett.xflat.engine;
+package org.gburgett.xflat.db;
 
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
@@ -22,6 +22,8 @@ import org.jdom2.Element;
  * @author gordon
  */
 public interface Engine {
+
+    public String getTableName();
     
     //CREATE
     /**

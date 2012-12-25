@@ -14,7 +14,6 @@ import org.gburgett.xflat.Table;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.PojoMapper;
-import org.gburgett.xflat.engine.Engine;
 import org.jdom2.Content;
 import org.jdom2.Namespace;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
@@ -27,7 +26,11 @@ public abstract class Database {
     
     public static Namespace xFlatNs = Namespace.getNamespace("db", "http://xflat.gburgett.org/xflat/db");
     
-    protected ScheduledExecutorService executorService;
+    private ScheduledExecutorService executorService;
+    protected ScheduledExecutorService getExecutorService(){
+        return executorService;
+    }
+    
     
     private File directory;
     protected File getDirectory(){
