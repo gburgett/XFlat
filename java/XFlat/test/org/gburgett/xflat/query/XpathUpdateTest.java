@@ -6,7 +6,7 @@ package org.gburgett.xflat.query;
 
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
-import org.gburgett.xflat.convert.converters.JDomConverters;
+import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.jdom2.Content;
 import org.jdom2.Element;
@@ -23,7 +23,7 @@ import test.Foo;
  *
  * @author gordon
  */
-public class XpathUpdateTests {
+public class XpathUpdateTest {
     
     private ConversionService conversionService;
     
@@ -34,8 +34,8 @@ public class XpathUpdateTests {
     @Before
     public void setup(){
         this.conversionService = new DefaultConversionService();
-        StringConverters.RegisterTo(conversionService);
-        JDomConverters.RegisterTo(conversionService);
+        StringConverters.registerTo(conversionService);
+        JDOMConverters.registerTo(conversionService);
         
         this.xpath = XPathFactory.instance();
     }

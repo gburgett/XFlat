@@ -31,6 +31,9 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     
     @Override
     public void insert(Element data) throws DuplicateKeyException {
+        //always clone incoming data
+        data = data.clone(); 
+        
         String id = getId(data);
         if(id == null){
             id = generateNewId();
@@ -82,6 +85,9 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     @Override
     public void replace(Element newValue) throws KeyNotFoundException {
+        //always clone incoming data
+        newValue = newValue.clone(); 
+        
         String id = getId(newValue);
         if(id == null){
             throw new KeyNotFoundException("Element has no ID");
@@ -92,6 +98,8 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     @Override
     public boolean replaceOne(XpathQuery query, Element newValue){
+        //always clone incoming data
+        newValue = newValue.clone(); 
         
         Element e = this.findOne(query);
         if(e == null){
@@ -113,6 +121,9 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     @Override
     public boolean upsert(Element newValue) {
+        //always clone incoming data
+        newValue = newValue.clone(); 
+        
         String id = getId(newValue);
         if(id == null){
             id = generateNewId();

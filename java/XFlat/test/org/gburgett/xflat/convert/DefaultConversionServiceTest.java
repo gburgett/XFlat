@@ -5,6 +5,7 @@
 package org.gburgett.xflat.convert;
 
 import java.util.Date;
+import org.gburgett.xflat.convert.converters.StringConverters;
 import org.junit.Test;
 import static org.mockito.Mockito.*;
 import static org.mockito.Matchers.*;
@@ -37,6 +38,7 @@ public class DefaultConversionServiceTest {
         System.out.println("testCanConvert_HasConverter_ReturnsTrue");
         
         DefaultConversionService instance = new DefaultConversionService();
+        instance.addConverter(String.class, Integer.class, StringConverters.StringToIntegerConverter);
         
         boolean result = instance.canConvert(String.class, Integer.class);
         
@@ -64,6 +66,7 @@ public class DefaultConversionServiceTest {
         System.out.println("testConvert_HasConverter_ConvertsCorrectly");
         
         DefaultConversionService instance = new DefaultConversionService();
+        instance.addConverter(String.class, Integer.class, StringConverters.StringToIntegerConverter);
         
         Integer converted = instance.convert("7", Integer.class);
         

@@ -11,7 +11,7 @@ import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
-import org.gburgett.xflat.convert.converters.JDomConverters;
+import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
@@ -71,8 +71,8 @@ public class ConvertingTableTest {
     @Before
     public void setUp() {
         conversionService = new DefaultConversionService();
-        StringConverters.RegisterTo(conversionService);
-        JDomConverters.RegisterTo(conversionService);
+        StringConverters.registerTo(conversionService);
+        JDOMConverters.registerTo(conversionService);
         
         database = mock(Database.class);
         engine = mock(Engine.class);

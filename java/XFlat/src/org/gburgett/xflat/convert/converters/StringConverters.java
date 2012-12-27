@@ -20,7 +20,7 @@ public class StringConverters {
      * Registers all the string converters to the given ConversionService.
      * @param service 
      */
-    public static void RegisterTo(ConversionService service){
+    public static void registerTo(ConversionService service){
         service.addConverter(String.class, Integer.class, StringToIntegerConverter);
         service.addConverter(String.class, Boolean.class, StringToBooleanConverter);
         service.addConverter(String.class, Double.class, StringToDoubleConverter);

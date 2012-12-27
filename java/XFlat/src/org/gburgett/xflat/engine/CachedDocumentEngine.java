@@ -4,11 +4,13 @@
  */
 package org.gburgett.xflat.engine;
 
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.WeakHashMap;
@@ -21,8 +23,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
@@ -32,6 +32,7 @@ import org.gburgett.xflat.db.Engine;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.hamcrest.Matcher;
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -50,15 +51,16 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     private final Object syncRoot = new Object();    
     
-    private ConcurrentMap<String, Element> cache = new ConcurrentHashMap<>(16, 0.75f, 4);
+    private ConcurrentMap<String, Element> cache = null;
     
-    private File file;
-    public File getFile(){
+    private DocumentFileWrapper file;
+    public DocumentFileWrapper getFile(){
         return file;
     }
     
-    protected CachedDocumentEngine(Database db, File file, String tableName){
-        super(db, tableName);
+    protected CachedDocumentEngine(DocumentFileWrapper file, String tableName){
+        super(tableName);
+        this.file = file;
     }
     
     //<editor-fold desc="interface methods">
@@ -78,6 +80,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     @Override
     public Element readRow(String id) {
         Element row = this.cache.get(id);
+        if(row == null){
+            return null;
+        }
+        
         //lock the row
         synchronized(row){
             //clone the data
@@ -87,6 +93,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public Cursor<Element> queryTable(XpathQuery query) {
+        query.setConversionService(this.getConversionService());
         TableCursor ret = new TableCursor(this.cache.values(), query);
         this.openCursors.put(ret, "");
         return ret;
@@ -114,6 +121,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             throw new KeyNotFoundException(id);
         }
         
+        update.setConversionService(this.getConversionService());
+        
         boolean ret = false;
         try {
             //lock the row
@@ -137,6 +146,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     @Override
     public int update(XpathQuery query, XpathUpdate update) {
         ensureReady();
+        
+        query.setConversionService(this.getConversionService());
+        update.setConversionService(this.getConversionService());
         
         Matcher<Element> rowMatcher = query.getRowMatcher();
         
@@ -193,6 +205,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     public int deleteAll(XpathQuery query) {
         ensureReady();
         
+        query.setConversionService(this.getConversionService());
+        
         Matcher<Element> rowMatcher = query.getRowMatcher();
         Iterator<Map.Entry<String,Element>> it = this.cache.entrySet().iterator();
         
@@ -219,15 +233,22 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     protected void spinUp() {
+        //concurrency level 4 - don't expect to need more than this.
+        this.cache = new ConcurrentHashMap<>(16, 0.75f, 4);
+        
         if(!file.exists()){
             //new file
             return;
         }
         
-        SAXBuilder builder = new org.jdom2.input.SAXBuilder();
+        
         try {
-            Document doc = builder.build(file);
-            for(Element row : doc.getRootElement().getChildren("row", Database.xFlatNs)){
+            Document doc = this.file.readFile();
+            List<Element> rowList = doc.getRootElement().getChildren("row", Database.xFlatNs);
+            //copy to array to avoid concurrent modification exception
+            Element[] rowArr = new Element[rowList.size()];
+            for(Element row : rowList.toArray(rowArr)){
+                row.detach();
                 this.cache.put(getId(row), row);
             }
         } catch (JDOMException | IOException ex) {
@@ -281,7 +302,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         //and set read-only mode.
         isSpinningDown.set(true);
         
-        dumpCacheNow();
+        if(this.cache != null)
+            dumpCacheNow();
         //start a task to check the open cursors - when they are all closed,
         //we can fire the event
         
@@ -292,6 +314,14 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         synchronized(syncRoot){
             if(spinDownTask.get() != null)
                 return;
+            
+            if(openCursors.isEmpty()){
+                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+                spinDownTask.set(null);
+                //we're ok to finish our spin down now
+                forceSpinDown();
+                return;
+            }
             
             final AtomicReference<ScheduledFuture<?>> spinDownFuture = new AtomicReference<>();
             this.spinDownTask.set(new Runnable(){
@@ -427,9 +457,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
             root.addContent(this.cache.values());
 
-            XMLOutputter outputter = new XMLOutputter();
-            try(FileOutputStream out = new FileOutputStream(file)) {
-                outputter.output(doc, out);
+            try{
+                this.file.writeFile(doc);
             }
             catch(IOException ex) {
                 dumpFailures.incrementAndGet();
@@ -536,8 +565,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             Element ret = peek;
             synchronized(ret){
                 //lock the row
-                return ret.getChildren().get(0).clone();
+                ret = ret.getChildren().get(0).clone();
             }
+            
+            returnCount++;
+            return ret;
         }
 
         @Override

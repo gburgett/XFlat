@@ -13,13 +13,13 @@ import org.jdom2.*;
  *
  * @author gordon
  */
-public class JDomConverters {
+public class JDOMConverters {
     
     /**
      * Registers all the string converters to the given ConversionService.
      * @param service 
      */
-    public static void RegisterTo(ConversionService service){
+    public static void registerTo(ConversionService service){
         service.addConverter(Content.class, String.class, ContentToStringConverter);
         service.addConverter(Element.class, String.class, ContentToStringConverter);
         service.addConverter(Text.class, String.class, ContentToStringConverter);

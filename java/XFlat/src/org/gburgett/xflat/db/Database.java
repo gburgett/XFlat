@@ -22,7 +22,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
  * The base class for classes that manage tables and conversion services.
  * @author gordon
  */
-public abstract class Database {
+public class Database {
     
     public static Namespace xFlatNs = Namespace.getNamespace("db", "http://xflat.gburgett.org/xflat/db");
     
@@ -58,7 +58,7 @@ public abstract class Database {
      * Creates a new database in the given directory.
      * @param directory The flat-file directory in which tables should be stored.
      */
-    protected Database(File directory){
+    public Database(File directory){
         this.directory = directory;
         
         this.executorService = new ScheduledThreadPoolExecutor(2);
