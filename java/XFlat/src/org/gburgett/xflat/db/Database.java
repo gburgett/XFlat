@@ -10,11 +10,12 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.gburgett.xflat.Table;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
-import org.gburgett.xflat.convert.PojoMapper;
-import org.jdom2.Content;
+import org.gburgett.xflat.convert.PojoConverter;
+import org.jdom2.Element;
 import org.jdom2.Namespace;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
@@ -26,21 +27,15 @@ public class Database {
     
     public static Namespace xFlatNs = Namespace.getNamespace("db", "http://xflat.gburgett.org/xflat/db");
     
+    //<editor-fold desc="dependencies">
     private ScheduledExecutorService executorService;
     protected ScheduledExecutorService getExecutorService(){
         return executorService;
     }
     
     
-    private File directory;
-    protected File getDirectory(){
-        return directory;
-    }
-    
-    //the engine cache
-    private Map<File, Engine> engines = new HashMap<>();
-    
     private ConversionService conversionService;
+    
     /**
      * Gets the current conversion service.  The conversion service can be
      * set or updated in order to convert any objects.
@@ -53,6 +48,17 @@ public class Database {
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
+    
+    //</editor-fold>
+    
+    private File directory;
+    protected File getDirectory(){
+        return directory;
+    }
+    
+    //the engine cache
+    private Map<File, Engine> engines = new HashMap<>();
+    
     
     /**
      * Creates a new database in the given directory.
@@ -88,12 +94,30 @@ public class Database {
         //the timeout in TableBase must be turned up.
     }
     
+    /**
+     * Extends the database's conversion service with the given PojoConverter.
+     * It does this by invoking {@link PojoConverter#extend(org.gburgett.xflat.convert.ConversionService) }
+     * using the database's current conversion service, in a synchronized context.
+     * @param extender The extender that should extend the database's conversion service.
+     */
+    public void extendConversionService(PojoConverter extender){
+        synchronized(this){
+            this.conversionService = extender.extend(conversionService);
+        }
+    }
+    
     
     public <T> Table<T> getTable(String name, Class<T> type){
-        if(!this.getConversionService().canConvert(type, Content.class) ||
-                !this.getConversionService().canConvert(Content.class, type)){
-            //register the pojo mapping for this table type
-            createPojoMapper(type).registerPojoMapping(type, this.conversionService);
+        if(!this.getConversionService().canConvert(type, Element.class) ||
+                !this.getConversionService().canConvert(Element.class, type)){
+            //try to load the pojo converter
+            loadPojoConverter();
+            
+            if(!this.getConversionService().canConvert(type, Element.class) ||
+                !this.getConversionService().canConvert(Element.class, type)){
+                throw new UnsupportedOperationException("No conversion available between " +
+                        type + " and " + Element.class);
+            }
         }
         
         throw new NotImplementedException();
@@ -104,9 +128,13 @@ public class Database {
         //The name is mapped to a java.io.File, which is the key of the engine cache.
     }
     
-    private PojoMapper createPojoMapper(Class<?> type){
+    private AtomicBoolean pojoMapperLoaded = new AtomicBoolean(false);
+    private void loadPojoConverter(){
+        if(!pojoMapperLoaded.compareAndSet(false, true)){
+            return;
+        }
         //TODO: load JAXB context dynamically via the classloader
-        //and create JAXB POJO mapper, then cache it.
+        //and create JAXB POJO mapper, then use it to extend conversion service.
         throw new NotImplementedException();
     }
 }

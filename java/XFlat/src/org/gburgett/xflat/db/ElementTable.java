@@ -85,54 +85,59 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     @Override
     public void replace(Element newValue) throws KeyNotFoundException {
-        //always clone incoming data
-        newValue = newValue.clone(); 
-        
         String id = getId(newValue);
         if(id == null){
             throw new KeyNotFoundException("Element has no ID");
         }
         
+        //always clone incoming data
+        newValue = newValue.clone(); 
+        
         this.getEngine().replaceRow(id, newValue);
     }
 
     @Override
-    public boolean replaceOne(XpathQuery query, Element newValue){
-        //always clone incoming data
-        newValue = newValue.clone(); 
-        
+    public boolean replaceOne(XpathQuery query, Element origValue){
         Element e = this.findOne(query);
         if(e == null){
             return false;
         }
         
         String id = getId(e);
-        setId(id, newValue);
+        setId(id, origValue);
         
-        try{
+        //always clone incoming data
+        Element newValue = origValue.clone(); 
+
+        try{            
             this.getEngine().replaceRow(id, newValue);
             return true;
         }catch(KeyNotFoundException ex){
             //someone concurrently deleted this row, try again by identifying
             //a new row by the query.
-            return replaceOne(query, newValue);
+            return replaceOne(query, origValue);
         }
     }
 
     @Override
     public boolean upsert(Element newValue) {
-        //always clone incoming data
-        newValue = newValue.clone(); 
         
         String id = getId(newValue);
         if(id == null){
             id = generateNewId();
             setId(id, newValue);
+            
+            //always clone incoming data
+            newValue = newValue.clone(); 
+        
             this.getEngine().insertRow(id, newValue);
             //inserted, return true
             return true;
         }
         else{
+            //always clone incoming data
+            newValue = newValue.clone(); 
+        
             return this.getEngine().upsertRow(id, newValue);
         }
     }
@@ -174,8 +179,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
     
     private String generateNewId(){
-        //TODO: move this into ID generator class
-        return UUID.randomUUID().toString();
+        return (String)this.getIdGenerator().generateNewId(String.class);
     }
 
     private String getId(Object id) throws IllegalArgumentException {
