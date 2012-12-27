@@ -4,6 +4,8 @@
  */
 package org.gburgett.xflat.db;
 
+import org.jdom2.Element;
+
 /**
  *
  * @author gordon
@@ -35,7 +37,7 @@ public abstract class IdGenerator {
      * @param id The ID to convert, cannot be null.
      * @return The string representation of the given ID.
      */
-    abstract String idToString(Object id);
+    public abstract String idToString(Object id);
     
     /**
      * A convenience for converting IDs from their string representations.
@@ -46,5 +48,32 @@ public abstract class IdGenerator {
      * types as given by {@link #supports(java.lang.Class) }.
      * @return The converted ID.
      */
-    abstract Object stringToId(String id, Class<?> idType);
+    public abstract Object stringToId(String id, Class<?> idType);
+    
+    /**
+     * Saves this ID generator's state to a JDOM Element so it can save when
+     * its associated Engine spins down.
+     * When saving state the IdGenerator is guaranteed to have no invocations on
+     * {@link #generateNewId}.
+     * Stateless ID generators such as the {@link UuidIdGenerator} do not have to
+     * override this.
+     * @param state The table metadata element to which the IdGenerator should save
+     * any state info.
+     */
+    public void saveState(Element state){
+    }
+    
+    /**
+     * Loads this ID generator's state from a JDOM element so it can resume when
+     * its associated engine spins up.
+     * When loading state the IdGenerator is guaranteed to have no invocations on
+     * {@link #generateNewId}.
+     * Stateless ID generators such as the {@link UuidIdGenerator} do not have to
+     * override this.
+     * @param state The table metadata element from which the IdGenerator should load
+     * any state info.
+     */
+    public void loadState(Element state){
+    }
+    
 }

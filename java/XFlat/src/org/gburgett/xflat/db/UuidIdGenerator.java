@@ -35,7 +35,7 @@ public class UuidIdGenerator extends IdGenerator {
     }
 
     @Override
-    String idToString(Object id) {
+    public String idToString(Object id) {
         if(id == null){
             return null;
         }
@@ -45,7 +45,7 @@ public class UuidIdGenerator extends IdGenerator {
     }
 
     @Override
-    Object stringToId(String id, Class<?> idType) {
+    public Object stringToId(String id, Class<?> idType) {
         if(id == null)
             return null;
         
