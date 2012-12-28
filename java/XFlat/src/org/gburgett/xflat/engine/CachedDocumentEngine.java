@@ -4,10 +4,8 @@
  */
 package org.gburgett.xflat.engine;
 
-import java.io.FileOutputStream;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -37,8 +35,6 @@ import org.hamcrest.Matcher;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
-import org.jdom2.input.SAXBuilder;
-import org.jdom2.output.XMLOutputter;
 
 /**
  * This is an engine that caches the entire table in memory as a JDOM {@link Document}.
@@ -47,7 +43,6 @@ import org.jdom2.output.XMLOutputter;
 public class CachedDocumentEngine extends EngineBase implements Engine {
 
     private final AtomicBoolean operationsReady = new AtomicBoolean(false);
-    private final AtomicBoolean isSpinningDown = new AtomicBoolean(false);
     
     private final Object syncRoot = new Object();    
     
@@ -56,6 +51,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private DocumentFileWrapper file;
     public DocumentFileWrapper getFile(){
         return file;
+    }
+    
+    public CachedDocumentEngine(File file, String tableName){
+        super(tableName);
+        this.file = new DocumentFileWrapper(file);
     }
     
     protected CachedDocumentEngine(DocumentFileWrapper file, String tableName){
@@ -74,6 +74,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             throw new DuplicateKeyException(id);
         }
         
+        setLastActivity(System.currentTimeMillis());
         dumpCache();
     }
 
@@ -83,6 +84,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         if(row == null){
             return null;
         }
+        
+        setLastActivity(System.currentTimeMillis());
         
         //lock the row
         synchronized(row){
@@ -96,6 +99,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         query.setConversionService(this.getConversionService());
         TableCursor ret = new TableCursor(this.cache.values(), query);
         this.openCursors.put(ret, "");
+        setLastActivity(System.currentTimeMillis());
+        
         return ret;
     }
 
@@ -109,6 +114,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             throw new KeyNotFoundException(id);
         }
         
+        setLastActivity(System.currentTimeMillis());
         dumpCache();
     }
 
@@ -136,6 +142,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             
             ret = false;
         }
+        
+        setLastActivity(System.currentTimeMillis());
         
         if(ret)
             dumpCache();
@@ -169,6 +177,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
         }
         
+        setLastActivity(System.currentTimeMillis());
+        
         if(rowsUpdated > 0){
             dumpCache();
         }
@@ -183,6 +193,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         Element row = wrapInRow(data, id);
         Element existed = this.cache.put(id, row);
         
+        setLastActivity(System.currentTimeMillis());
         dumpCache();
         
         return existed == null; //if none existed, then we inserted
@@ -198,6 +209,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             throw new KeyNotFoundException(id);
         }
         
+        setLastActivity(System.currentTimeMillis());
         dumpCache();
     }
 
@@ -223,6 +235,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
         }
         
+        setLastActivity(System.currentTimeMillis());
+        
         if(numRemoved > 0)
             dumpCache();
         
@@ -233,26 +247,34 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     protected void spinUp() {
-        //concurrency level 4 - don't expect to need more than this.
-        this.cache = new ConcurrentHashMap<>(16, 0.75f, 4);
-        
-        if(!file.exists()){
-            //new file
+        if(!this.state.compareAndSet(EngineState.Uninitialized, EngineState.SpinningUp)){
             return;
         }
         
+        //concurrency level 4 - don't expect to need more than this.
+        this.cache = new ConcurrentHashMap<>(16, 0.75f, 4);
         
-        try {
-            Document doc = this.file.readFile();
-            List<Element> rowList = doc.getRootElement().getChildren("row", Database.xFlatNs);
-            //copy to array to avoid concurrent modification exception
-            Element[] rowArr = new Element[rowList.size()];
-            for(Element row : rowList.toArray(rowArr)){
-                row.detach();
-                this.cache.put(getId(row), row);
+        if(file.exists()){
+            try {
+                Document doc = this.file.readFile();
+                List<Element> rowList = doc.getRootElement().getChildren("row", Database.xFlatNs);
+                //copy to array to avoid concurrent modification exception
+                Element[] rowArr = new Element[rowList.size()];
+                for(Element row : rowList.toArray(rowArr)){
+                    row.detach();
+                    this.cache.put(getId(row), row);
+                }
+            } catch (JDOMException | IOException ex) {
+                throw new XflatException("Error building document cache", ex);
             }
-        } catch (JDOMException | IOException ex) {
-            throw new XflatException("Error building document cache", ex);
+        }
+        
+        this.state.compareAndSet(EngineState.SpinningUp, EngineState.SpunUp);
+        if(operationsReady.get()){
+            this.state.compareAndSet(EngineState.SpunUp, EngineState.Running);
+            synchronized(operationsReady){
+                operationsReady.notifyAll();
+            }
         }
     }
 
@@ -262,6 +284,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             operationsReady.set(true);
             operationsReady.notifyAll();
         }
+        this.state.compareAndSet(EngineState.SpunUp, EngineState.Running);
     }
 
     /**
@@ -270,7 +293,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
      * when spinning down.
      */
     private void ensureReady(){
-        if(isSpinningDown.get()){
+        if(this.state.get() == EngineState.SpunDown ||
+                this.state.get() == EngineState.SpinningDown){
             throw new XflatException("Write operations not supported on an engine that is spinning down");
         }
         
@@ -300,7 +324,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     protected void spinDown(final SpinDownEventHandler completionEventHandler) {
         //not much to do since everything's in the cache, just dump the cache
         //and set read-only mode.
-        isSpinningDown.set(true);
+        if(!this.state.compareAndSet(EngineState.Running, EngineState.SpinningDown)){
+            //we're in the wrong state.
+            return;
+        }
         
         if(this.cache != null)
             dumpCacheNow();
@@ -316,10 +343,14 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 return;
             
             if(openCursors.isEmpty()){
-                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-                spinDownTask.set(null);
-                //we're ok to finish our spin down now
-                forceSpinDown();
+                if(this.state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
+                    if(completionEventHandler != null)
+                        completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+                    
+                    spinDownTask.set(null);
+                    //we're ok to finish our spin down now
+                    forceSpinDown();
+                }
                 return;
             }
             
@@ -344,7 +375,13 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                             if(!openCursors.isEmpty())
                                 return;
                             
-                            completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+                            if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
+                                //already spun down
+                                return;
+                            }
+                            
+                            if(completionEventHandler != null)
+                                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
                             spinDownTask.set(null);
                             //we're ok to finish our spin down now
                             forceSpinDown();
@@ -362,14 +399,16 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         //drop all remaining references to the cache, replace with a cache
         //that throws exceptions on access.
         this.cache = new InactiveCache();
+        
+        this.state.set(EngineState.SpunDown);
+    }
+    
+    private boolean isSpinningDown(){
+        return this.state.get() == EngineState.SpunDown ||
+                this.state.get() == EngineState.SpinningDown;
     }
 
-    private AtomicReference<Date> lastModified = new AtomicReference<>(null);
-    @Override
-    protected Date getLastModified() {
-        return lastModified.get();
-    }
-
+    
     private String getId(Element row) {
         return row.getAttributeValue("id", Database.xFlatNs);
     }
@@ -391,9 +430,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private AtomicInteger dumpFailures = new AtomicInteger();
     
     private void dumpCache(){
-        //we dump cache anytime we modify, so lastmodified = now
-        lastModified.set(new Date(System.currentTimeMillis()));
-        
         long delay = 0;
         
         //did we dump inside the last 100 ms?
@@ -406,14 +442,14 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 delay = 0;
         }
         
-        if(scheduledDump.get() != null || isSpinningDown.get()){
+        if(scheduledDump.get() != null || isSpinningDown()){
             //we're already scheduled to dump the cache
             return;
         }
         
         ScheduledFuture<?> dumpTask;
         synchronized(syncRoot){
-            if(scheduledDump.get() != null || isSpinningDown.get()){
+            if(scheduledDump.get() != null || isSpinningDown()){
                 return;
             }
             
@@ -492,7 +528,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         @Override
         public void close() throws Exception {
             CachedDocumentEngine.this.openCursors.remove(this);
-            if(!isSpinningDown.get())
+            if(!isSpinningDown())
                 return;
             
             //run the spin down monitoring task immediately, don't wait for the scheduler.

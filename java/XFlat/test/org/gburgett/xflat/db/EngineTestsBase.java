@@ -20,6 +20,7 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
+import org.gburgett.xflat.db.EngineBase.EngineState;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.hamcrest.Description;
@@ -45,7 +46,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     protected ConversionService conversionService;
     
     protected AtomicBoolean spinDownInvoked = new AtomicBoolean(false);
-    protected AtomicBoolean spinDownComplete = new AtomicBoolean(false);
     
     protected File workspace = new File("./engine tests");
     
@@ -105,10 +105,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             @Override
             public void spinDownComplete(EngineBase.SpinDownEvent event) {
                 synchronized(notifyMe){
-                    if(spinDownComplete.get())
-                        return;
-                    
-                    spinDownComplete.set(true);
                     notifyMe.notifyAll();
                 }
             }
@@ -119,11 +115,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 @Override
                 public void run() {
                     synchronized(notifyMe){
-                        if(spinDownComplete.get()){
+                        if(instance.getState() == EngineBase.EngineState.SpunDown){
                             return;
                         }
 
-                        spinDownComplete.set(true);
                         instance.forceSpinDown();
                         didTimeOut.set(true);
                         notifyMe.notifyAll();
@@ -131,7 +126,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 }
             }, 200, TimeUnit.MILLISECONDS);
             
-            while(!spinDownComplete.get()){
+            while(instance.getState() != EngineState.SpunDown){
                 synchronized(notifyMe){
                     notifyMe.wait();
                 }
@@ -143,12 +138,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     }
     
     protected void verifySpinDownComplete() throws InterruptedException{
-        if(!spinDownComplete.get()){
+        if(instance.getState() != EngineState.SpunDown){
             //give it a little leeway
             Thread.sleep(500);
         }
         
-        assertTrue("Should have spun down", spinDownComplete.get());
+        assertEquals("Should have spun down", EngineState.SpunDown, instance.getState());
     }
     
     private TEngine setupEngine(){
@@ -161,7 +156,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     protected void spinUp(EngineBase instance){
         
         spinDownInvoked.set(false);
-        spinDownComplete.set(false);
         instance.spinUp();
         instance.beginOperations();
     }

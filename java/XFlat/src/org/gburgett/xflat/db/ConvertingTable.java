@@ -6,6 +6,7 @@ package org.gburgett.xflat.db;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         this.accessor = IdAccessor.forClass(type);
         if(!this.accessor.hasId()){
             //we need to keep a reference to the ID in a weak cache
-            idMap = new WeakHashMap<>();
+            idMap = Collections.synchronizedMap(new WeakHashMap<T, String>());
         }
     }
         

@@ -4,11 +4,13 @@
  */
 package org.gburgett.xflat.db;
 
-import java.util.Date;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.convert.ConversionService;
+import org.jdom2.Element;
 
 /**
  * The base class for Engine objects.  The Database uses the functionality
@@ -31,6 +33,11 @@ public abstract class EngineBase implements Engine {
     }
     
     //<editor-fold desc="transition functions">
+    
+    protected AtomicReference<EngineState> state = new AtomicReference<>(EngineState.Uninitialized);
+    public EngineState getState(){
+        return state.get();
+    }
     
     /**
      * Initializes the engine and instructs it to begin acquiring the resources
@@ -63,14 +70,36 @@ public abstract class EngineBase implements Engine {
      */
     protected abstract void forceSpinDown();
     
+    private AtomicLong lastActivity = new AtomicLong();
+    
     /**
-     * Gets the date at which the data in the engine was last modified.
+     * Gets the date at which the last operation was performed on the engine.
      * This is used by the Database to determine whether this engine needs to
      * remain in its cache or if it can be spun down for later.
-     * @return The date at which the last "write" command occurred, or null if no
-     * writes have yet occurred.
+     * @return The date at which the last write or read has occurred, or the date
+     * of engine creation if no operations have occurred.
      */
-    protected abstract Date getLastModified();
+    public long getLastActivity(){
+        return lastActivity.get();
+    }
+    
+    /**
+     * Concurrently updates the lastActivity property to the greater of the
+     * existing value or the given time.
+     * @param time the time to update lastActivity to, if greater than the existing
+     * value.
+     */
+    protected void setLastActivity(long time){
+        long existing;
+        do{
+            existing = lastActivity.get();
+            if(existing >= time){
+                //no need to update
+                return;
+            }
+            //ensure we compared to the latest value before setting.
+        }while(!lastActivity.compareAndSet(existing, time));
+    }
     
     public static interface SpinDownEventHandler{
         /**
@@ -112,4 +141,29 @@ public abstract class EngineBase implements Engine {
         this.conversionService = conversionService;
     }
     
+    /**
+     * Saves metadata to the given element.  Metadata is things like indexes
+     * and other configuration.
+     * @param metadataElement The element from which metadata should be loaded.
+     */
+    protected void saveMetadata(Element metadataElement){
+        
+    }
+    /**
+     * Loads metadata from the given element.  Metadata is things like indexes
+     * and other configurations the engine may need to save.
+     * @param metatdataElement The element to which metadata should be saved.
+     */
+    protected void loadMetadata(Element metatdataElement){
+        
+    }
+ 
+    public enum EngineState{
+        Uninitialized,
+        SpinningUp,
+        SpunUp,
+        Running,
+        SpinningDown,
+        SpunDown
+    }
 }
