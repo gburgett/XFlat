@@ -9,10 +9,12 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
@@ -31,8 +33,10 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import static org.junit.Assert.*;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -41,41 +45,78 @@ import org.junit.Test;
  */
 public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
-    protected ScheduledExecutorService executorService;
+    protected static ScheduledExecutorService executorService;
+    protected static ConversionService conversionService;
     
-    protected ConversionService conversionService;
+    protected static org.jdom2.xpath.XPathFactory xpath = org.jdom2.xpath.XPathFactory.instance();
     
-    protected AtomicBoolean spinDownInvoked = new AtomicBoolean(false);
+    protected static File workspace;
     
-    protected File workspace = new File("./engine tests");
     
-    protected org.jdom2.xpath.XPathFactory xpath = org.jdom2.xpath.XPathFactory.instance();
+    protected ThreadLocal<TestContext> context = new ThreadLocal<>();
     
-    private TEngine instance;
-    
-    @Before
-    public void setUp() throws IOException {
-        if(!workspace.exists()){
-            workspace.mkdirs();
-        }
-        
-        executorService = new ScheduledThreadPoolExecutor(2);
+    @BeforeClass
+    public static void setUpClass() {
+        executorService = new ScheduledThreadPoolExecutor(4);
         conversionService = new DefaultConversionService();
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
+        
+        workspace = new File("enginetests");
+        if(!workspace.exists()){
+            workspace.mkdirs();
+        }
+    }
+    
+    
+    @Before
+    public void setUp() throws IOException {
+        TestContext ctx = new TestContext();
+        context.set(ctx);
+        
+        ctx.workspace = new File(workspace, Long.toHexString(ctx.id));
+        if(!ctx.workspace.exists()){
+            ctx.workspace.mkdirs();
+        }
+    }
+    
+    /**
+     * Gets the current test context for this thread.
+     * Since JUnit can run multiple tests in the same fixture concurrently,
+     * we have to keep a ThreadLocal TestContext instance.  The TestContext
+     * is created in {@link #setUp() } and used in {@link #tearDown() } to verify
+     * that the engine spun down correctly.  
+     * This method also verifies that my assumptions about the test runner are correct,
+     * that a single thread will progress from startUp through test to tearDown.
+     * @return This thread's TestContext instance, created in the SetUp method.
+     */
+    protected TestContext getContext(){
+        TestContext ctx = this.context.get();
+        assertNotNull("We must have a context");
+        assertEquals("Context must be for correct thread", Thread.currentThread().getId(), ctx.id);
+        return ctx;
     }
     
     
     @After
     public void tearDown() throws InterruptedException, TimeoutException{
-        spinDown(instance);
+        TestContext ctx = getContext();
+        
+        spinDown(ctx.instance, true);
         
         verifySpinDownComplete();
     
-        deleteDir(this.workspace);
+        deleteDir(ctx.workspace);
+        ctx.workspace.delete();
     }
     
-    private void deleteDir(File directory){
+    @AfterClass
+    public static void tearDownClass(){
+        deleteDir(workspace);
+        workspace.delete();
+    }
+    
+    private static void deleteDir(File directory){
         for(File f : directory.listFiles()){
             if(f.isDirectory()){
                 deleteDir(f);
@@ -87,23 +128,46 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
     }
     
+    /**
+     * Spins down the Engine, waiting for it to complete and throwing
+     * an exception if it times out.
+     * @param instance The engine to spin down
+     * @throws InterruptedException
+     * @throws TimeoutException 
+     */
     protected void spinDown(EngineBase instance) throws InterruptedException, TimeoutException {
         this.spinDown(instance, true);
     }
     
-    protected synchronized void spinDown(final EngineBase instance, boolean synchronous) throws InterruptedException, TimeoutException{
+    
+    /**
+     * Spins down the Engine, optionally waiting for it to complete and throwing
+     * an exception if it times out.
+     * @param engine The engine to spin down
+     * @param synchronous True to wait for the engine to spin down, with a timeout.
+     * @throws InterruptedException
+     * @throws TimeoutException 
+     */
+    protected void spinDown(final EngineBase engine, boolean synchronous) throws InterruptedException, TimeoutException{
+
+        TestContext ctx = getContext();
         
-        if(spinDownInvoked.get()){
+        if(!ctx.spinDownInvoked.compareAndSet(false, true)){
             return;
         }
         
-        final AtomicBoolean didTimeOut = new AtomicBoolean();
+        if(engine.getState() != EngineState.Running){
+            throw new UnsupportedOperationException("cannot spin down an engine in state " + engine.getState());
+        }
+        
+        final AtomicReference<EngineState> didTimeOut = new AtomicReference(null);
+        final AtomicBoolean didSpinDown = new AtomicBoolean(false);
         final Object notifyMe = new Object();
         
-        spinDownInvoked.set(true);
-        instance.spinDown(new EngineBase.SpinDownEventHandler(){
+        engine.spinDown(new EngineBase.SpinDownEventHandler(){
             @Override
             public void spinDownComplete(EngineBase.SpinDownEvent event) {
+                didSpinDown.get();
                 synchronized(notifyMe){
                     notifyMe.notifyAll();
                 }
@@ -111,39 +175,55 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         });
         
         if(synchronous){
-            executorService.schedule(new Runnable(){
-                @Override
-                public void run() {
-                    synchronized(notifyMe){
-                        if(instance.getState() == EngineBase.EngineState.SpunDown){
+            ScheduledFuture<?> timeout = 
+                executorService.schedule(new Runnable(){
+                    @Override
+                    public void run() {
+                        if(engine.getState() == EngineState.SpunDown){
+                            return;
+                        }
+                        
+                        if(didSpinDown.get()){
                             return;
                         }
 
-                        instance.forceSpinDown();
-                        didTimeOut.set(true);
-                        notifyMe.notifyAll();
+                        synchronized(notifyMe){
+                            didTimeOut.set(engine.getState());
+                            engine.forceSpinDown();
+                            notifyMe.notifyAll();
+                        }
                     }
-                }
-            }, 200, TimeUnit.MILLISECONDS);
+                }, 500, TimeUnit.MILLISECONDS);
             
-            while(instance.getState() != EngineState.SpunDown){
+            while(engine.getState() != EngineState.SpunDown){
                 synchronized(notifyMe){
                     notifyMe.wait();
                 }
             }
             
-            if(didTimeOut.get())
-                throw new TimeoutException("spin down timed out");
+            if(didTimeOut.get() != null){
+                if(didSpinDown.get()){
+                    fail("Spin down completed, but timeout was called with engine state " + didTimeOut.get());
+                }
+                throw new TimeoutException("spin down timed out with engine state " + didTimeOut.get());
+            }
+            else{
+                timeout.cancel(true);
+            }
+                
         }
     }
     
     protected void verifySpinDownComplete() throws InterruptedException{
-        if(instance.getState() != EngineState.SpunDown){
+        
+        TestContext ctx = getContext();
+        
+        if(ctx.instance.getState() != EngineState.SpunDown){
             //give it a little leeway
             Thread.sleep(500);
         }
         
-        assertEquals("Should have spun down", EngineState.SpunDown, instance.getState());
+        assertEquals("Should have spun down", EngineState.SpunDown, ctx.instance.getState());
     }
     
     private TEngine setupEngine(){
@@ -155,7 +235,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     protected void spinUp(EngineBase instance){
         
-        spinDownInvoked.set(false);
+        TestContext ctx = getContext();
+        
+        ctx.spinDownInvoked.set(false);
         instance.spinUp();
         instance.beginOperations();
     }
@@ -183,14 +265,14 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     private Document makeDocument(String tableName, Element... rowData){
         Document ret = new Document();
-        Element root = new Element("table", Database.xFlatNs)
-                .setAttribute("name", tableName, Database.xFlatNs);
+        Element root = new Element("table", XFlatDatabase.xFlatNs)
+                .setAttribute("name", tableName, XFlatDatabase.xFlatNs);
         ret.setRootElement(root);   
         
         int i = 0;
         for(Element e : rowData){
-            root.addContent(new Element("row", Database.xFlatNs)
-                    .setAttribute("id", Integer.toString(i++), Database.xFlatNs)
+            root.addContent(new Element("row", XFlatDatabase.xFlatNs)
+                    .setAttribute("id", Integer.toString(i++), XFlatDatabase.xFlatNs)
                     .setContent(e));
         }
         
@@ -198,11 +280,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     }
     
     private String getId(Element row){
-        return row.getAttributeValue("id", Database.xFlatNs);
+        return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
     
     private Element setId(Element row, String id){
-        row.setAttribute("id", id, Database.xFlatNs);
+        row.setAttribute("id", id, XFlatDatabase.xFlatNs);
         return row;
     }
     
@@ -215,32 +297,36 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         return null;
     }
     
+    //<editor-fold desc="tests">
+    
     @Test
     public void testInsert_NoValuesYet_Inserts() throws Exception {
         System.out.println("testInsert_NoValuesYet_Inserts");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
+        
+        ctx.instance = setupEngine();
         
         prepFileContents(null);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        instance.insertRow("test id", rowData);
+        ctx.instance.insertRow("test id", rowData);
         
         //ASSERT
-        Element fromEngine = instance.readRow("test id");
+        Element fromEngine = ctx.instance.readRow("test id");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
         
         assertNotNull("File contents should exist", doc);
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Should have 1 row", 1, children.size());
         Element data = children.get(0).getChild("data");
         assertNotNull("row should have the data", data);
@@ -251,33 +337,35 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testInsert_HasValues_Inserts() throws Exception {
         System.out.println("testInsert_HasValues_Inserts");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        instance.insertRow("test id", rowData);
+        ctx.instance.insertRow("test id", rowData);
         
         
-        Element fromEngine = instance.readRow("test id");
+        Element fromEngine = ctx.instance.readRow("test id");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         //ASSERT
         Document doc = getFileContents();
         
         assertNotNull("File contents should exist", doc);
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Should have 2 rows", 2, children.size());
         
         Element data = findId(children, "test id");
@@ -289,14 +377,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testInsert_AlreadyHasId_ThrowsDuplicateKeyException() throws Exception {
         System.out.println("testInsert_AlreadyHasId_ThrowsDuplicateKeyException");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -304,20 +394,20 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         boolean didThrow = false;
         try {
             //ACT
-            instance.insertRow("0", rowData);
+            ctx.instance.insertRow("0", rowData);
         } catch (DuplicateKeyException expected) {
             didThrow = true;
         }
         assertTrue("Should have thrown DuplicateKeyException", didThrow);
         
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         //ASSERT
         Document doc = getFileContents();
         
         assertNotNull("File contents should exist", doc);
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Should have 1 row", 1, children.size());
         
         Element data = findId(children, "0");
@@ -330,16 +420,18 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testReadRow_NoRowExists_ReturnsNull() throws Exception {
         System.out.println("testReadRow_NoRowExists_ReturnsNull");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
+        
+        ctx.instance = setupEngine();
         
         prepFileContents(null);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         
         //ACT
-        Element data = instance.readRow("72");
+        Element data = ctx.instance.readRow("72");
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         //ASSERT
         assertNull("Should not read data that does not exist", data);
@@ -350,20 +442,22 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testReadRow_ReadsWrongRow_ReturnsNull() throws Exception {
         System.out.println("testReadRow_ReadsWrongRow_ReturnsNull");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         
         //ACT
-        Element data = instance.readRow("72");
+        Element data = ctx.instance.readRow("72");
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         //ASSERT
         assertNull("Should not read data that does not exist", data);
@@ -374,21 +468,23 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testReadRow_ReadsCorrectRow_ReturnsData() throws Exception {
         System.out.println("testReadRow_ReadsCorrectRow_ReturnsData");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("some text data"),
                 new Element("data").setText("other text data")
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         
         //ACT
-        Element data = instance.readRow("1");
+        Element data = ctx.instance.readRow("1");
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         //ASSERT
         assertNotNull("Should have read some data", data);
@@ -400,19 +496,21 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testQueryTable_NoData_NoResults() throws Exception {
         System.out.println("testQueryTable_NoData_NoResults");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
+        
+        ctx.instance = setupEngine();
         
         prepFileContents(null);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
-        try(Cursor<Element> cursor = instance.queryTable(query)){
+        try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down
             //but do it async cause we're using the cursor
-            spinDown(instance, false);
+            spinDown(ctx.instance, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -429,9 +527,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testQueryTable_WrongData_NoResults() throws Exception {
         System.out.println("testQueryTable_WrongData_NoResults");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
                 new Element("data").setContent(
                         new Element("fooInt").setText("18")
@@ -439,15 +539,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
-        try(Cursor<Element> cursor = instance.queryTable(query)){
+        try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down
             //but do it async cause we're using the cursor
-            spinDown(instance, false);
+            spinDown(ctx.instance, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -464,9 +564,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testQueryTable_OneMatch_OneResult() throws Exception {
         System.out.println("testQueryTable_OneMatch_OneResult");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
                 new Element("data").setContent(
                         new Element("fooInt").setText("17")
@@ -477,15 +579,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
-        try(Cursor<Element> cursor = instance.queryTable(query)){
+        try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down
             //but do it async cause we're using the cursor
-            spinDown(instance, false);
+            spinDown(ctx.instance, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -505,9 +607,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testQueryTable_MultipleMatches_MultipleResults() throws Exception {
         System.out.println("testQueryTable_MultipleMatches_MultipleResults");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
                 new Element("data").setContent(
                         new Element("fooInt").setText("17")
@@ -518,15 +622,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
         XpathQuery query = XpathQuery.gte(xpath.compile("data/fooInt"), 17);
-        try(Cursor<Element> cursor = instance.queryTable(query)){
+        try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down,
             //but do it async cause we're using the cursor
-            spinDown(instance, false);
+            spinDown(ctx.instance, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -546,10 +650,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testReplaceRow_NoData_ThrowsKeyNotFoundException() throws Exception {
         System.out.println("testReplaceRow_NoData_ThrowsKeyNotFoundException");
                 
-        instance = setupEngine();
+        TestContext ctx = getContext();
+        
+        ctx.instance = setupEngine();
         
         prepFileContents(null);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -557,17 +663,17 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         boolean didThrow = false;
         try {
             //ACT
-            instance.replaceRow("test id", rowData);
+            ctx.instance.replaceRow("test id", rowData);
         } catch (KeyNotFoundException expected) {
             didThrow = true;
         }
         assertTrue("Should have thrown KeyNotFoundException", didThrow);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         //ASSERT
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have no data", 0, children.size());
     }//end testReplaceRow_NoData_ThrowsKeyNotFoundException
     
@@ -575,30 +681,32 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testReplaceRow_RowExists_Replaced() throws Exception {
         System.out.println("testReplaceRow_RowExists_Replaced");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        instance.replaceRow("0", rowData);
+        ctx.instance.replaceRow("0", rowData);
 
         //ASSERT
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have correct data", children,
@@ -612,15 +720,17 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_NoElementWithId_ThrowsKeyNotFoundException() throws Exception {
         System.out.println("testUpdate_NoElementWithId_ThrowsKeyNotFoundException");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
         
@@ -628,16 +738,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         boolean didThrow = false;
         try {
             //ACT
-            instance.update("14", update);
+            ctx.instance.update("14", update);
         } catch (KeyNotFoundException expected) {
             didThrow = true;
         }
         assertTrue("Should have thrown KeyNotFoundException", didThrow);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -651,28 +761,30 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_RowHasNoUpdateableField_NoUpdatePerformed() throws Exception {
         System.out.println("testUpdate_RowHasNoUpdateableField_NoUpdatePerformed");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathUpdate update = XpathUpdate.set(xpath.compile("fourth"), "updated text");
         
         //ACT
-        boolean result = instance.update("0", update);
+        boolean result = ctx.instance.update("0", update);
         
         //ASSERT
         assertFalse("Should have reported unsuccessful update", result);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -686,32 +798,34 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_ElementHasId_UpdatesElement() throws Exception {
         System.out.println("testUpdate_ElementHasId_UpdatesElement");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
         
         //ACT
-        boolean result = instance.update("0", update);
+        boolean result = ctx.instance.update("0", update);
         
         //ASSERT
         assertTrue("Should have reported successful update", result);
         
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertEquals("Should have updated in engine", "other", fromEngine.getName());
         assertEquals("Should have updated in engine", "updated text", fromEngine.getText());
 
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have updated data", children,
@@ -725,9 +839,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_NoMatchingElements_NoUpdates() throws Exception {
         System.out.println("testUpdate_NoMatchingElements_NoUpdates");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
                     .setAttribute("fooInt", "23")
@@ -735,21 +851,21 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
         
         //ACT
-        int result = instance.update(query, update);
+        int result = ctx.instance.update(query, update);
         
         //ASSERT
         assertEquals("Should report 0 rows updated", 0, result);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -763,9 +879,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_MatchingRowHasNoUpdateableField_NoUpdatesPerformed() throws Exception {
         System.out.println("testUpdate_MatchingRowHasNoUpdateableField_NoUpdatesPerformed");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
                     .setAttribute("fooInt", "17")
@@ -773,21 +891,21 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("fourth"), "updated text");
         
         //ACT
-        int result = instance.update(query, update);
+        int result = ctx.instance.update(query, update);
         
         //ASSERT
         assertEquals("Should report 0 rows updated", 0, result);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -801,9 +919,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_MatchingRowHasUpdateableField_FieldIsUpdated() throws Exception {
         System.out.println("testUpdate_MatchingRowHasUpdateableField_FieldIsUpdated");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
                     .setAttribute("fooInt", "17")
@@ -811,25 +931,25 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("third"), "updated text");
         
         //ACT
-        int result = instance.update(query, update);
+        int result = ctx.instance.update(query, update);
                 
         //ASSERT
         assertEquals("Should report 1 row updated", 1, result);
         
-        Element fromEngine = instance.readRow("1");
+        Element fromEngine = ctx.instance.readRow("1");
         assertEquals("Should have updated in engine", "third", fromEngine.getName());
         assertEquals("Should have updated in engine", "updated text", fromEngine.getText());
 
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have updated data", children,
@@ -843,9 +963,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpdate_MultipleMatchingUpdateableRows_MultipleUpdatesPerformed() throws Exception {
         System.out.println("testUpdate_MultipleMatchingUpdateableRows_MultipleUpdatesPerformed");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other")
                     .setAttribute("fooInt", "17")
                     .setContent(new Element("data")
@@ -864,29 +986,29 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         XpathQuery query = XpathQuery.gte(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("*/data"), "updated text");
         
         //ACT
-        int result = instance.update(query, update);
+        int result = ctx.instance.update(query, update);
         
         //ASSERT
         assertEquals("Should report 2 rows updated", 2, result);
         
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertEquals("Should have updated in engine", "other", fromEngine.getName());
         assertThat("Should have updated in engine", fromEngine, hasChildText("data", "updated text"));
         
-        fromEngine = instance.readRow("1");
+        fromEngine = ctx.instance.readRow("1");
         assertEquals("Should have updated in engine", "third", fromEngine.getName());
         assertThat("Should have updated in engine", fromEngine, hasChildText("data", "updated text"));
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 3, children.size());
         
         assertThat("Document should have updated data", children,
@@ -901,30 +1023,32 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpsertRow_RowDoesntExist_Inserts() throws Exception {
         System.out.println("testUpsertRow_RowDoesntExist_Inserts");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
+        
+        ctx.instance = setupEngine();
         
         prepFileContents(null);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        boolean inserted = instance.upsertRow("test id", rowData);
+        boolean inserted = ctx.instance.upsertRow("test id", rowData);
                 
         //ASSERT
         assertTrue("Should report inserted", inserted);
         
-        Element fromEngine = instance.readRow("test id");
+        Element fromEngine = ctx.instance.readRow("test id");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
         
         assertNotNull("File contents should exist", doc);
         
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Should have 1 row", 1, children.size());
         
         Element data = children.get(0).getChild("data");
@@ -936,32 +1060,34 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testUpsertRow_RowExists_Replaces() throws Exception {
         System.out.println("testUpsertRow_RowExists_Replaces");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        boolean inserted = instance.upsertRow("0", rowData);
+        boolean inserted = ctx.instance.upsertRow("0", rowData);
        
         //ASSERT
         assertFalse("Should report as updated", inserted);
         
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have correct data", children,
@@ -975,25 +1101,27 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testDeleteRow_RowDoesntExist_ThrowsKeyNotFoundException() throws Exception {
         System.out.println("testDeleteRow_RowDoesntExist_ThrowsKeyNotFoundException");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
+        
+        ctx.instance = setupEngine();
         
         prepFileContents(null);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
         boolean didThrow = false;
         try {
             //ACT
-            instance.deleteRow("test id");
+            ctx.instance.deleteRow("test id");
         } catch (KeyNotFoundException expected) {
             didThrow = true;
         }
         assertTrue("Should have thrown KeyNotFoundException", didThrow);
 
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have no elements", 0, children.size());
         
     }//end testDeleteRow_RowDoesntExist_ThrowsKeyNotFoundException
@@ -1002,27 +1130,29 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testDeleteRow_RowExists_Deletes() throws Exception {
         System.out.println("testDeleteRow_RowExists_Deletes");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
-        instance.deleteRow("0");
+        ctx.instance.deleteRow("0");
 
         //ASSERT
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertNull("Row should be deleted in engine", fromEngine);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have one fewer element", 1, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1035,36 +1165,38 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testDeleteAll_MatchesNone_NoneDeleted() throws Exception {
         System.out.println("testDeleteAll_MatchesNone_NoneDeleted");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         
-        int numDeleted = instance.deleteAll(query);
+        int numDeleted = ctx.instance.deleteAll(query);
 
         //ASSERT
         assertEquals("Should have deleted none", 0, numDeleted);
         
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertEquals("Should have not changed in engine", "other", fromEngine.getName());
         assertEquals("Should have not changed in engine", "other text data", fromEngine.getText());
         
-        fromEngine = instance.readRow("1");
+        fromEngine = ctx.instance.readRow("1");
         assertEquals("Should have not changed in engine", "third", fromEngine.getName());
         assertEquals("Should have not changed in engine", "third text data", fromEngine.getText());
 
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1078,9 +1210,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     public void testDeleteAll_MatchesMultiple_MultipleDeleted() throws Exception {
         System.out.println("testDeleteAll_MatchesMultiple_MultipleDeleted");
         
-        instance = setupEngine();
+        TestContext ctx = getContext();
         
-        Document inFile = makeDocument(instance.getTableName(),
+        ctx.instance = setupEngine();
+        
+        Document inFile = makeDocument(ctx.instance.getTableName(),
             new Element("other")
                 .setAttribute("fooInt", "17")
                 .setText("other text data"),
@@ -1093,27 +1227,27 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         );
         
         prepFileContents(inFile);
-        spinUp(instance);
+        spinUp(ctx.instance);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         
-        int numDeleted = instance.deleteAll(query);
+        int numDeleted = ctx.instance.deleteAll(query);
 
         //ASSERT
         assertEquals("Should have deleted two", 2, numDeleted);
         
-        Element fromEngine = instance.readRow("0");
+        Element fromEngine = ctx.instance.readRow("0");
         assertNull("Should have deleted row", fromEngine);
-        fromEngine = instance.readRow("1");
+        fromEngine = ctx.instance.readRow("1");
         assertNull("Should have deleted row", fromEngine);
-        fromEngine = instance.readRow("2");
+        fromEngine = ctx.instance.readRow("2");
         assertNotNull("Should not have deleted row", fromEngine);
         
-        spinDown(instance);
+        spinDown(ctx.instance);
         
         Document doc = getFileContents();
-        List<Element> children = doc.getRootElement().getChildren("row", Database.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have fewer elements", 1, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1121,6 +1255,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                     hasChildText("fourth", "fourth text data")
                 ));
     }//end testDeleteAll_MatchesMultiple_MultipleDeleted
+    
+    //</editor-fold>
     
     private Matcher<Element> hasChildThat(final String childName, final Matcher<Element> matcher){
         return new TypeSafeMatcher<Element>(){
@@ -1165,5 +1301,19 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
             
         };
+    }
+    
+    protected class TestContext{
+        public TEngine instance;
+        
+        public AtomicBoolean spinDownInvoked = new AtomicBoolean(false);
+    
+        public File workspace;
+        
+        public long id;
+        
+        public TestContext(){
+            this.id = Thread.currentThread().getId();
+        }
     }
 }

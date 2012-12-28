@@ -13,8 +13,8 @@ import org.gburgett.xflat.XflatException;
  */
 public abstract class TableBase<T> {
     
-    private Database database;
-    protected Database getDatabase(){
+    private XFlatDatabase database;
+    protected XFlatDatabase getDatabase(){
         return this.database;
     }
     
@@ -40,7 +40,7 @@ public abstract class TableBase<T> {
     private final Object syncRoot = new Object();
     
     
-    protected TableBase(Database db, Class<T> tableType, String tableName){
+    protected TableBase(XFlatDatabase db, Class<T> tableType, String tableName){
         this.database = db;
         this.engine = new AtomicReference<>();
         this.tableType = tableType;

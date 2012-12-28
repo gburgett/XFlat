@@ -105,12 +105,12 @@ public class TimestampIdGenerator extends IdGenerator {
     
     @Override
     public void saveState(Element state){
-        state.setAttribute("maxId", Long.toString(this.lastDate.get()), Database.xFlatNs);
+        state.setAttribute("maxId", Long.toString(this.lastDate.get()), XFlatDatabase.xFlatNs);
     }
     
     @Override
     public void loadState(Element state){
-        String maxId = state.getAttributeValue("maxId", Database.xFlatNs);
+        String maxId = state.getAttributeValue("maxId", XFlatDatabase.xFlatNs);
         this.lastDate.set(Long.parseLong(maxId));
     }
 }

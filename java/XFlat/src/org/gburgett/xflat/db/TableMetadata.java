@@ -30,11 +30,11 @@ public class TableMetadata {
 
     Map<TableBase, Class<?>> tables = new WeakHashMap<>();
 
-    Database db;
+    XFlatDatabase db;
     
     TableConfig config;
 
-    public TableMetadata(String name, Database db){
+    public TableMetadata(String name, XFlatDatabase db){
         this.name = name;
         this.db = db;
     }
@@ -104,7 +104,7 @@ public class TableMetadata {
         }
     }
 
-    public static TableMetadata makeNewTableMetadata(String name, Database db, DatabaseConfig dbConfig, TableConfig config, Class<?> idType){
+    public static TableMetadata makeNewTableMetadata(String name, XFlatDatabase db, DatabaseConfig dbConfig, TableConfig config, Class<?> idType){
 
         config = config == null ? TableConfig.defaultConfig : config;
         TableMetadata ret = new TableMetadata(name, db);
@@ -139,19 +139,19 @@ public class TableMetadata {
         return ret;
     }
 
-    public static TableMetadata makeTableMetadataFromDocument(String name, Database db, Document metadata, TableConfig config, Class<?> idType){
+    public static TableMetadata makeTableMetadataFromDocument(String name, XFlatDatabase db, Document metadata, TableConfig config, Class<?> idType){
         TableMetadata ret = new TableMetadata(name, db);
         if(config == null){
-            Element c = metadata.getRootElement().getChild("config", Database.xFlatNs);
+            Element c = metadata.getRootElement().getChild("config", XFlatDatabase.xFlatNs);
             config = TableConfig.FromElementConverter.convert(c);
         }
         //else we already verified that config was equal to that stored in metadata
 
         //load ID generator
         Class<? extends IdGenerator> generatorClass = null;
-        Element g = metadata.getRootElement().getChild("generator", Database.xFlatNs);
+        Element g = metadata.getRootElement().getChild("generator", XFlatDatabase.xFlatNs);
         if(g != null){
-            String gClassStr = g.getAttributeValue("class", Database.xFlatNs);
+            String gClassStr = g.getAttributeValue("class", XFlatDatabase.xFlatNs);
             if(gClassStr != null){
                 try {
                     generatorClass = (Class<? extends IdGenerator>) TableMetadata.class.getClassLoader().loadClass(gClassStr);
@@ -169,9 +169,9 @@ public class TableMetadata {
 
         //load engine
         Class<? extends EngineBase> engineClass = null;
-        Element engineEl = metadata.getRootElement().getChild("engine", Database.xFlatNs);
+        Element engineEl = metadata.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
         if(engineEl != null){
-            String engineClassAttr = engineEl.getAttributeValue("class", Database.xFlatNs);
+            String engineClassAttr = engineEl.getAttributeValue("class", XFlatDatabase.xFlatNs);
             if(engineClassAttr != null){
                 try {
                     engineClass = (Class<? extends EngineBase>) TableMetadata.class.getClassLoader().loadClass(engineClassAttr);
@@ -198,22 +198,22 @@ public class TableMetadata {
 
     public Document saveTableMetadata(){
         Document doc = new Document();
-        doc.setRootElement(new Element("metadata", Database.xFlatNs));
+        doc.setRootElement(new Element("metadata", XFlatDatabase.xFlatNs));
         
         //save config
         Element cfg = TableConfig.ToElementConverter.convert(this.config);
         doc.getRootElement().addContent(cfg);
         
         //save generator
-        Element g= new Element("generator", Database.xFlatNs);
-        g.setAttribute("class", this.idGenerator.getClass().getName(), Database.xFlatNs);
+        Element g= new Element("generator", XFlatDatabase.xFlatNs);
+        g.setAttribute("class", this.idGenerator.getClass().getName(), XFlatDatabase.xFlatNs);
         this.idGenerator.saveState(g);
         
         doc.getRootElement().addContent(g);
         
         //save engine
-        Element e = new Element("engine", Database.xFlatNs);
-        e.setAttribute("class", this.engine.getClass().getName(), Database.xFlatNs);
+        Element e = new Element("engine", XFlatDatabase.xFlatNs);
+        e.setAttribute("class", this.engine.getClass().getName(), XFlatDatabase.xFlatNs);
         this.engine.saveMetadata(e);
         doc.getRootElement().addContent(e);
         

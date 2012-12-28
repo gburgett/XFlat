@@ -4,6 +4,7 @@
  */
 package org.gburgett.xflat.db;
 
+import org.gburgett.xflat.Database;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -34,7 +35,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
  * The base class for classes that manage tables and conversion services.
  * @author gordon
  */
-public class Database {
+public class XFlatDatabase implements Database {
     
     public static Namespace xFlatNs = Namespace.getNamespace("db", "http://xflat.gburgett.org/xflat/db");
     
@@ -89,7 +90,7 @@ public class Database {
      * Creates a new database in the given directory.
      * @param directory The flat-file directory in which tables should be stored.
      */
-    public Database(File directory){
+    public XFlatDatabase(File directory){
         this.directory = directory;
     }
     
@@ -107,7 +108,7 @@ public class Database {
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable(){
             @Override
             public void run() {
-                Database.this.shutdown();
+                XFlatDatabase.this.shutdown();
             }
         }));
     }
@@ -177,7 +178,7 @@ public class Database {
                 //we're good here.
                 continue;
             }
-            Element cfg = existing.getRootElement().getChild("config", Database.xFlatNs);
+            Element cfg = existing.getRootElement().getChild("config", XFlatDatabase.xFlatNs);
             if(cfg == null){
                 //still good
                 continue;
@@ -251,11 +252,13 @@ public class Database {
         }
     }
     
+    @Override
     public <T> Table<T> getTable(Class<T> type){
-        return this.getTable(type.getSimpleName(), type);
+        return this.getTable(type, type.getSimpleName());
     }
     
-    public <T> Table<T> getTable(String name, Class<T> type){
+    @Override
+    public <T> Table<T> getTable(Class<T> type, String name){
         if(!this.getConversionService().canConvert(type, Element.class) ||
                 !this.getConversionService().canConvert(Element.class, type)){
             //try to load the pojo converter

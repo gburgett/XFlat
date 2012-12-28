@@ -20,12 +20,13 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.db.Database;
+import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.db.Engine;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.query.XpathQuery;
@@ -257,7 +258,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         if(file.exists()){
             try {
                 Document doc = this.file.readFile();
-                List<Element> rowList = doc.getRootElement().getChildren("row", Database.xFlatNs);
+                List<Element> rowList = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
                 //copy to array to avoid concurrent modification exception
                 Element[] rowArr = new Element[rowList.size()];
                 for(Element row : rowList.toArray(rowArr)){
@@ -318,7 +319,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
     
     private WeakHashMap<Cursor<Element>, String> openCursors = new WeakHashMap<>();
-    private AtomicReference<Runnable> spinDownTask = new AtomicReference<>(null);
     
     @Override
     protected void spinDown(final SpinDownEventHandler completionEventHandler) {
@@ -329,69 +329,60 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             return;
         }
         
-        if(this.cache != null)
-            dumpCacheNow();
-        //start a task to check the open cursors - when they are all closed,
-        //we can fire the event
-        
-        if(spinDownTask.get() != null){
-            return;
-        }
-        
-        synchronized(syncRoot){
-            if(spinDownTask.get() != null)
-                return;
-            
-            if(openCursors.isEmpty()){
-                if(this.state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
-                    if(completionEventHandler != null)
-                        completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-                    
-                    spinDownTask.set(null);
-                    //we're ok to finish our spin down now
-                    forceSpinDown();
-                }
-                return;
-            }
-            
-            final AtomicReference<ScheduledFuture<?>> spinDownFuture = new AtomicReference<>();
-            this.spinDownTask.set(new Runnable(){
+        final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
+        if(this.cache != null && lastModified.get() >= lastDump.get()){
+            //schedule immediate dump
+             cacheDumpTask.set(this.getExecutorService().schedule(
+                new Runnable(){
                     @Override
                     public void run() {
-                        if(!openCursors.isEmpty())
-                            return;
-
-                        Future<?> thisTask = spinDownFuture.get();
-                        if(thisTask == null || thisTask.isDone())
-                            return;
-
-                        thisTask.cancel(false);
-                        spinDownFuture.set(null);
-
-                        synchronized(syncRoot){
-                            if(spinDownTask.get() == null)
-                                return;
-                            
-                            if(!openCursors.isEmpty())
-                                return;
-                            
-                            if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
-                                //already spun down
-                                return;
-                            }
-                            
-                            if(completionEventHandler != null)
-                                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-                            spinDownTask.set(null);
-                            //we're ok to finish our spin down now
-                            forceSpinDown();
+                        try{
+                            dumpCacheNow();
+                        }
+                        catch(XflatException ex){
+                            log.warn("Unable to dump cached data", ex);
                         }
                     }
-                });
-            spinDownFuture.set(
-                this.getExecutorService().scheduleAtFixedRate(
-                this.spinDownTask.get(), 5, 10, TimeUnit.MILLISECONDS));
+                }, 0, TimeUnit.MILLISECONDS));
         }
+        
+        if(openCursors.isEmpty() && cacheDumpTask.get() == null || cacheDumpTask.get().isDone()){
+            this.state.set(EngineState.SpunDown);
+            if(completionEventHandler != null)
+                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+
+            //we're ok to finish our spin down now
+            forceSpinDown();
+
+            return;
+        }
+
+        Runnable spinDownTask = new Runnable(){
+                @Override
+                public void run() {
+                    if(!openCursors.isEmpty())
+                        return;
+
+                    if(cacheDumpTask.get() != null && !cacheDumpTask.get().isDone()){
+                        return;
+                    }
+
+                    if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
+                        throw new RuntimeException("cancel task - in wrong state");
+                    }
+
+                    if(completionEventHandler != null)
+                        completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+                    //we're ok to finish our spin down now
+                    forceSpinDown();
+
+                    throw new RuntimeException("Scheduled Task Complete");
+
+                }
+            };
+        this.getExecutorService().scheduleAtFixedRate(
+            spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
+
     }
 
     @Override
@@ -410,15 +401,15 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     
     private String getId(Element row) {
-        return row.getAttributeValue("id", Database.xFlatNs);
+        return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
     
     private void setId(Element row, String id){
-        row.setAttribute("id", id, Database.xFlatNs);
+        row.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
     private Element wrapInRow(Element data, String id){
-        Element row = new Element("row", Database.xFlatNs).setContent(data);
+        Element row = new Element("row", XFlatDatabase.xFlatNs).setContent(data);
         setId(row, id);
         
         return row;
@@ -426,18 +417,19 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     
     private AtomicReference<Future<?>> scheduledDump = new AtomicReference<>(null);
-    private AtomicReference<Date> lastDump = new AtomicReference<>(null);
+    private AtomicLong lastDump = new AtomicLong(System.currentTimeMillis());
+    private AtomicLong lastModified = new AtomicLong(System.currentTimeMillis());
     private AtomicInteger dumpFailures = new AtomicInteger();
     
     private void dumpCache(){
         long delay = 0;
+        lastModified.set(System.currentTimeMillis());
         
         //did we dump inside the last 100 ms?
-        if(lastDump.get() != null &&
-            lastDump.get().after(new Date(System.currentTimeMillis() - 100)))
+        if(lastDump.get() + 100 > System.currentTimeMillis())
         {
             //yes, dump at 100 ms
-            delay = lastDump.get().getTime() + 100 - System.currentTimeMillis();
+            delay = lastDump.get() + 100 - System.currentTimeMillis();
             if(delay < 0)
                 delay = 0;
         }
@@ -448,7 +440,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         }
         
         ScheduledFuture<?> dumpTask;
-        synchronized(syncRoot){
+        synchronized(dumpSyncRoot){
             if(scheduledDump.get() != null || isSpinningDown()){
                 return;
             }
@@ -485,10 +477,15 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private final Object dumpSyncRoot = new Object();
     private void dumpCacheNow(){
         synchronized(dumpSyncRoot){
+            if(lastModified.get() < lastDump.get()){
+                //no need to dump
+                return;
+            }
+            
             //take a 'snapshot' of the detached elements
             Document doc = new Document();
-            Element root = new Element("table", Database.xFlatNs)
-                    .setAttribute("name", this.getTableName(), Database.xFlatNs);
+            Element root = new Element("table", XFlatDatabase.xFlatNs)
+                    .setAttribute("name", this.getTableName(), XFlatDatabase.xFlatNs);
             doc.setRootElement(root);
 
             root.addContent(this.cache.values());
@@ -502,7 +499,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
             finally {
                 scheduledDump.set(null);
-                lastDump.set(new Date(System.currentTimeMillis()));
+                lastDump.set(System.currentTimeMillis());
             }
 
             //success!
@@ -528,13 +525,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         @Override
         public void close() throws Exception {
             CachedDocumentEngine.this.openCursors.remove(this);
-            if(!isSpinningDown())
-                return;
-            
-            //run the spin down monitoring task immediately, don't wait for the scheduler.
-            Runnable t = spinDownTask.get();
-            if(t != null)
-                t.run();
         }
         
     }

@@ -108,12 +108,12 @@ public class IntegerIdGenerator extends IdGenerator {
     
     @Override
     public void saveState(Element state){
-        state.setAttribute("maxId", Integer.toString(this.lastId.get()), Database.xFlatNs);
+        state.setAttribute("maxId", Integer.toString(this.lastId.get()), XFlatDatabase.xFlatNs);
     }
     
     @Override
     public void loadState(Element state){
-        String maxId = state.getAttributeValue("maxId", Database.xFlatNs);
+        String maxId = state.getAttributeValue("maxId", XFlatDatabase.xFlatNs);
         this.lastId.set(Integer.parseInt(maxId));
     }
     

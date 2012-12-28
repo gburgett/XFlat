@@ -28,8 +28,10 @@ public class CachedDocumentEngineTest extends EngineTestsBase {
     public void setUp() throws IOException{
         super.setUp();
         
+        TestContext ctx = getContext();
+        
         name = "CachedDocumentEngineTest";
-        file = new File(this.workspace, name + ".xml");
+        file = new File(ctx.workspace, name + ".xml");
         wrapper = new DocumentFileWrapper(file);
     }
     

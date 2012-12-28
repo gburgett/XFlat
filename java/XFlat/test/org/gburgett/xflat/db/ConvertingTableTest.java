@@ -41,7 +41,7 @@ public class ConvertingTableTest {
     ConversionService conversionService;
     Engine engine;
     IdGenerator idGenerator;
-    Database database;
+    XFlatDatabase database;
     
     private XPathFactory xpath;
     
@@ -74,7 +74,7 @@ public class ConvertingTableTest {
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
-        database = mock(Database.class);
+        database = mock(XFlatDatabase.class);
         engine = mock(Engine.class);
         idGenerator = mock(IdGenerator.class);
         
@@ -86,11 +86,11 @@ public class ConvertingTableTest {
     }
 
     private String getId(Element data){
-        return data.getAttributeValue("id", Database.xFlatNs);
+        return data.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
     
     private void setId(Element e, String id){
-        e.setAttribute("id", id, Database.xFlatNs);
+        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
     @Test

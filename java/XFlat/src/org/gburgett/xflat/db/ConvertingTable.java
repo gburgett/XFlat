@@ -39,7 +39,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     
     private Map<T, String> idMap;
     
-    ConvertingTable(Database db, Class<T> type, String name){
+    ConvertingTable(XFlatDatabase db, Class<T> type, String name){
         super(db, type, name);
         
         this.accessor = IdAccessor.forClass(type);
@@ -51,7 +51,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         
     //<editor-fold desc="helpers">
     private String getId(Element rowData){
-        return rowData.getAttributeValue("id", Database.xFlatNs);
+        return rowData.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
     
     private String getId(T data){
@@ -76,7 +76,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     private void setId(Element rowData, String sId){
-        rowData.setAttribute("id", sId, Database.xFlatNs);
+        rowData.setAttribute("id", sId, XFlatDatabase.xFlatNs);
     }
     
     private Element convert(T data){

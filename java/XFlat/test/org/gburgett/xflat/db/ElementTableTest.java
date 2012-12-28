@@ -41,7 +41,7 @@ public class ElementTableTest {
     ConversionService conversionService;
     Engine engine;
     IdGenerator idGenerator;
-    Database database;
+    XFlatDatabase database;
     
     private XPathFactory xpath;
     
@@ -58,7 +58,7 @@ public class ElementTableTest {
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
-        database = mock(Database.class);
+        database = mock(XFlatDatabase.class);
         engine = mock(Engine.class);
         idGenerator = mock(IdGenerator.class);
         
@@ -70,15 +70,15 @@ public class ElementTableTest {
     }
 
     private String getId(Element data){
-        return data.getAttributeValue("id", Database.xFlatNs);
+        return data.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
     
     private void setId(Element e, String id){
         if(id == null){
-            e.removeAttribute("id", Database.xFlatNs);
+            e.removeAttribute("id", XFlatDatabase.xFlatNs);
             return;
         }
-        e.setAttribute("id", id, Database.xFlatNs);
+        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
     @Test

@@ -25,7 +25,7 @@ import org.jdom2.Element;
 public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     
-    ElementTable(Database db, String tableName){
+    ElementTable(XFlatDatabase db, String tableName){
         super(db, Element.class, tableName);
     }
     
@@ -166,7 +166,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     
     
     private String getId(Element element){
-        Attribute a = element.getAttribute("id", Database.xFlatNs);
+        Attribute a = element.getAttribute("id", XFlatDatabase.xFlatNs);
         if(a != null){
             return a.getValue();
         }
@@ -175,7 +175,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
     
     private void setId(String id, Element e){
-        e.setAttribute("id", id, Database.xFlatNs);
+        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
     private String generateNewId(){
