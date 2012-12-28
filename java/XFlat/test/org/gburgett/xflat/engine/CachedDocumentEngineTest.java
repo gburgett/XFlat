@@ -19,30 +19,17 @@ import org.junit.Before;
  */
 public class CachedDocumentEngineTest extends EngineTestsBase {
 
-    File file;
-    DocumentFileWrapper wrapper;
-    String name;
-    
-    @Before
+    String name = "CachedDocumentEngineTest";
     @Override
-    public void setUp() throws IOException{
-        super.setUp();
-        
-        TestContext ctx = getContext();
-        
-        name = "CachedDocumentEngineTest";
-        file = new File(ctx.workspace, name + ".xml");
-        wrapper = new DocumentFileWrapper(file);
-    }
-    
-    @Override
-    protected EngineBase createInstance() {
-        
-        return new CachedDocumentEngine(wrapper, name);
+    protected EngineBase createInstance(TestContext ctx) {
+        File file = new File(ctx.workspace, name + ".xml");
+        ctx.additionalContext.put("file", file);
+        return new CachedDocumentEngine(new DocumentFileWrapper(file), name);
     }
 
     @Override
-    protected void prepFileContents(Document contents) throws IOException {
+    protected void prepFileContents(TestContext ctx, Document contents) throws IOException {
+        File file = (File)ctx.additionalContext.get("file");
         if(contents == null){
             //ensure file doesn't exist
             if(file.exists())
@@ -51,15 +38,13 @@ public class CachedDocumentEngineTest extends EngineTestsBase {
             return;
         }
         
-        if(!file.exists())
-            file.createNewFile();
-        
-        wrapper.writeFile(contents);
+        new DocumentFileWrapper(file).writeFile(contents);
     }
 
     @Override
-    protected Document getFileContents() throws IOException, JDOMException {
-        return wrapper.readFile();
+    protected Document getFileContents(TestContext ctx) throws IOException, JDOMException {
+        File file = (File)ctx.additionalContext.get("file");
+        return new DocumentFileWrapper(file).readFile();
     }
     
     

@@ -6,8 +6,10 @@ package org.gburgett.xflat.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -32,9 +34,7 @@ import org.hamcrest.TypeSafeMatcher;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
-import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Before;
 import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -52,9 +52,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     protected static File workspace;
     
-    
-    protected ThreadLocal<TestContext> context = new ThreadLocal<>();
-    
     @BeforeClass
     public static void setUpClass() {
         executorService = new ScheduledThreadPoolExecutor(4);
@@ -66,48 +63,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         if(!workspace.exists()){
             workspace.mkdirs();
         }
-    }
-    
-    
-    @Before
-    public void setUp() throws IOException {
-        TestContext ctx = new TestContext();
-        context.set(ctx);
-        
-        ctx.workspace = new File(workspace, Long.toHexString(ctx.id));
-        if(!ctx.workspace.exists()){
-            ctx.workspace.mkdirs();
-        }
-    }
-    
-    /**
-     * Gets the current test context for this thread.
-     * Since JUnit can run multiple tests in the same fixture concurrently,
-     * we have to keep a ThreadLocal TestContext instance.  The TestContext
-     * is created in {@link #setUp() } and used in {@link #tearDown() } to verify
-     * that the engine spun down correctly.  
-     * This method also verifies that my assumptions about the test runner are correct,
-     * that a single thread will progress from startUp through test to tearDown.
-     * @return This thread's TestContext instance, created in the SetUp method.
-     */
-    protected TestContext getContext(){
-        TestContext ctx = this.context.get();
-        assertNotNull("We must have a context");
-        assertEquals("Context must be for correct thread", Thread.currentThread().getId(), ctx.id);
-        return ctx;
-    }
-    
-    
-    @After
-    public void tearDown() throws InterruptedException, TimeoutException{
-        TestContext ctx = getContext();
-        
-        spinDown(ctx.instance, true);
-        
-        verifySpinDownComplete();
-    
-        deleteDir(ctx.workspace);
-        ctx.workspace.delete();
     }
     
     @AfterClass
@@ -129,14 +84,34 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     }
     
     /**
+     * Gets a new test context for this test, creating the workspace
+     * directory and setting up the engine instance.
+     */
+    protected TestContext getContext(){
+        TestContext ctx = new TestContext();
+        
+        ctx.workspace = new File(workspace, Long.toHexString(ctx.id));
+        if(!ctx.workspace.exists()){
+            ctx.workspace.mkdirs();
+        }
+        else{
+            deleteDir(ctx.workspace);
+        }
+        
+        ctx.instance = setupEngine(ctx);
+        
+        return ctx;
+    }
+    
+    /**
      * Spins down the Engine, waiting for it to complete and throwing
      * an exception if it times out.
      * @param instance The engine to spin down
      * @throws InterruptedException
      * @throws TimeoutException 
      */
-    protected void spinDown(EngineBase instance) throws InterruptedException, TimeoutException {
-        this.spinDown(instance, true);
+    protected void spinDown(TestContext ctx) throws InterruptedException, TimeoutException {
+        this.spinDown(ctx, true);
     }
     
     
@@ -148,9 +123,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
      * @throws InterruptedException
      * @throws TimeoutException 
      */
-    protected void spinDown(final EngineBase engine, boolean synchronous) throws InterruptedException, TimeoutException{
+    protected void spinDown(final TestContext ctx, boolean synchronous) throws InterruptedException, TimeoutException{
 
-        TestContext ctx = getContext();
+        final EngineBase engine = ctx.instance;
         
         if(!ctx.spinDownInvoked.compareAndSet(false, true)){
             return;
@@ -214,10 +189,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
     }
     
-    protected void verifySpinDownComplete() throws InterruptedException{
-        
-        TestContext ctx = getContext();
-        
+    protected void verifySpinDownComplete(TestContext ctx) throws InterruptedException{
         if(ctx.instance.getState() != EngineState.SpunDown){
             //give it a little leeway
             Thread.sleep(500);
@@ -226,40 +198,38 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have spun down", EngineState.SpunDown, ctx.instance.getState());
     }
     
-    private TEngine setupEngine(){
-        TEngine instance = this.createInstance();
+    private TEngine setupEngine(TestContext ctx){
+        TEngine instance = this.createInstance(ctx);
         instance.setExecutorService(executorService);
         instance.setConversionService(conversionService);
         return instance;
     }
     
-    protected void spinUp(EngineBase instance){
-        
-        TestContext ctx = getContext();
+    protected void spinUp(TestContext ctx){
         
         ctx.spinDownInvoked.set(false);
-        instance.spinUp();
-        instance.beginOperations();
+        ctx.instance.spinUp();
+        ctx.instance.beginOperations();
     }
     
     /**
      * Gets the engine instance to test
      * @return 
      */
-    protected abstract TEngine createInstance();
+    protected abstract TEngine createInstance(TestContext ctx);
     
     /**
      * Prepares the underlying XML file by writing the given contents to it.
      * @param contents The contents which should be stored in the underlying XML file.
      */
-    protected abstract void prepFileContents(Document contents) throws IOException;
+    protected abstract void prepFileContents(TestContext ctx, Document contents) throws IOException;
     
     /**
      * Gets the contents of the written file as a Document.  This will be invoked
      * after spin down to get the final table contents.
      * @return 
      */
-    protected abstract Document getFileContents() throws IOException, JDOMException;
+    protected abstract Document getFileContents(TestContext ctx) throws IOException, JDOMException;
     
     
     
@@ -305,10 +275,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
         
-        prepFileContents(null);
-        spinUp(ctx.instance);
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -320,10 +290,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
+        spinDown(ctx);
         
-        spinDown(ctx.instance);
-        
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
@@ -331,6 +300,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Element data = children.get(0).getChild("data");
         assertNotNull("row should have the data", data);
         assertEquals("row should have the data", "some text data", data.getText());
+        
     }//end testInsert_NoValuesYet_Inserts
     
     @Test
@@ -339,14 +309,14 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -359,10 +329,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
         //ASSERT
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
@@ -379,14 +349,14 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -401,10 +371,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertTrue("Should have thrown DuplicateKeyException", didThrow);
         
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
         //ASSERT
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
@@ -422,16 +392,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
         
-        prepFileContents(null);
-        spinUp(ctx.instance);
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
         
         
         //ACT
         Element data = ctx.instance.readRow("72");
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
         //ASSERT
         assertNull("Should not read data that does not exist", data);
@@ -444,20 +414,18 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
-        
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         
         //ACT
         Element data = ctx.instance.readRow("72");
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
         //ASSERT
         assertNull("Should not read data that does not exist", data);
@@ -470,21 +438,21 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("some text data"),
                 new Element("data").setText("other text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         
         //ACT
         Element data = ctx.instance.readRow("1");
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
         //ASSERT
         assertNotNull("Should have read some data", data);
@@ -498,10 +466,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
         
-        prepFileContents(null);
-        spinUp(ctx.instance);
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
         
         
         //ACT
@@ -510,7 +478,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
             //cursors ought to still read during spin down
             //but do it async cause we're using the cursor
-            spinDown(ctx.instance, false);
+            spinDown(ctx, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -519,7 +487,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         
         //now verify that we spin down shortly after
-        this.verifySpinDownComplete();
+        this.verifySpinDownComplete(ctx);
         
     }//end testQueryTable_NoData_NoResults
     
@@ -529,7 +497,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
@@ -538,8 +506,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                         )
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
@@ -547,7 +515,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
             //cursors ought to still read during spin down
             //but do it async cause we're using the cursor
-            spinDown(ctx.instance, false);
+            spinDown(ctx, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -556,7 +524,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         
         //now verify that we spin down shortly after
-        this.verifySpinDownComplete();
+        this.verifySpinDownComplete(ctx);
         
     }//end testQueryTable_WrongData_NoResults
     
@@ -566,7 +534,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
@@ -578,8 +546,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                         )
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
@@ -587,7 +555,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
             //cursors ought to still read during spin down
             //but do it async cause we're using the cursor
-            spinDown(ctx.instance, false);
+            spinDown(ctx, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -599,7 +567,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         
         //now verify that we spin down shortly after
-        this.verifySpinDownComplete();
+        this.verifySpinDownComplete(ctx);
         
     }//end testQueryTable_OneMatch_OneResult
     
@@ -609,7 +577,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
@@ -621,8 +589,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                         )
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         //ACT
         XpathQuery query = XpathQuery.gte(xpath.compile("data/fooInt"), 17);
@@ -630,7 +598,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
             //cursors ought to still read during spin down,
             //but do it async cause we're using the cursor
-            spinDown(ctx.instance, false);
+            spinDown(ctx, false);
 
             //ASSERT
             assertNotNull("Should have gotten a cursor", cursor);
@@ -642,7 +610,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         
         //now verify that we spin down shortly after
-        this.verifySpinDownComplete();
+        this.verifySpinDownComplete(ctx);
         
     }//end testQueryTable_MultipleMatches_MultipleResults
     
@@ -652,10 +620,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
         
-        prepFileContents(null);
-        spinUp(ctx.instance);
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -669,10 +637,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         assertTrue("Should have thrown KeyNotFoundException", didThrow);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
         //ASSERT
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have no data", 0, children.size());
     }//end testReplaceRow_NoData_ThrowsKeyNotFoundException
@@ -683,15 +651,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -703,9 +671,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -722,15 +690,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
         
@@ -744,9 +712,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         assertTrue("Should have thrown KeyNotFoundException", didThrow);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -763,15 +731,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathUpdate update = XpathUpdate.set(xpath.compile("fourth"), "updated text");
         
@@ -781,9 +749,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         //ASSERT
         assertFalse("Should have reported unsuccessful update", result);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -800,15 +768,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
         
@@ -822,9 +790,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "other", fromEngine.getName());
         assertEquals("Should have updated in engine", "updated text", fromEngine.getText());
 
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -841,7 +809,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
@@ -850,8 +818,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                     .setText("third text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
@@ -862,9 +830,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         //ASSERT
         assertEquals("Should report 0 rows updated", 0, result);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -881,7 +849,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
@@ -890,8 +858,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                     .setText("third text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("fourth"), "updated text");
@@ -902,9 +870,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         //ASSERT
         assertEquals("Should report 0 rows updated", 0, result);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -921,7 +889,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
@@ -930,8 +898,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                     .setText("third text data")
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("third"), "updated text");
@@ -946,9 +914,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "third", fromEngine.getName());
         assertEquals("Should have updated in engine", "updated text", fromEngine.getText());
 
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -965,7 +933,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                 new Element("other")
@@ -985,8 +953,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 )
             );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         XpathQuery query = XpathQuery.gte(xpath.compile("*/@fooInt"), 17);
         XpathUpdate update = XpathUpdate.set(xpath.compile("*/data"), "updated text");
@@ -1005,9 +973,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "third", fromEngine.getName());
         assertThat("Should have updated in engine", fromEngine, hasChildText("data", "updated text"));
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 3, children.size());
         
@@ -1025,10 +993,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
         
-        prepFileContents(null);
-        spinUp(ctx.instance);
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -1042,9 +1010,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
         
@@ -1062,15 +1030,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         Element rowData = new Element("data").setText("some text data");
         
@@ -1084,9 +1052,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -1103,10 +1071,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
         
-        prepFileContents(null);
-        spinUp(ctx.instance);
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
         
         //ACT
         boolean didThrow = false;
@@ -1118,9 +1086,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         }
         assertTrue("Should have thrown KeyNotFoundException", didThrow);
 
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have no elements", 0, children.size());
         
@@ -1132,15 +1100,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         //ACT
         ctx.instance.deleteRow("0");
@@ -1149,9 +1117,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Element fromEngine = ctx.instance.readRow("0");
         assertNull("Row should be deleted in engine", fromEngine);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have one fewer element", 1, children.size());
         
@@ -1167,15 +1135,15 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
@@ -1193,9 +1161,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("Should have not changed in engine", "third", fromEngine.getName());
         assertEquals("Should have not changed in engine", "third text data", fromEngine.getText());
 
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
@@ -1212,7 +1180,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        ctx.instance = setupEngine();
+        
         
         Document inFile = makeDocument(ctx.instance.getTableName(),
             new Element("other")
@@ -1226,8 +1194,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 .setText("fourth text data")
         );
         
-        prepFileContents(inFile);
-        spinUp(ctx.instance);
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
         
         //ACT
         XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
@@ -1244,9 +1212,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         fromEngine = ctx.instance.readRow("2");
         assertNotNull("Should not have deleted row", fromEngine);
         
-        spinDown(ctx.instance);
+        spinDown(ctx);
         
-        Document doc = getFileContents();
+        Document doc = getFileContents(ctx);
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have fewer elements", 1, children.size());
         
@@ -1311,6 +1279,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         public File workspace;
         
         public long id;
+        
+        public final Map<String, Object> additionalContext = new HashMap<>();
         
         public TestContext(){
             this.id = Thread.currentThread().getId();
