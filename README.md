@@ -1,7 +1,8 @@
 XFlat
 =====
 
-A lightweight XML persistence framework presenting a CRUD interface to flat XML files.
+A lightweight embedded object-oriented schemaless non-relational DB persisting objects to flat XML files.
+XFlat is a completely free alternative to db4o for an embedded object DB.
 
 ----
 
@@ -17,10 +18,9 @@ Well thats a bit harder, but you could write a class to inspect the DOM and pull
 
 > But I also need to query my POJOs by arbitrary criteria.
 
-Looks like you need a database.  Take a look at Derby or Sql Lite
+Looks like you need a database.  Take a look at db4o or Sql Lite
 
-> Well I don't really have that much data, and it's not very relational.  
-> It would be really nice to just keep it in a flat file.
+> Well I'd prefer not to have to deal with Sql, and my application is commercial.
 
 Oh, well in that case XFlat is for you!
 
@@ -29,38 +29,44 @@ Oh, well in that case XFlat is for you!
 XFlat is a single lightweight JAR that persists XML DOM Elements to flat files.
 It presents as a CRUD interface to XML Elements that can be queried by ID or arbitrary XPath expressions.
 Because it is stored in flat files, XFlat is not relational and is schemaless.
-XFlat is effective for table sizes up to the dozens of KB.  Future versions may contain engines that are
+XFlat is effective for table sizes up to the dozens of KB.  Future versions will contain engines that are
 effective up to the hundreds of MB, using memory-mapped files.
 
-XFlat also comes with a converting wrapper that maps POJOs to DOM Elements using JAXB.  The underlying implementation
-can be swapped if necessary.  The JAXB context is only loaded if it is used, so you can avoid it completely by using
-only the JDOM CRUD interface.
 
-XFlat manages a "database" as a directory of flat files.  Each "database" contains a number of "tables".
-One table corresponds to one file, unless the table is sharded (to be implemented in future versions).
-A table contains any number of "rows".  A row is simply an XML Dom Element in the XFlat namespace which contains
-one child element.  This child element is the content of the row.
+#### Features:
+* POJO mapping to XML
+  * XFlat maps POJOs to JDOM `Element` objects using JAXB.  The underlying implementation can be swapped if necessary.
+The JAXB context is only loaded if it is used, so you can avoid it completely by specifying custom converters,
+or using only the JDOM CRUD interface.
 
-Rows can be queried by unique ID, or by an XPath expression combined with a Hamcrest matcher.  The unique ID
-is always a string and is stored as an attribute on the row element.  The XPath query can select any DOM element
-within a row, and the value of that DOM element is matched by the Hamcrest matcher to determine whether the row
-is selected by the query.
 
-The database manages each table using one of several "engines".  The engines are optimized for different file sizes,
-and they can (and will) be hot-swapped as tables grow and shrink.  The simplest engine (and the only one implemented
-for version 1.0) keeps the entire contents of the table in memory as a JDom Document, and flushes it to disk often.
-This is obviously not workable for table sizes greater than dozens of kb, so future versions will contain engines
-for larger sizes.
+* Queriable by XPath expressions
+  * Tables can be queried by any arbitrary XPath expression using the table row as the context.  The expression
+selects a part of the `Element` that is convertible to the value which is being matched, then the matching is performed
+using Hamcrest Matchers.
 
-(not implemented for version 1.0)
-XFlat can also index tables by arbitrary xpath expressions.  The values of the content selected by the expression 
-are kept in the index for optimizing future queries.  XPath Queries that use any non-indexed expressions will 
-cause a full table scan.
 
-(not impelemented for version 1.0)
-XFlat has the capability to "shard" tables.  Sharding is splitting the table's contents into multiple files
-by some indexed value (most often ID).  Queries on that index then know which file to open in order to get at the
-correct data.  This is only useful when tables grow very large.
+* Multiple hot-swapped Engines (to be implemented)
+  * The management of each table is handled by an Engine.  As a table grows or shrinks, the appropriate Engine for managing
+the data is swapped in behind the scenes.  For example, very small tables can use an engine that loads the whole
+XML DOM in-memory, while very large tables can use an engine that manipulates a memory-mapped file.
+
+
+* Indexing on XPath expressions (to be implemented)
+  * Engines can take advantage of indexes that are based on any arbitrary XPath expression.  The expression selects a
+part of the `Element` that is converted to a `Comparable` (such as an Integer), then the engine can map that `Comparable`
+to the row and binary search indexes to improve performance.
+
+
+* Sharding on XPath expressions (to be implemented)
+  * A table can be sharded across multiple files based on a sharding key selected by an XPath expression.  The expression
+selects a part of the `Element` that is converted to a `Comparable`, then a `RangeProvider` determines which file to store
+the Element in.
+
+
+* ACID Transactions (to be implemented)
+  * XFlat can support Transactions which can be saved and resumed.  All uncommitted transactional data is persisted in
+the same file as the table data, so transactions can be resumed between program execution.
 
 ====
 
@@ -82,3 +88,23 @@ Optional dependencies:
   * jaxen-1.1.4.jar
   
 * JAXB reference implementation 1.0 - for automatic POJO mapping
+
+====
+### Examples
+
+Insert an instance of `Foo` into the table "Foo" stored in "myDataDirectory/Foo.xml".
+```java
+XFlatDatabase db = new XFlatDatabase(new File("myDataDirectory"));
+//initialize with default config
+db.initialize();
+
+Foo myFoo = new Foo();
+Table<Foo> fooTable = db.getTable(Foo.class);
+fooTable.insert(myFoo);  //inserts with unique automatically-generated ID
+System.out.println("Stored foo in table Foo with ID " + myFoo.getId());
+
+Foo myFoo2 = fooTable.find(myFoo.getId());
+//myFoo2 is a new instance with the same data as myFoo
+```
+
+See "Examples.md" for more examples
