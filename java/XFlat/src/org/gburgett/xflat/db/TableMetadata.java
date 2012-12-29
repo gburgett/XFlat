@@ -39,7 +39,7 @@ public class TableMetadata {
         this.db = db;
     }
 
-    public synchronized <T> Table<T> getTable(Class<T> clazz){
+    public synchronized TableBase getTable(Class<?> clazz){
         if(clazz == null){
             throw new IllegalArgumentException("clazz cannot be null");
         }
@@ -57,7 +57,7 @@ public class TableMetadata {
 
         for(Map.Entry<TableBase, Class<?>> entry : tables.entrySet()){
             if(entry.getValue().equals(clazz)){
-                return (Table<T>)entry.getKey();
+                return entry.getKey();
             }
         }
 
@@ -66,7 +66,7 @@ public class TableMetadata {
         table.setEngine(engine);
         tables.put(table, clazz);
 
-        return (Table<T>)table;
+        return table;
     }
 
     private <T> TableBase makeTableForClass(Class<T> clazz){
@@ -106,8 +106,10 @@ public class TableMetadata {
 
     public static TableMetadata makeNewTableMetadata(String name, XFlatDatabase db, DatabaseConfig dbConfig, TableConfig config, Class<?> idType){
 
-        config = config == null ? TableConfig.defaultConfig : config;
         TableMetadata ret = new TableMetadata(name, db);
+        
+        config = config == null ? TableConfig.defaultConfig : config;
+        ret.config = config;
 
         //make ID Generator
         Class<? extends IdGenerator> generatorClass = config.getIdGenerator();
@@ -135,7 +137,9 @@ public class TableMetadata {
         //make engine
         //TODO: engines will in the future be configurable & based on a strategy
         ret.engine = new CachedDocumentEngine(new File(db.getDirectory(), name + ".xml"), name);
-
+        ret.engine.setConversionService(db.getConversionService());
+        ret.engine.setExecutorService(db.getExecutorService());
+        
         return ret;
     }
 
@@ -147,6 +151,8 @@ public class TableMetadata {
         }
         //else we already verified that config was equal to that stored in metadata
 
+        ret.config = config;
+        
         //load ID generator
         Class<? extends IdGenerator> generatorClass = null;
         Element g = metadata.getRootElement().getChild("generator", XFlatDatabase.xFlatNs);
@@ -192,7 +198,9 @@ public class TableMetadata {
             throw new XflatException("Cannot load metadata: cannot instantiate new engine", ex);
         }
         ret.engine.loadMetadata(engineEl);
-
+        ret.engine.setConversionService(db.getConversionService());
+        ret.engine.setExecutorService(db.getExecutorService());
+        
         return ret;
     }
 

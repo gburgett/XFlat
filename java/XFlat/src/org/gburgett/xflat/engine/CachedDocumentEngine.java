@@ -339,7 +339,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         try{
                             dumpCacheNow();
                         }
-                        catch(XflatException ex){
+                        catch(Exception ex){
                             log.warn("Unable to dump cached data", ex);
                         }
                     }
@@ -425,11 +425,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         long delay = 0;
         lastModified.set(System.currentTimeMillis());
         
-        //did we dump inside the last 100 ms?
-        if(lastDump.get() + 100 > System.currentTimeMillis())
+        //did we dump inside the last 250 ms?
+        if(lastDump.get() + 250 > System.currentTimeMillis())
         {
-            //yes, dump at 100 ms
-            delay = lastDump.get() + 100 - System.currentTimeMillis();
+            //yes, dump at 250 ms
+            delay = lastDump.get() + 250 - System.currentTimeMillis();
             if(delay < 0)
                 delay = 0;
         }
@@ -487,9 +487,13 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             Element root = new Element("table", XFlatDatabase.xFlatNs)
                     .setAttribute("name", this.getTableName(), XFlatDatabase.xFlatNs);
             doc.setRootElement(root);
-
-            root.addContent(this.cache.values());
-
+            
+            for(Element e : this.cache.values()){
+                synchronized(e){
+                    root.addContent(e.clone());
+                }
+            }
+            
             try{
                 this.file.writeFile(doc);
             }

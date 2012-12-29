@@ -6,12 +6,13 @@ package org.gburgett.xflat.util;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import org.jdom2.Document;
+import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
 import org.jdom2.output.XMLOutputter;
@@ -50,8 +51,21 @@ public class DocumentFileWrapper {
     }
     
     public void writeFile(Document doc) throws IOException{
+        this.ensureDirectoryExists();
+        
         try(OutputStream out = new FileOutputStream(file)) {
             outputter.output(doc, out);
+        }
+    }
+    
+    private void ensureDirectoryExists(){
+        if(this.file.exists()){
+            return;
+        }
+        
+        File parent = this.file.getParentFile();
+        if(!parent.exists()){
+            parent.mkdirs();
         }
     }
 }

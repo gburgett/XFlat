@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.Table;
@@ -92,35 +93,75 @@ public class XFlatDatabase implements Database {
      */
     public XFlatDatabase(File directory){
         this.directory = directory;
-    }
-    
-    public void Initialize(){
         
-        this.validateConfig();
-        
-        this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
         this.conversionService = new DefaultConversionService();
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
-        this.InitializeScheduledTasks();
-        
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable(){
-            @Override
-            public void run() {
-                XFlatDatabase.this.shutdown();
-            }
-        }));
+        this.state = new AtomicReference<>(DatabaseState.Uninitialized);
     }
     
-    public void shutdown(){
-        if(this.state.get() != DatabaseState.Running){
+    public void Initialize(){
+        if(!this.state.compareAndSet(DatabaseState.Uninitialized, DatabaseState.Running)){
             return;
         }
         
-        long timeout = System.currentTimeMillis() + 250;
-                
-        this.state.set(DatabaseState.ShuttingDown);
+        try
+        {
+            if(!this.directory.exists())
+                this.directory.mkdirs();
+        
+            this.validateConfig();
+
+            this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
+
+            this.InitializeScheduledTasks();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable(){
+                @Override
+                public void run() {
+                    XFlatDatabase.this.shutdown();
+                }
+            }));
+        
+        }catch(Exception ex){
+            this.state.set(DatabaseState.Uninitialized);
+            throw new XflatException("Initialization error");
+        }
+    }
+    
+    /**
+     * Shuts down the database.
+     * This method blocks until the database is completely shut down, as long
+     * as it takes.
+     */
+    public void shutdown(){
+        try{
+            this.shutdown(0);
+        }catch(TimeoutException ex){
+            throw new RuntimeException("A timeout occured that should never have happened", ex);
+        }
+    }
+    
+    /**
+     * Shuts down the database.
+     * This method blocks only until the timeout expires - if the database
+     * is not completely shutdown in that time, a TimeoutException is thrown.
+     * @param timeout The number of milliseconds to wait before timing out
+     * @throws TimeoutException if the database did not fully shut down before
+     * the timeout expired.
+     */
+    public void shutdown(int timeout) throws TimeoutException{
+        if(!this.state.compareAndSet(DatabaseState.Running, DatabaseState.ShuttingDown)){
+            return;
+        }
+        
+        //by default, wait as long as it takes
+        Long lTimeout = Long.MAX_VALUE;
+        if(timeout > 0){
+            //wait only until the timeout
+            lTimeout = System.currentTimeMillis() + timeout;
+        }
 
         //spin them all down
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
@@ -141,7 +182,7 @@ public class XFlatDatabase implements Database {
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
             saveTableMetadata(table.getKey(), table.getValue().saveTableMetadata());
         }
-
+        
         //wait for the engines to finish spinning down
         do{
             Iterator<Map.Entry<String, TableMetadata>> it = this.tables.entrySet().iterator();
@@ -158,16 +199,21 @@ public class XFlatDatabase implements Database {
                 return;
             }
 
-        }while(System.currentTimeMillis() < timeout);
+        }while(System.currentTimeMillis() < lTimeout);
 
         //force any remaining tables to spin down now
+        boolean anyLeft = false;
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
+            anyLeft = true;
             try{
                 table.getValue().engine.forceSpinDown();
             }catch(Exception ex){
                 //eat
             }
         }
+        
+        if(anyLeft)
+            throw new TimeoutException("Shutdown timed out");
     }
     
     private void validateConfig(){
@@ -242,10 +288,6 @@ public class XFlatDatabase implements Database {
         File file = new File(this.directory, tableName + ".config.xml");
         
         try {
-            if(!file.exists()){
-                file.createNewFile();
-            }
-            
             new DocumentFileWrapper(file).writeFile(metadata);
         } catch(IOException ex){
             throw new XflatException("Error saving metadata for table " + tableName, ex);
@@ -259,6 +301,13 @@ public class XFlatDatabase implements Database {
     
     @Override
     public <T> Table<T> getTable(Class<T> type, String name){
+        if(this.state.get() == DatabaseState.Uninitialized){
+            throw new IllegalStateException("Database has not been initialized");
+        }
+        if(this.state.get() == DatabaseState.ShuttingDown){
+            throw new IllegalStateException("Database is shutting down");
+        }
+        
         if(!this.getConversionService().canConvert(type, Element.class) ||
                 !this.getConversionService().canConvert(Element.class, type)){
             //try to load the pojo converter
@@ -296,7 +345,8 @@ public class XFlatDatabase implements Database {
             }
         }
         
-        return table.getTable(type);
+        TableBase ret = table.getTable(type);
+        return (Table<T>)ret;
     }
     
     private AtomicBoolean pojoConverter = new AtomicBoolean(false);

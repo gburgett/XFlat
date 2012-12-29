@@ -38,6 +38,7 @@ import org.junit.AfterClass;
 import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import test.Utils;
 
 /**
  *
@@ -67,21 +68,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     @AfterClass
     public static void tearDownClass(){
-        deleteDir(workspace);
+        Utils.deleteDir(workspace);
         workspace.delete();
     }
     
-    private static void deleteDir(File directory){
-        for(File f : directory.listFiles()){
-            if(f.isDirectory()){
-                deleteDir(f);
-                f.delete();
-            }
-            else{
-                f.delete();
-            }
-        }
-    }
+    
     
     /**
      * Gets a new test context for this test, creating the workspace
@@ -95,7 +86,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             ctx.workspace.mkdirs();
         }
         else{
-            deleteDir(ctx.workspace);
+            Utils.deleteDir(ctx.workspace);
         }
         
         ctx.instance = setupEngine(ctx);
@@ -233,22 +224,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     
     
-    private Document makeDocument(String tableName, Element... rowData){
-        Document ret = new Document();
-        Element root = new Element("table", XFlatDatabase.xFlatNs)
-                .setAttribute("name", tableName, XFlatDatabase.xFlatNs);
-        ret.setRootElement(root);   
-        
-        int i = 0;
-        for(Element e : rowData){
-            root.addContent(new Element("row", XFlatDatabase.xFlatNs)
-                    .setAttribute("id", Integer.toString(i++), XFlatDatabase.xFlatNs)
-                    .setContent(e));
-        }
-        
-        return ret;
-    }
-    
     private String getId(Element row){
         return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
@@ -311,7 +286,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
@@ -351,7 +326,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
@@ -414,7 +389,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
             );
         
@@ -440,7 +415,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("some text data"),
                 new Element("data").setText("other text data")
             );
@@ -499,7 +474,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
                 new Element("data").setContent(
                         new Element("fooInt").setText("18")
@@ -536,7 +511,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
                 new Element("data").setContent(
                         new Element("fooInt").setText("17")
@@ -579,7 +554,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data"),
                 new Element("data").setContent(
                         new Element("fooInt").setText("17")
@@ -653,7 +628,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -692,7 +667,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -733,7 +708,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -770,7 +745,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -811,7 +786,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
                     .setAttribute("fooInt", "23")
@@ -851,7 +826,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
                     .setAttribute("fooInt", "17")
@@ -891,7 +866,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
                     .setAttribute("fooInt", "17")
@@ -935,7 +910,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("other")
                     .setAttribute("fooInt", "17")
                     .setContent(new Element("data")
@@ -1032,7 +1007,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -1102,7 +1077,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -1137,7 +1112,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                     new Element("other").setText("other text data"),
                     new Element("third").setText("third text data")
                 );
@@ -1182,7 +1157,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         
-        Document inFile = makeDocument(ctx.instance.getTableName(),
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
             new Element("other")
                 .setAttribute("fooInt", "17")
                 .setText("other text data"),
