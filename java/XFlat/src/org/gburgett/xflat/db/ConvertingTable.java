@@ -18,6 +18,7 @@ import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.Table;
 import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
@@ -66,6 +67,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
                 return null;
             
             return this.getIdGenerator().idToString(id);
+            
         }
         else if(this.idMap != null){
             //hopefully we cached it
@@ -84,7 +86,12 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     private Element convert(T data, String id){
-        Element ret = this.conversionService.convert(data, Element.class);
+        Element ret;
+        try {
+            ret = this.conversionService.convert(data, Element.class);
+        } catch (ConversionException ex) {
+            throw new XflatException("Cannot convert data with ID " + id, ex);
+        }
         
         if (id != null){
             setId(ret, id);
@@ -94,9 +101,15 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     private T convert(Element rowData){
-        T ret = this.conversionService.convert(rowData, this.getTableType());
-        
         String sId = getId(rowData);
+        
+        T ret;
+        try {
+            ret = this.conversionService.convert(rowData, this.getTableType());
+        } catch (ConversionException ex) {
+            throw new XflatException("Cannot convert data with ID " + sId, ex);
+        }
+        
         if(sId == null){
             //can't do any ID stuff, return ret.
             return ret;

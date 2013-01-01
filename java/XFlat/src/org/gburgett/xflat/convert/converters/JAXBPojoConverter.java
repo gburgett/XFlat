@@ -4,10 +4,7 @@
  */
 package org.gburgett.xflat.convert.converters;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
 import javax.xml.bind.JAXBContext;
@@ -23,10 +20,10 @@ import org.gburgett.xflat.convert.ConversionNotSupportedException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.Converter;
 import org.gburgett.xflat.convert.PojoConverter;
-import org.jdom2.Content;
+import org.gburgett.xflat.util.JDOMStreamReader;
+import org.gburgett.xflat.util.JDOMStreamWriter;
 import org.jdom2.Document;
 import org.jdom2.Element;
-import org.jdom2.JDOMException;
 import org.jdom2.output.XMLOutputter;
 
 /**
@@ -195,30 +192,16 @@ public class JAXBPojoConverter implements PojoConverter {
         @Override
         public Element convert(T source) throws ConversionException {
             try{
-                byte[] bytes;
-                try(ByteArrayOutputStream os = new ByteArrayOutputStream()){
-                    this.marshaller.marshal(source, os);
+                Document doc;
+                try(JDOMStreamWriter out = new JDOMStreamWriter()){
+                    this.marshaller.marshal(source, out);
                     
-                    bytes = os.toByteArray();
+                    doc = out.getDocument();
                 }
                 
-                XMLStreamReader reader = null;
-                try{
-                    reader = factory.createXMLStreamReader(new ByteArrayInputStream(bytes));
-                    org.jdom2.input.StAXStreamBuilder builder = 
-                            new org.jdom2.input.StAXStreamBuilder();
-                    
-                    Document doc = builder.build(reader);
-                    
-                    return doc.detachRootElement();
-                }
-                finally{
-                    if(reader != null){
-                        reader.close();
-                    }
-                }
+                return doc.detachRootElement();
                 
-            }catch(JAXBException | XMLStreamException | JDOMException | IOException ex){
+            }catch(JAXBException | XMLStreamException ex){
                 throw new ConversionException("Unable to convert", ex);
             }
         }
@@ -238,21 +221,14 @@ public class JAXBPojoConverter implements PojoConverter {
         @Override
         public T convert(Element source) throws ConversionException {
            
-            byte[] bytes;
-            try{
-                
-                try(ByteArrayOutputStream out = new ByteArrayOutputStream()){
-                    outputter.output(source, out);
-                    bytes = out.toByteArray();
-                }
-                
-                try(InputStream in = new ByteArrayInputStream(bytes)){
-                    T ret = (T)unmarshaller.unmarshal(in);
-                    return ret;
-                }
-                
+            Document doc = new Document();
+            doc.setRootElement(source.detach());
+            
+            try(JDOMStreamReader in = new JDOMStreamReader(doc)){
+                T ret = (T)unmarshaller.unmarshal(in);
+                return ret;
             }
-            catch(JAXBException | IOException | ClassCastException ex){
+            catch(JAXBException | XMLStreamException | ClassCastException ex){
                 throw new ConversionException("Unable to convert element to " + clazz, ex);
             }
             

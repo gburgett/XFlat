@@ -6,6 +6,9 @@ package org.gburgett.xflat.query;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.jdom2.Attribute;
 import org.jdom2.Content;
@@ -260,8 +263,13 @@ public class XpathUpdate {
                 !this.conversionService.canConvert(value.getClass(), String.class)){
             return null;
         }
-        
-        return this.conversionService.convert(value, String.class);
+        try {
+            return this.conversionService.convert(value, String.class);
+        } catch (ConversionException ex) {
+            Log log = LogFactory.getLog(getClass());
+            log.warn("Unable to convert update value to string", ex);
+            return null;
+        }
     }
 
     private Content getContentValue(Object value){
@@ -275,8 +283,13 @@ public class XpathUpdate {
                 !this.conversionService.canConvert(value.getClass(), Content.class)){
             return null;
         }
-        
-        return this.conversionService.convert(value, Content.class);
+        try {
+            return this.conversionService.convert(value, Content.class);
+        } catch (ConversionException ex) {
+            Log log = LogFactory.getLog(getClass());
+            log.warn("Unable to convert update value to content", ex);
+            return null;
+        }
     }
 
     public enum UpdateType{

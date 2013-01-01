@@ -43,10 +43,10 @@ public abstract class IdGenerator {
      * Since all engines take string IDs (which can be stored in the XML DOM)
      * this is how we persist the ID.
      * @param id The ID to convert, cannot be null.
-     * @return The string representation of the given ID.
+     * @return The string representation of the given ID, or null if it could not be
+     * converted.
      */
-    public abstract String idToString(Object id)
-            throws ConversionException;
+    public abstract String idToString(Object id);
     
     /**
      * A convenience for converting IDs from their string representations.
@@ -55,10 +55,9 @@ public abstract class IdGenerator {
      * @param id The string value of the ID.
      * @param idType The type to convert the ID to, must be one of the supported
      * types as given by {@link #supports(java.lang.Class) }.
-     * @return The converted ID.
+     * @return The converted ID, or null if it could not be converted.
      */
-    public abstract Object stringToId(String id, Class<?> idType)
-            throws ConversionException;
+    public abstract Object stringToId(String id, Class<?> idType);
     
     /**
      * Saves this ID generator's state to a JDOM Element so it can save when
