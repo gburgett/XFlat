@@ -40,7 +40,7 @@ public class StringConverters {
     
     public static final Converter<String, Integer> StringToIntegerConverter = new Converter<String, Integer>(){
         @Override
-        public Integer convert(String source) {
+        public Integer convert(String source) throws ConversionException {
             try{
                 return Integer.valueOf(source);
             }catch(NumberFormatException ex){
@@ -58,7 +58,7 @@ public class StringConverters {
     
     public static final Converter<String, Long> StringToLongConverter = new Converter<String, Long>() {
         @Override
-        public Long convert(String source) {
+        public Long convert(String source) throws ConversionException {
             try{
                 return Long.valueOf(source);
             }catch(NumberFormatException ex){
@@ -69,7 +69,7 @@ public class StringConverters {
     
     public static final Converter<String, Float> StringToFloatConverter = new Converter<String, Float>(){
         @Override
-        public Float convert(String source) {
+        public Float convert(String source) throws ConversionException {
             try{
                 return Float.valueOf(source);
             }catch(NumberFormatException ex){
@@ -80,7 +80,7 @@ public class StringConverters {
     
     public static final Converter<String, Double> StringToDoubleConverter = new Converter<String, Double>(){
         @Override
-        public Double convert(String source) {
+        public Double convert(String source) throws ConversionException {
             try{
                 return Double.valueOf(source);
             }catch(NumberFormatException ex){
@@ -109,7 +109,7 @@ public class StringConverters {
             };
     public static final Converter<String, Date> StringToDateConverter = new Converter<String, Date>(){
         @Override
-        public Date convert(String source) {
+        public Date convert(String source) throws ConversionException {
             try{
                 return format.get().parse(source);
             }catch(ParseException ex){

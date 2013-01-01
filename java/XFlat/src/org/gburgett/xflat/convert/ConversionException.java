@@ -10,7 +10,7 @@ package org.gburgett.xflat.convert;
  * Copied from org.springframework.core.convert,
  * modified by Gordon Burgett
  */
-public class ConversionException extends RuntimeException {
+public class ConversionException extends Exception {
 
     /**
      * Creates a new instance of

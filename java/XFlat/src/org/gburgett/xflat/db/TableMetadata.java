@@ -8,8 +8,11 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.gburgett.xflat.Table;
 import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.db.EngineBase.EngineState;
 import org.gburgett.xflat.db.EngineBase.SpinDownEvent;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
@@ -147,7 +150,11 @@ public class TableMetadata {
         TableMetadata ret = new TableMetadata(name, db);
         if(config == null){
             Element c = metadata.getRootElement().getChild("config", XFlatDatabase.xFlatNs);
-            config = TableConfig.FromElementConverter.convert(c);
+            try {
+                config = TableConfig.FromElementConverter.convert(c);
+            } catch (ConversionException ex) {
+                throw new XflatException("Cannot deserialize metadata for table " + name, ex);
+            }
         }
         //else we already verified that config was equal to that stored in metadata
 
@@ -209,7 +216,12 @@ public class TableMetadata {
         doc.setRootElement(new Element("metadata", XFlatDatabase.xFlatNs));
         
         //save config
-        Element cfg = TableConfig.ToElementConverter.convert(this.config);
+        Element cfg;
+        try {
+            cfg = TableConfig.ToElementConverter.convert(this.config);
+        } catch (ConversionException ex) {
+            throw new XflatException("Cannot serialize table metadata", ex);
+        }
         doc.getRootElement().addContent(cfg);
         
         //save generator

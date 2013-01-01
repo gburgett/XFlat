@@ -32,8 +32,12 @@ public interface ConversionService {
      * @param source the source object to convert (may be null)
      * @param target the target type to convert to (required)
      * @return the converted object, an instance of targetType
+     * @throws ConversionException if there is an error during conversion
+     * @throws ConversionNotSupportedException if the conversion is not
+     * supported according to {@link #canConvert(java.lang.Class, java.lang.Class) }.
      */
-    public <T> T convert(Object source, Class<T> target);
+    public <T> T convert(Object source, Class<T> target)
+            throws ConversionException;
 
     /**
      * Adds a converter to the conversion service.

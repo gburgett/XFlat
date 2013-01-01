@@ -6,6 +6,10 @@ package org.gburgett.xflat.db;
 
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.jdom2.Element;
 
@@ -49,14 +53,19 @@ public class TimestampIdGenerator extends IdGenerator {
             return ret;
         }
         if(String.class.equals(idType)){
-            return StringConverters.DateToStringConverter.convert(ret);
+            try {
+                return StringConverters.DateToStringConverter.convert(ret);
+            } catch (ConversionException ex) {
+                //Should never happen
+                throw new XflatException("Unable to convert Integer to String", ex);
+            }
         }
         
         throw new UnsupportedOperationException("Unsupported ID type " + idType);
     }
 
     @Override
-    public String idToString(Object id) {
+    public String idToString(Object id) throws ConversionException {
         if(id == null){
             return "0";
         }
@@ -79,7 +88,7 @@ public class TimestampIdGenerator extends IdGenerator {
     }
 
     @Override
-    public Object stringToId(String id, Class<?> idType) {
+    public Object stringToId(String id, Class<?> idType) throws ConversionException {
         
         if(String.class.equals(idType)){
             return id;

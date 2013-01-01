@@ -37,7 +37,7 @@ public class DefaultConversionService implements ConversionService {
     }
 
     @Override
-    public <T> T convert(Object source, Class<T> target) {        
+    public <T> T convert(Object source, Class<T> target) throws ConversionException {        
         Converter<?, ?> converter;
         
         converterLock.readLock().lock();
@@ -49,7 +49,7 @@ public class DefaultConversionService implements ConversionService {
                     return null;
                 }
                 //else
-                throw new ConversionException("No converters for target " + target);
+                throw new ConversionNotSupportedException("No converters for target " + target);
             }
 
             if(source == null){
@@ -62,7 +62,7 @@ public class DefaultConversionService implements ConversionService {
             else{
                 converter = entry.getConverter(source.getClass());
                 if(converter == null){
-                    throw new ConversionException("No converter for source type " + source.getClass());
+                    throw new ConversionNotSupportedException("No converter for source type " + source.getClass());
                 }
             }
         }finally{

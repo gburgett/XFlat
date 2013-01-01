@@ -7,6 +7,8 @@ package org.gburgett.xflat.query;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
@@ -308,7 +310,13 @@ public class XpathQuery {
             if(selected == null){
                 if(expectedType != null && conversionService != null && 
                         conversionService.canConvert(null, expectedType)){
-                    return subMatcher.matches(conversionService.convert(null, expectedType));
+                    try {
+                        return subMatcher.matches(conversionService.convert(null, expectedType));
+                    } catch (ConversionException ex) {
+                        Log log = LogFactory.getLog(getClass());
+                        log.warn("Unable to convert null to " + expectedType);
+                        return false;
+                    }
                 }
 
                 return subMatcher.matches(null);

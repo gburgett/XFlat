@@ -4,6 +4,8 @@
  */
 package org.gburgett.xflat.db;
 
+import org.gburgett.xflat.Database;
+import org.gburgett.xflat.convert.ConversionException;
 import org.jdom2.Element;
 
 /**
@@ -43,7 +45,8 @@ public abstract class IdGenerator {
      * @param id The ID to convert, cannot be null.
      * @return The string representation of the given ID.
      */
-    public abstract String idToString(Object id);
+    public abstract String idToString(Object id)
+            throws ConversionException;
     
     /**
      * A convenience for converting IDs from their string representations.
@@ -54,7 +57,8 @@ public abstract class IdGenerator {
      * types as given by {@link #supports(java.lang.Class) }.
      * @return The converted ID.
      */
-    public abstract Object stringToId(String id, Class<?> idType);
+    public abstract Object stringToId(String id, Class<?> idType)
+            throws ConversionException;
     
     /**
      * Saves this ID generator's state to a JDOM Element so it can save when

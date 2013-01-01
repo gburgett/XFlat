@@ -24,6 +24,7 @@ import org.jdom2.xpath.XPathFactory;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
+import test.Baz;
 import test.Foo;
 import test.Utils;
 
@@ -54,24 +55,6 @@ public class DatabaseIntegrationTests {
         
         return ret;
     }
-    
-    @Test
-    public void testStartupShutdown_NoProblems() throws Exception {
-        System.out.println("testStartupShutdown_NoProblems");
-        
-        XFlatDatabase db = getDatabase("StartupShutdown_NoProblems");
-        
-        db.Initialize();
-        try{
-
-            Thread.sleep(100);
-
-            db.shutdown();
-        }
-        finally{
-            db.shutdown();
-        }
-    }//end testStartupShutdown_NoProblems
     
     @Test
     public void testInsertAndRetrieve_Foo() throws Exception {
@@ -335,6 +318,47 @@ public class DatabaseIntegrationTests {
         assertTrue("Should have thrown XflatException", didThrow);
         
     }//end testInsert_Resume_ValidatesConfig
+    
+    @Test
+    public void testInsert_Baz_UsesJaxbConversionService() throws Exception {
+        System.out.println("testInsert_Baz_UsesJaxbConversionService");
+        XFlatDatabase db = getDatabase("Insert_Baz_UsesJaxb");
+        
+        db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
+        db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
+        
+        db.Initialize();
+        try{
+        
+        Table<Baz> bazTable = db.getTable(Baz.class);
+        
+        Baz b = new Baz();
+        b.setAttrInt(81);
+        b.getTestData().add("test data 1");
+        b.getTestData().add("test data 2");
+        b.getTestData().add("test data 3");
+        
+        bazTable.insert(b);
+        
+        Baz b2 = bazTable.find(b.getId());
+        
+        
+        assertNotSame("Should not be the same baz", b, b2);
+        assertEquals("should be same data", b.getAttrInt(), b2.getAttrInt());
+        assertThat("should be same data", b2.getTestData(),
+                Matchers.contains("test data 1", "test data 2", "test data 3"));
+        }
+        finally{
+            db.shutdown();
+        }
+        
+        Document tableDoc = this.loadTableDoc("Insert_Baz_UsesJaxb", "Baz");
+        List<Element> rows = Utils.getRows(tableDoc);
+        assertEquals("Should have 1 row on disk", 1, rows.size());
+        assertEquals("Should have right data", "81",
+                rows.get(0).getChild("baz").getAttributeValue("attrInt"));
+        
+    }//end testInsert_Baz_UsesJaxbConversionService
     
     private Matcher<Integer> isEven(){
         return new TypeSafeMatcher<Integer>(){

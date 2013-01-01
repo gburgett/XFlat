@@ -17,8 +17,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Table;
 import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.PojoConverter;
@@ -86,6 +91,8 @@ public class XFlatDatabase implements Database {
     public void configureTable(String tableName, TableConfig config){
         this.tableConfigs.put(tableName, config);
     }
+    
+    private Log log = LogFactory.getLog(getClass());
     
     /**
      * Creates a new database in the given directory.
@@ -229,11 +236,19 @@ public class XFlatDatabase implements Database {
                 //still good
                 continue;
             }
-            
-            TableConfig inMetadata = TableConfig.FromElementConverter.convert(cfg);
-            if(!entry.getValue().equals(inMetadata)){
-                throw new XflatException("Configuration for table " + entry.getKey() + 
-                        " does not match stored configuration");
+
+            try {
+                
+                TableConfig inMetadata = TableConfig.FromElementConverter.convert(cfg);
+                if(!entry.getValue().equals(inMetadata)){
+                    throw new XflatException("Configuration for table " + entry.getKey() +
+                            " does not match stored configuration");
+                }
+            } catch (ConversionException ex) {
+                //table metadata is corrupt, ignore but warn
+                log.warn("The metadata for table " + entry.getKey() + " is corrupt", ex);
+                
+                continue;
             }
         }
     }
@@ -280,7 +295,8 @@ public class XFlatDatabase implements Database {
         try {
             return new DocumentFileWrapper(file).readFile();
         } catch (IOException | JDOMException ex) {
-            throw new XflatException("Error reading metadata for table " + tableName, ex);
+            log.warn("Metadata for table " + tableName + " is corrupt, rewriting", ex);
+            return null;
         }
     }
     
@@ -310,9 +326,17 @@ public class XFlatDatabase implements Database {
         
         if(!this.getConversionService().canConvert(type, Element.class) ||
                 !this.getConversionService().canConvert(Element.class, type)){
-            //try to load the pojo converter
-            loadPojoConverter();
             
+            try {
+                //try to load the pojo converter
+                loadPojoConverter();
+                
+            } catch (Exception ex) {
+                throw new UnsupportedOperationException("No conversion available between " +
+                        type + " and " + Element.class, ex);
+            }
+            
+            //check again
             if(!this.getConversionService().canConvert(type, Element.class) ||
                 !this.getConversionService().canConvert(Element.class, type)){
                 throw new UnsupportedOperationException("No conversion available between " +
@@ -350,13 +374,21 @@ public class XFlatDatabase implements Database {
     }
     
     private AtomicBoolean pojoConverter = new AtomicBoolean(false);
-    private void loadPojoConverter(){
+    private void loadPojoConverter() throws ClassNotFoundException, InstantiationException, IllegalAccessException{
         if(!pojoConverter.compareAndSet(false, true)){
             return;
         }
-        //TODO: load JAXB context dynamically via the classloader
-        //and create JAXB POJO mapper, then use it to extend conversion service.
-        throw new NotImplementedException();
+        Class<?> converter;
+        
+        converter = this.getClass().getClassLoader().loadClass(this.config.getPojoConverterClass());
+        
+        if(converter == null){
+            return;
+        }
+        
+        PojoConverter obj = (PojoConverter)converter.newInstance();
+        
+        this.extendConversionService(obj);
     }
     
     public enum DatabaseState{
