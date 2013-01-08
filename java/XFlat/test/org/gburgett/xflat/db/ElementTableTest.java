@@ -48,7 +48,12 @@ public class ElementTableTest {
     ElementTable getInstance(){
         ElementTable ret = new ElementTable(database, "test");
         ret.setIdGenerator(idGenerator);
-        ret.setEngine(engine);
+        ret.setEngineProvider(new EngineProvider() {
+            @Override
+            public Engine provideEngine() {
+                return engine;
+            }
+        });
         return ret;
     };
     

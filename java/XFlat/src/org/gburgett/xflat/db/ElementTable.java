@@ -31,28 +31,50 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     
     @Override
     public void insert(Element data) throws DuplicateKeyException {
-        //always clone incoming data
-        data = data.clone(); 
-        
         String id = getId(data);
         if(id == null){
             id = generateNewId();
             setId(id, data);
         }
         
-        this.getEngine().insertRow(id, data);
+        //always clone incoming data
+        final Element cData = data.clone(); 
+        final String sId = id;
+        
+        this.doWithEngine(new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.insertRow(sId, cData);
+                    return null;
+                }
+            });
+        
     }
 
     @Override
     public Element find(Object id) {
         
-        String sId = getId(id);
-        return this.getEngine().readRow(sId);
+        final String sId = getId(id);
+        return this.doWithEngine(new EngineAction<Element>(){
+            @Override
+            public Element act(Engine engine) {
+                return engine.readRow(sId);
+            }
+        });
+    }
+    
+    private Cursor<Element> queryTable(final XpathQuery query){
+        return this.doWithEngine(new EngineAction<Cursor<Element>>(){
+            @Override
+            public Cursor<Element> act(Engine engine) {
+                return engine.queryTable(query);
+            }
+        });
     }
 
     @Override
     public Element findOne(XpathQuery query) {
-        try(Cursor<Element> c = this.getEngine().queryTable(query)){
+        try(Cursor<Element> c = this.queryTable(query)){
             Iterator<Element> i = c.iterator();
             if(i.hasNext()){
                 return i.next();
@@ -66,12 +88,12 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     @Override
     public Cursor<Element> find(XpathQuery query) {
-        return this.getEngine().queryTable(query);
+        return this.queryTable(query);
     }
 
     @Override
     public List<Element> findAll(XpathQuery query) {
-        try(Cursor<Element> c = this.getEngine().queryTable(query)){
+        try(Cursor<Element> c = this.queryTable(query)){
             List<Element> ret = new ArrayList<>();
             for(Element e : c){
                 ret.add(e);
@@ -85,15 +107,21 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     @Override
     public void replace(Element newValue) throws KeyNotFoundException {
-        String id = getId(newValue);
+        final String id = getId(newValue);
         if(id == null){
             throw new KeyNotFoundException("Element has no ID");
         }
         
         //always clone incoming data
-        newValue = newValue.clone(); 
+        final Element data = newValue.clone(); 
         
-        this.getEngine().replaceRow(id, newValue);
+        this.doWithEngine(new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.replaceRow(id, data);
+                return null;
+            }
+        });
     }
 
     @Override
@@ -103,14 +131,20 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
             return false;
         }
         
-        String id = getId(e);
+        final String id = getId(e);
         setId(id, origValue);
         
         //always clone incoming data
-        Element newValue = origValue.clone(); 
+        final Element newValue = origValue.clone(); 
 
         try{            
-            this.getEngine().replaceRow(id, newValue);
+            this.doWithEngine(new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.replaceRow(id, newValue);
+                    return null;
+                }
+            });
             return true;
         }catch(KeyNotFoundException ex){
             //someone concurrently deleted this row, try again by identifying
@@ -122,46 +156,81 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     @Override
     public boolean upsert(Element newValue) {
         
-        String id = getId(newValue);
+        //always clone incoming data
+        final Element data = newValue.clone(); 
+
+        final String id = getId(newValue);
         if(id == null){
-            id = generateNewId();
-            setId(id, newValue);
+            final String nId = generateNewId();
+            setId(nId, newValue);
             
-            //always clone incoming data
-            newValue = newValue.clone(); 
-        
-            this.getEngine().insertRow(id, newValue);
+            
+            this.doWithEngine(new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.insertRow(nId, data);
+                    return null;
+                }
+            });
             //inserted, return true
             return true;
         }
         else{
-            //always clone incoming data
-            newValue = newValue.clone(); 
-        
-            return this.getEngine().upsertRow(id, newValue);
+            return this.doWithEngine(new EngineAction<Boolean>(){
+                @Override
+                public Boolean act(Engine engine) {
+                    return engine.upsertRow(id, data);
+                }
+            });
         }
     }
 
     @Override
-    public boolean update(Object id, XpathUpdate update) throws KeyNotFoundException {
-        String sId = getId(id);
-        return this.getEngine().update(sId, update);
+    public boolean update(Object id, final XpathUpdate update) throws KeyNotFoundException {
+        final String sId = getId(id);
+        return this.doWithEngine(new EngineAction<Boolean>(){
+            @Override
+            public Boolean act(Engine engine) {
+                return engine.update(sId, update);
+            }
+        });
     }
 
     @Override
-    public int update(XpathQuery query, XpathUpdate update) {
-        return this.getEngine().update(query, update);
+    public int update(final XpathQuery query, final XpathUpdate update) {
+        return this.doWithEngine(new EngineAction<Integer>(){
+            @Override
+            public Integer act(Engine engine) {
+                return engine.update(query, update);
+            }
+        });
     }
 
     @Override
     public void delete(Object id) throws KeyNotFoundException {
-        String sId = getId(id);
-        this.getEngine().deleteRow(sId);
+        if(id == null){
+            throw new IllegalArgumentException("id cannot be null");
+        }
+        
+        final String sId = getId(id);
+        
+        this.doWithEngine(new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.deleteRow(sId);
+                return null;
+            }
+        });
     }
 
     @Override
-    public int deleteAll(XpathQuery query) {
-        return this.getEngine().deleteAll(query);
+    public int deleteAll(final XpathQuery query) {
+        return this.doWithEngine(new EngineAction<Integer>(){
+            @Override
+            public Integer act(Engine engine) {
+                return engine.deleteAll(query);
+            }
+        });
     }
     
     

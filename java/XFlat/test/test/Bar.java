@@ -32,7 +32,7 @@ public class Bar {
     
     public static class FromElementConverter implements Converter<Element, Bar>{
         @Override
-        public Bar convert(Element source) {
+        public Bar convert(Element source) throws ConversionException {
             if(!"bar".equals(source.getName() ))
                 throw new ConversionException("Expected element named 'Foo'");
             

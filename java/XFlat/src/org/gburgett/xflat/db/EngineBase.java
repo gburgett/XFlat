@@ -45,13 +45,13 @@ public abstract class EngineBase implements Engine {
      * read-only requests, but any write requests MUST block until {@link #beginOperations() )
      * is called.
      */
-    protected abstract void spinUp();
+    protected abstract boolean spinUp();
     
     /**
      * Instructs the engine to begin full read/write operations.  At this point this
      * engine has full control over the data files.
      */
-    protected abstract void beginOperations();
+    protected abstract boolean beginOperations();
     
     /**
      * Instructs this Engine to wrap up its operations in preparation for being
@@ -61,14 +61,14 @@ public abstract class EngineBase implements Engine {
      * @param completionEventHandler An event handler that is notified when
      * the Engine has finished spinning down.
      */
-    protected abstract void spinDown(SpinDownEventHandler completionEventHandler);
+    protected abstract boolean spinDown(SpinDownEventHandler completionEventHandler);
     
     /**
      * Forces this engine to immediately release all resources, even if there are
      * still outstanding cursors.  Cursors that continue iterating will throw an
      * exception that indicates the engine has spun down.
      */
-    protected abstract void forceSpinDown();
+    protected abstract boolean forceSpinDown();
     
     private AtomicLong lastActivity = new AtomicLong();
     

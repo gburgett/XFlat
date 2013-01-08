@@ -25,6 +25,7 @@ public class TableConfig {
     
     private TableConfig(TableConfig other){
         this.idGenerator = other.idGenerator;
+        this.inactivityShutdownMs = other.inactivityShutdownMs;
     }
     
     private Class<? extends IdGenerator> idGenerator;
@@ -51,6 +52,23 @@ public class TableConfig {
         return ret;
     }
     
+    private long inactivityShutdownMs;
+    /**
+     * Gets the inactivity shutdown duration.  A table that has been inactive for
+     * this many milliseconds will be spun down to conserve resources, and spun
+     * up again when next needed.
+     * @return The shutdown duration in milliseconds.
+     */
+    public long getInactivityShutdownMs() {
+        return this.inactivityShutdownMs;
+    }
+    /** @see #getInactivityShutdownMs()  */
+    public TableConfig setInactivityShutdownMs(long inactivityShutdownMs) {
+        TableConfig ret = new TableConfig(this);
+        ret.inactivityShutdownMs = inactivityShutdownMs;
+        return ret;
+    }
+    
     //TODO: future configuration options
     
     /**
@@ -58,12 +76,14 @@ public class TableConfig {
      * is specified.
      */
     public static TableConfig defaultConfig = new TableConfig()
-            .setIdGenerator(null);
+            .setIdGenerator(null)
+            .setInactivityShutdownMs(3000);
 
     @Override
     public int hashCode() {
-        int hash = 7;
+        int hash = 5;
         hash = 29 * hash + Objects.hashCode(this.idGenerator);
+        hash = 29 * hash + (int) (this.inactivityShutdownMs ^ (this.inactivityShutdownMs >>> 32));
         return hash;
     }
 
@@ -79,9 +99,12 @@ public class TableConfig {
         if (!Objects.equals(this.idGenerator, other.idGenerator)) {
             return false;
         }
+        if (this.inactivityShutdownMs != other.inactivityShutdownMs) {
+            return false;
+        }
         return true;
     }
-    
+
     
     public static Converter<TableConfig, Element> ToElementConverter = new Converter<TableConfig, Element>(){
         @Override

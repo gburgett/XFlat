@@ -51,7 +51,12 @@ public class ConvertingTableTest {
         
         ConvertingTable<Foo> fooInstance = new ConvertingTable<>(database, Foo.class, "foo");
         fooInstance.setConversionService(conversionService);
-        fooInstance.setEngine(engine);
+        fooInstance.setEngineProvider(new EngineProvider() {
+            @Override
+            public Engine provideEngine() {
+                return engine;
+            }
+        });
         fooInstance.setIdGenerator(idGenerator);
         return fooInstance;
     };
@@ -62,7 +67,12 @@ public class ConvertingTableTest {
         
         ConvertingTable<Bar> barInstance = new ConvertingTable<>(database, Bar.class, "foo");
         barInstance.setConversionService(conversionService);
-        barInstance.setEngine(engine);
+        barInstance.setEngineProvider(new EngineProvider() {
+            @Override
+            public Engine provideEngine() {
+                return engine;
+            }
+        });
         barInstance.setIdGenerator(idGenerator);
         
         return barInstance;

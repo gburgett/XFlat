@@ -62,7 +62,7 @@ public class Foo {
     
     public static class FromElementConverter implements Converter<Element, Foo>{
         @Override
-        public Foo convert(Element source) {
+        public Foo convert(Element source) throws ConversionException {
             if(!"foo".equals(source.getName() ))
                 throw new ConversionException("Expected element named 'Foo'");
             

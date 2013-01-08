@@ -210,11 +210,11 @@ public class JDOMStreamWriter implements XMLStreamWriter, AutoCloseable {
         Namespace ns = this.getNamespace(namespaceURI, prefix);
         switch(state){
             case IN_ROOT_ELEMENT:
-                this.root.setNamespace(ns);
+                this.root.addNamespaceDeclaration(ns);
                 break;
                 
             case IN_ELEMENT:
-                this.elementStack.peek().setNamespace(ns);
+                this.elementStack.peek().addNamespaceDeclaration(ns);
                 break;
                 
             default:

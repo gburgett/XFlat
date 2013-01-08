@@ -156,7 +156,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     
     @Override
     public void insert(T row) throws DuplicateKeyException {
-        Element e = convert(row);
+        final Element e = convert(row);
         String id = getId(e);
         if(id == null){
             //generate new ID
@@ -164,13 +164,28 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
              setId(e, id);
         }
         
-        this.getEngine().insertRow(id, e);
+        final String sId = id;
+        
+        this.doWithEngine(new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.insertRow(sId, e);
+                return null;
+            }
+        });
     }
 
     @Override
     public T find(Object id) {
-        String sId = this.getIdGenerator().idToString(id);
-        Element data = this.getEngine().readRow(sId);
+        final String sId = this.getIdGenerator().idToString(id);
+        
+        Element data = this.doWithEngine(new EngineAction<Element>(){
+            @Override
+            public Element act(Engine engine) {
+                return engine.readRow(sId);
+            }
+        });
+        
         if(data == null){
             return null;
         }
@@ -180,8 +195,9 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public T findOne(XpathQuery query) {
+    public T findOne(final XpathQuery query) {
         Element e = findOneElement(query);
+        
         if(e == null){
             return null;
         }
@@ -190,7 +206,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     private Element findOneElement(XpathQuery query){
-        try(Cursor<Element> elements = this.getEngine().queryTable(query)){
+        try(Cursor<Element> elements = this.queryTable(query)){
             Iterator<Element> it = elements.iterator();
             if(!it.hasNext()){
                 return null;
@@ -203,16 +219,30 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         }
     }
     
+    private Cursor<Element> queryTable(final XpathQuery query){
+        return this.doWithEngine(new EngineAction<Cursor<Element>>(){
+            @Override
+            public Cursor<Element> act(Engine engine) {
+                return engine.queryTable(query);
+            }
+        });
+    }
+    
     @Override
-    public Cursor<T> find(XpathQuery query) {
-        return new ConvertingCursor(this.getEngine().queryTable(query));
+    public Cursor<T> find(final XpathQuery query) {
+        return this.doWithEngine(new EngineAction<Cursor<T>>(){
+            @Override
+            public Cursor<T> act(Engine engine) {
+                return new ConvertingCursor(engine.queryTable(query));
+            }
+        });
     }
 
     @Override
     public List<T> findAll(XpathQuery query) {
         List<T> ret = new ArrayList<>();
         
-        try(Cursor<Element> data = this.getEngine().queryTable(query)){
+        try(Cursor<Element> data = this.queryTable(query)){
             for(Element e : data){
                 ret.add(convert(e));
             }
@@ -226,13 +256,20 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     @Override
     public void replace(T newValue) throws KeyNotFoundException {
-        String id = getId(newValue);
+        final String id = getId(newValue);
         if(id == null){
             throw new KeyNotFoundException("Object has no ID");
         }
         
-        Element data = convert(newValue, id);
-        this.getEngine().replaceRow(id, data);
+        final Element data = convert(newValue, id);
+        this.doWithEngine(new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.replaceRow(id, data);
+                return null;
+            }
+        });
+        
     }
 
     @Override
@@ -258,15 +295,21 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         return true;
     }
     
-    private String recursiveReplaceOne(XpathQuery query, Element data, Element existing){
+    private String recursiveReplaceOne(XpathQuery query, final Element data, Element existing){
         if(existing == null){
             return null;
         }
         
-        String id = getId(existing);
+        final String id = getId(existing);
         setId(data, id);
         try{
-            this.getEngine().replaceRow(id, data);
+            this.doWithEngine(new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.replaceRow(id, data);
+                    return null;
+                }
+            });
             
             return id;
         }
@@ -279,34 +322,57 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     @Override
     public boolean upsert(T newValue) {
-        Element data = convert(newValue);
-        String id = getId(data);
+        final Element data = convert(newValue);
+        final String id = getId(data);
+        
         if(id == null){
             //insert
-            id = generateId(newValue);
-            setId(data, id);
-            this.getEngine().insertRow(id, data);
+            final String nId = generateId(newValue);
+            setId(data, nId);
+            
+            this.doWithEngine(new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.insertRow(nId, data);
+                    return null;
+                }
+            });
             
             return true;    //inserted
         }
         else{
-            return this.getEngine().upsertRow(id, data);
+            return this.doWithEngine(new EngineAction<Boolean>(){
+                @Override
+                public Boolean act(Engine engine) {
+                    return engine.upsertRow(id, data);
+                }
+            });
         }
     }
 
     @Override
-    public boolean update(Object id, XpathUpdate update) throws KeyNotFoundException {
+    public boolean update(Object id, final XpathUpdate update) throws KeyNotFoundException {
         if(id == null){
             throw new IllegalArgumentException("Id cannot be null");
         }
-        String sId = this.getIdGenerator().idToString(id);
+        final String sId = this.getIdGenerator().idToString(id);
         
-        return this.getEngine().update(sId, update);
+        return this.doWithEngine(new EngineAction<Boolean>(){
+            @Override
+            public Boolean act(Engine engine) {
+                return engine.update(sId, update);
+            }
+        });
     }
 
     @Override
-    public int update(XpathQuery query, XpathUpdate update) {
-        return this.getEngine().update(query, update);
+    public int update(final XpathQuery query, final XpathUpdate update) {
+        return this.doWithEngine(new EngineAction<Integer>(){
+            @Override
+            public Integer act(Engine engine) {
+                return engine.update(query, update);
+            }
+        });
     }
 
     @Override
@@ -314,14 +380,25 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         if(id == null){
             throw new IllegalArgumentException("id cannot be null");
         }
-        String sId = this.getIdGenerator().idToString(id);
+        final String sId = this.getIdGenerator().idToString(id);
         
-        this.getEngine().deleteRow(sId);
+        this.doWithEngine(new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.deleteRow(sId);
+                return null;
+            }
+        });
     }
 
     @Override
-    public int deleteAll(XpathQuery query) {
-        return this.getEngine().deleteAll(query);
+    public int deleteAll(final XpathQuery query) {
+        return this.doWithEngine(new EngineAction<Integer>(){
+            @Override
+            public Integer act(Engine engine) {
+                return engine.deleteAll(query);
+            }
+        });
     }
     
     private class ConvertingCursor implements Cursor<T>{

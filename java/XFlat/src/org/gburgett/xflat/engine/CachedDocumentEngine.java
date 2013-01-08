@@ -6,7 +6,6 @@ package org.gburgett.xflat.engine;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
+import org.gburgett.xflat.EngineStateException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.db.XFlatDatabase;
@@ -247,9 +247,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     //</editor-fold>
 
     @Override
-    protected void spinUp() {
+    protected boolean spinUp() {
         if(!this.state.compareAndSet(EngineState.Uninitialized, EngineState.SpinningUp)){
-            return;
+            return false;
         }
         
         //concurrency level 4 - don't expect to need more than this.
@@ -270,22 +270,29 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
         }
         
-        this.state.compareAndSet(EngineState.SpinningUp, EngineState.SpunUp);
+        this.state.set(EngineState.SpunUp);
         if(operationsReady.get()){
-            this.state.compareAndSet(EngineState.SpunUp, EngineState.Running);
+            this.state.set(EngineState.Running);
             synchronized(operationsReady){
                 operationsReady.notifyAll();
             }
         }
+        
+        return true;
     }
 
     @Override
-    protected void beginOperations() {
-        synchronized(operationsReady){
-            operationsReady.set(true);
-            operationsReady.notifyAll();
+    protected boolean beginOperations() {
+        if(this.state.compareAndSet(EngineState.SpunUp, EngineState.Running)){
+            synchronized(operationsReady){
+                operationsReady.set(true);
+                operationsReady.notifyAll();
+            }
+            
+            return true;
         }
-        this.state.compareAndSet(EngineState.SpunUp, EngineState.Running);
+        
+        return false;
     }
 
     /**
@@ -294,9 +301,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
      * when spinning down.
      */
     private void ensureReady(){
-        if(this.state.get() == EngineState.SpunDown ||
-                this.state.get() == EngineState.SpinningDown){
-            throw new XflatException("Write operations not supported on an engine that is spinning down");
+        EngineState state = this.state.get();
+        if(state == EngineState.SpunDown ||
+                state == EngineState.SpinningDown){
+            throw new EngineStateException("Write operations not supported on an engine that is spinning down", state);
         }
         
         if(operationsReady.get()){
@@ -321,12 +329,12 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private WeakHashMap<Cursor<Element>, String> openCursors = new WeakHashMap<>();
     
     @Override
-    protected void spinDown(final SpinDownEventHandler completionEventHandler) {
+    protected boolean spinDown(final SpinDownEventHandler completionEventHandler) {
         //not much to do since everything's in the cache, just dump the cache
         //and set read-only mode.
         if(!this.state.compareAndSet(EngineState.Running, EngineState.SpinningDown)){
             //we're in the wrong state.
-            return;
+            return false;
         }
         
         final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
@@ -352,9 +360,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
 
             //we're ok to finish our spin down now
-            forceSpinDown();
-
-            return;
+            return forceSpinDown();
+            
         }
 
         Runnable spinDownTask = new Runnable(){
@@ -383,15 +390,18 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         this.getExecutorService().scheduleAtFixedRate(
             spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
 
+        return true;
     }
 
     @Override
-    protected void forceSpinDown() {
+    protected boolean forceSpinDown() {
         //drop all remaining references to the cache, replace with a cache
         //that throws exceptions on access.
         this.cache = new InactiveCache();
         
         this.state.set(EngineState.SpunDown);
+        
+        return true;
     }
     
     private boolean isSpinningDown(){

@@ -13,6 +13,7 @@ import org.jdom2.CDATA;
 import org.jdom2.Content;
 import org.jdom2.Document;
 import org.jdom2.Element;
+import org.jdom2.Namespace;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -99,6 +100,58 @@ public class JDOMStreamWriterTest {
         assertEquals("should have super deep data", "Textual CDATA", deepContent.get(0).getValue());
     }//end testMultipleElementsWithText_DocHasElements
     
+    
+    @Test
+    public void testElementsWithNamespace() throws Exception {
+        System.out.println("testElementsWithNamespace");
+        
+        Document doc;
+        JDOMStreamWriter writer = new JDOMStreamWriter();
+        try{
+            writer.writeStartDocument();
+            writer.writeStartElement("testUri", "root");
+                writer.writeNamespace("tst", "testUri2");
+            
+                writer.writeStartElement("tst", "element", "testUri2");
+                    writer.writeAttribute("tst", "testUri2", "attr", "1");
+                    writer.writeCharacters("prefixed ns");
+                writer.writeEndElement();
+                
+                writer.writeStartElement("testUri", "element");
+                    writer.writeCharacters("same ns");
+                writer.writeEndElement();
+                
+                writer.writeStartElement("element");
+                    writer.writeCharacters("no ns");
+                writer.writeEndElement();
+            
+            writer.writeEndElement();
+            writer.writeEndDocument();
+            
+            doc = writer.getDocument();
+        }
+        finally{
+            writer.close();
+        }
+        
+        assertNotNull("Should have root element", doc.getRootElement());
+        assertEquals("Should have correct ns", "testUri", doc.getRootElement().getNamespaceURI());
+        
+        List<Namespace> declared = doc.getRootElement().getNamespacesIntroduced();
+        assertEquals("Should have declared prefixed ns", "testUri2", declared.get(1).getURI());
+        assertEquals("Should have declared prefixed ns", "tst", declared.get(1).getPrefix());
+        
+        List<Element> content = doc.getRootElement().getChildren();
+        assertEquals("Should have correct ns", "testUri2", content.get(0).getNamespaceURI());
+        assertEquals("Should have correct prefix", "tst", content.get(0).getNamespacePrefix());
+        
+        assertEquals("Should have correct ns", "testUri", content.get(1).getNamespaceURI());
+        assertEquals("Should have no prefix", "", content.get(1).getNamespacePrefix());
+        
+        assertEquals("Should have no ns", "", content.get(2).getNamespaceURI());
+        assertEquals("Should have no prefix", "", content.get(2).getNamespacePrefix());
+        
+    }//end testElementsWithNamespace
     
     private Matcher<Element> hasName(final String name){
         return new TypeSafeMatcher<Element>(){

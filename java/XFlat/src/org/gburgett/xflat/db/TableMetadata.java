@@ -5,12 +5,7 @@
 package org.gburgett.xflat.db;
 
 import java.io.File;
-import java.lang.reflect.Constructor;
-import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.gburgett.xflat.Table;
+import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.db.EngineBase.EngineState;
@@ -24,54 +19,54 @@ import org.jdom2.Element;
  *
  * @author gordon
  */
-public class TableMetadata {
+public class TableMetadata implements EngineProvider {
     String name;
 
-    EngineBase engine;
+    AtomicReference<EngineBase> engine = new AtomicReference<>();
+    
+    Element engineMetadata;
 
     IdGenerator idGenerator;
-
-    Map<TableBase, Class<?>> tables = new WeakHashMap<>();
 
     XFlatDatabase db;
     
     TableConfig config;
+    
+    long lastActivity = System.currentTimeMillis();
+    
+    EngineState getEngineState(){
+        EngineBase engine = this.engine.get();
+        if(engine == null)
+            return EngineState.Uninitialized;
+        
+        return engine.getState();
+    }
 
     public TableMetadata(String name, XFlatDatabase db){
         this.name = name;
         this.db = db;
     }
 
-    public synchronized TableBase getTable(Class<?> clazz){
+    public TableBase getTable(Class<?> clazz){
         if(clazz == null){
             throw new IllegalArgumentException("clazz cannot be null");
         }
-
-        if(engine.getState() == EngineState.SpinningDown || 
-                engine.getState() == EngineState.SpunDown)
-        {
-            throw new UnsupportedOperationException("Cannot get table for spun-down engine");
-        }
-
-        if(engine.getState() == EngineState.Uninitialized){
-            //spin it up
-            this.spinUp();
-        }
-
-        for(Map.Entry<TableBase, Class<?>> entry : tables.entrySet()){
-            if(entry.getValue().equals(clazz)){
-                return entry.getKey();
-            }
-        }
+        
+        this.ensureSpinUp();
 
         TableBase table = makeTableForClass(clazz);
         table.setIdGenerator(idGenerator);
-        table.setEngine(engine);
-        tables.put(table, clazz);
+        table.setEngineProvider(this);
 
         return table;
     }
 
+    @Override
+    public Engine provideEngine(){
+        this.lastActivity = System.currentTimeMillis();
+        return this.ensureSpinUp();
+    }
+    
     private <T> TableBase makeTableForClass(Class<T> clazz){
         if(Element.class.equals(clazz)){
             return new ElementTable(this.db, this.name);
@@ -81,18 +76,82 @@ public class TableMetadata {
         ret.setConversionService(this.db.getConversionService());
         return ret;
     }
+    
+    private EngineBase makeNewEngine(){
+        synchronized(this){
+            //TODO: engines will in the future be configurable & based on a strategy
+            EngineBase ret = new CachedDocumentEngine(new File(db.getDirectory(), name + ".xml"), name);
 
-    private void spinUp(){
-        this.engine.spinUp();
-        this.engine.beginOperations();
+            ret.setConversionService(db.getConversionService());
+            ret.setExecutorService(db.getExecutorService());
+            ret.loadMetadata(engineMetadata);
+            
+            return ret;
+        }
+    }
+
+    private EngineBase ensureSpinUp(){
+        EngineBase engine = this.engine.get();
+        
+        EngineState state;
+        
+        if(engine == null ||
+                (state = engine.getState()) == EngineState.SpinningDown ||
+                state == EngineState.SpunDown){
+            EngineBase newEngine = makeNewEngine();
+            if(!this.engine.compareAndSet(newEngine, engine)){
+                //another thread has changed the engine - spinwait and retry if necessary
+                long waitUntil = System.currentTimeMillis() + 1;
+                while(System.currentTimeMillis() < waitUntil){
+                    engine = this.engine.get();
+                    if(engine.getState() == EngineState.SpinningUp ||
+                            engine.getState() == EngineState.SpunUp ||
+                            engine.getState() == EngineState.Running){
+                        return engine;
+                    }
+                    //still in the wrong state, retry recursive
+                    return this.ensureSpinUp();
+                }
+            }
+        }
+        else if(state == EngineState.SpinningUp ||
+                            state == EngineState.SpunUp ||
+                            state == EngineState.Running){
+            //good to go
+            return engine;
+        }
+        
+        //spinUp returns true if this thread successfully spun it up
+        if(engine.spinUp())
+            engine.beginOperations();
+        
+        return engine;
     }
     
     public void spinDown(){
-        this.engine.spinDown(new SpinDownEventHandler(){
-            @Override
-            public void spinDownComplete(SpinDownEvent event) {
+        synchronized(this){
+            final EngineBase engine = this.engine.getAndSet(null);
+            EngineState state;
+            if(engine == null ||
+                    (state = engine.getState()) == EngineState.SpinningDown ||
+                    state == EngineState.SpunDown)
+                //another thread already spinning it down
+                return;
+
+            if(engine.spinDown(new SpinDownEventHandler(){
+                    @Override
+                    public void spinDownComplete(SpinDownEvent event) {
+                        engine.forceSpinDown();
+                    }
+                }))
+            {
+                //save metadata for the next engine
+                engine.saveMetadata(engineMetadata);
             }
-        });
+            else{
+                engine.forceSpinDown();
+            }
+        }
     }
 
     private static IdGenerator makeIdGenerator(Class<? extends IdGenerator> generatorClass){
@@ -138,10 +197,7 @@ public class TableMetadata {
         }
 
         //make engine
-        //TODO: engines will in the future be configurable & based on a strategy
-        ret.engine = new CachedDocumentEngine(new File(db.getDirectory(), name + ".xml"), name);
-        ret.engine.setConversionService(db.getConversionService());
-        ret.engine.setExecutorService(db.getExecutorService());
+        
         
         return ret;
     }
@@ -181,32 +237,7 @@ public class TableMetadata {
         ret.idGenerator.loadState(g);
 
         //load engine
-        Class<? extends EngineBase> engineClass = null;
-        Element engineEl = metadata.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
-        if(engineEl != null){
-            String engineClassAttr = engineEl.getAttributeValue("class", XFlatDatabase.xFlatNs);
-            if(engineClassAttr != null){
-                try {
-                    engineClass = (Class<? extends EngineBase>) TableMetadata.class.getClassLoader().loadClass(engineClassAttr);
-                } catch (ClassNotFoundException ex) {
-                    throw new XflatException("Cannot load metadata: Cannot load engine class", ex);
-                }
-            }
-        }
-        if(engineClass == null){
-            throw new XflatException("Cannot load metadata: Cannot load engine class");
-        }
-        try {
-            Constructor<? extends EngineBase> constructor = 
-                    engineClass.getConstructor(File.class, String.class);
-
-            ret.engine = constructor.newInstance(new File(db.getDirectory(), name + ".xml"), name);
-        } catch (Exception ex) {
-            throw new XflatException("Cannot load metadata: cannot instantiate new engine", ex);
-        }
-        ret.engine.loadMetadata(engineEl);
-        ret.engine.setConversionService(db.getConversionService());
-        ret.engine.setExecutorService(db.getExecutorService());
+        ret.engineMetadata = metadata.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
         
         return ret;
     }
@@ -234,7 +265,7 @@ public class TableMetadata {
         //save engine
         Element e = new Element("engine", XFlatDatabase.xFlatNs);
         e.setAttribute("class", this.engine.getClass().getName(), XFlatDatabase.xFlatNs);
-        this.engine.saveMetadata(e);
+        this.engine.get().saveMetadata(e);
         doc.getRootElement().addContent(e);
         
         return doc;

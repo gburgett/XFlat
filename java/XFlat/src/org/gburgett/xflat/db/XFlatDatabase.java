@@ -17,8 +17,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Table;
@@ -35,7 +33,6 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.Namespace;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 /**
  * The base class for classes that manage tables and conversion services.
@@ -74,6 +71,13 @@ public class XFlatDatabase implements Database {
     public DatabaseState getState(){
         return state.get();
     }
+    
+    private final Thread shutdownHook = new Thread(new Runnable(){
+                @Override
+                public void run() {
+                    XFlatDatabase.this.shutdown();
+                }
+            });
     
     //the engine cache
     private ConcurrentHashMap<String, TableMetadata> tables = new ConcurrentHashMap<>();
@@ -124,13 +128,9 @@ public class XFlatDatabase implements Database {
 
             this.InitializeScheduledTasks();
 
-            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable(){
-                @Override
-                public void run() {
-                    XFlatDatabase.this.shutdown();
-                }
-            }));
+            Runtime.getRuntime().addShutdownHook(this.shutdownHook);
         
+            
         }catch(Exception ex){
             this.state.set(DatabaseState.Uninitialized);
             throw new XflatException("Initialization error");
@@ -144,7 +144,7 @@ public class XFlatDatabase implements Database {
      */
     public void shutdown(){
         try{
-            this.shutdown(0);
+            this.shutdown(500);
         }catch(TimeoutException ex){
             throw new RuntimeException("A timeout occured that should never have happened", ex);
         }
@@ -172,14 +172,8 @@ public class XFlatDatabase implements Database {
 
         //spin them all down
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
-            EngineState state = table.getValue().engine.getState();
             try{
-                if(state == EngineState.Running){
-                    table.getValue().engine.spinDown(null);
-                }
-                else if(state != EngineState.SpinningDown){
-                    table.getValue().engine.forceSpinDown();
-                }
+                table.getValue().spinDown();
             }catch(Exception ex){
                 //eat
             }
@@ -195,7 +189,9 @@ public class XFlatDatabase implements Database {
             Iterator<Map.Entry<String, TableMetadata>> it = this.tables.entrySet().iterator();
             while(it.hasNext()){
                 Map.Entry<String, TableMetadata> table = it.next();
-                if(table.getValue().engine.getState() == EngineState.SpunDown){
+                EngineState state = table.getValue().getEngineState();
+                if(state == EngineState.Uninitialized ||
+                        state == EngineState.SpunDown){
                     it.remove();
                     continue;
                 }
@@ -213,7 +209,9 @@ public class XFlatDatabase implements Database {
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
             anyLeft = true;
             try{
-                table.getValue().engine.forceSpinDown();
+                EngineBase engine = table.getValue().engine.get();
+                if(engine != null)
+                    engine.forceSpinDown();
             }catch(Exception ex){
                 //eat
             }
@@ -221,6 +219,12 @@ public class XFlatDatabase implements Database {
         
         if(anyLeft)
             throw new TimeoutException("Shutdown timed out");
+        
+        try{
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        }catch(Exception ex){
+            //that's ok
+        }
     }
     
     private void validateConfig(){
@@ -267,11 +271,14 @@ public class XFlatDatabase implements Database {
      * on the DB.
      */
     private void update(){
-        //Check the current file sizes of each currently cached engine.
-        //If the file sizes necessitate a change of engine, clear the engine
-        //on each cached TableBase and spin it down, then set the new engine
-        //and spin it up.  The whole process must take < 100 ms or else
-        //the timeout in TableBase must be turned up.
+        //TODO: hot-swap engines here
+        
+        //check on inactivity shutdown
+        for(TableMetadata m : this.tables.values()){
+            if(m.lastActivity + m.config.getInactivityShutdownMs() < System.currentTimeMillis()){
+                m.spinDown();
+            }
+        }
     }
     
     

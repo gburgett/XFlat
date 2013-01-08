@@ -65,7 +65,7 @@ public class TimestampIdGenerator extends IdGenerator {
     }
 
     @Override
-    public String idToString(Object id) throws ConversionException {
+    public String idToString(Object id) {
         if(id == null){
             return "0";
         }
@@ -83,12 +83,15 @@ public class TimestampIdGenerator extends IdGenerator {
         else{
             throw new UnsupportedOperationException("Unknown ID type " + id.getClass());
         }
-        
-        return StringConverters.DateToStringConverter.convert(ret);
+        try {
+            return StringConverters.DateToStringConverter.convert(ret);
+        } catch (ConversionException ex) {
+            return "0";
+        }
     }
 
     @Override
-    public Object stringToId(String id, Class<?> idType) throws ConversionException {
+    public Object stringToId(String id, Class<?> idType) {
         
         if(String.class.equals(idType)){
             return id;
@@ -99,7 +102,11 @@ public class TimestampIdGenerator extends IdGenerator {
             date = new Date(0);
         }
         else{
-            date = StringConverters.StringToDateConverter.convert(id);
+            try {
+                date = StringConverters.StringToDateConverter.convert(id);
+            } catch (ConversionException ex) {
+                date = new Date(0);
+            }
         }
         
         if(Date.class.equals(idType)){

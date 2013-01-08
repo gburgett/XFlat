@@ -4,8 +4,7 @@
  */
 package org.gburgett.xflat.db;
 
-import java.util.concurrent.atomic.AtomicReference;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.EngineStateException;
 
 /**
  *
@@ -36,23 +35,11 @@ public abstract class TableBase<T> {
         return this.idGenerator;
     }
     
-    private AtomicReference<Engine> engine;
-    private final Object syncRoot = new Object();
-    
+    private EngineProvider engineProvider;
     
     protected TableBase(XFlatDatabase db, Class<T> tableType, String tableName){
         this.database = db;
-        this.engine = new AtomicReference<>();
         this.tableType = tableType;
-    }
-    
-    /**
-     * Clears out the current engine in preparation for swapping engines.
-     * While the engine is cleared, operations on the table will cause the thread
-     * to wait until the new engine is set.  The wait times out after 100 ms.
-     */
-    void clearEngine(){
-        engine.set(null);
     }
     
     /**
@@ -60,50 +47,40 @@ public abstract class TableBase<T> {
      * waiting on the new engine.
      * @param engine The new engine for the table.
      */
-    void setEngine(Engine engine){
+    void setEngineProvider(EngineProvider engine){
         if(engine == null){
-            throw new IllegalArgumentException("Engine cannot be null - use clearEngine instead");
+            throw new IllegalArgumentException("EngineProvider cannot be null - use clearEngine instead");
         }
         
-        synchronized(syncRoot){
-            this.engine.set(engine);
-        
-            //we successfully updated to a new engine
-            syncRoot.notifyAll();
+        this.engineProvider = engine;
+    }
+    
+    /**
+     * Performs an action with an engine obtained from the EngineProvider.
+     * Also wraps the action in some special engine error handling.
+     * 
+     * Beware that the action may be executed multiple times depending on the retry
+     * logic of this method.
+     * @param <T> The return type of the action.
+     * @param action The action to perform.
+     * @return The value returned by the action.
+     */
+    protected <T> T doWithEngine(EngineAction<T> action){
+        try{
+            return action.act(this.engineProvider.provideEngine());
+        }
+        catch(EngineStateException ex){
+            //The engine we got may have been just spun down by another thread,
+            //try again with a new engine and if it happens again let it throw
+            return action.act(this.engineProvider.provideEngine());
         }
     }
     
     /**
-     * Gets the current engine.  If the engine is in the process of being swapped,
-     * the thread is blocked until the new engine is set.  The blocking times out
-     * after 100ms.
-     * @return The current engine.
+     * Represents an action that a table can perform with an engine.
+     * @param <T> 
      */
-    protected Engine getEngine(){
-        Engine ret = engine.get();
-        
-        if(engine == null){
-            try{
-                //we're in the process of swapping engines, wait for completion
-                long start = System.currentTimeMillis();
-                synchronized(syncRoot){
-                    //while loop because of potential spurious wakeups
-                    while((ret = engine.get()) == null) {
-                        syncRoot.wait(100);
-                        //did we time out?
-                        if(System.currentTimeMillis() - start > 100){
-                            throw new XflatException("Timeout while swapping database engines");
-                        }
-                    }
-                }
-            }
-            catch(InterruptedException ex){
-                throw new XflatException("Interrupted while waiting for engine swap to complete.", ex);
-            }
-        }
-        
-        return ret;
+    protected interface EngineAction<T>{
+        public T act(Engine engine);
     }
-    
-    
 }
