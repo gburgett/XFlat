@@ -7,6 +7,7 @@ package org.gburgett.xflat.db;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.Table;
 import org.gburgett.xflat.XflatException;
@@ -32,7 +33,7 @@ import test.Utils;
  *
  * @author gordon
  */
-public class DatabaseIntegrationTests {
+public class DatabaseIntegrationTest {
     
     static File workspace = new File("DbIntegrationTests");
     
@@ -44,6 +45,10 @@ public class DatabaseIntegrationTests {
     }
     
     private Document loadTableDoc(String testName, String tableName) throws IOException, JDOMException {
+        
+        LogFactory.getLog(getClass())
+                .trace(String.format("getting table doc %s", tableName));
+        
         File doc = new File(new File(workspace, testName), tableName + ".xml");
         
         return new DocumentFileWrapper(doc).readFile();
@@ -323,10 +328,7 @@ public class DatabaseIntegrationTests {
     public void testInsert_Baz_UsesJaxbConversionService() throws Exception {
         System.out.println("testInsert_Baz_UsesJaxbConversionService");
         XFlatDatabase db = getDatabase("Insert_Baz_UsesJaxb");
-        
-        db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
-        db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
-        
+                
         db.Initialize();
         try{
         

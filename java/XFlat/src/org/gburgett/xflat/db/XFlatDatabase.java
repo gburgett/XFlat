@@ -4,12 +4,13 @@
  */
 package org.gburgett.xflat.db;
 
-import org.gburgett.xflat.Database;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.gburgett.xflat.Database;
 import org.gburgett.xflat.Table;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
@@ -60,6 +62,22 @@ public class XFlatDatabase implements Database {
         return this.conversionService;
     }
     
+    private EngineFactory engineFactory = new DefaultEngineFactory();
+    /**
+     * Sets the {@link EngineFactory} used to create {@link Engine} instances
+     * for the tables.
+     * @param factory 
+     */
+    public void setEngineFactory(EngineFactory factory){
+        this.engineFactory = factory;
+    }
+    /**
+     * @see #setEngineFactory(org.gburgett.xflat.db.EngineFactory) 
+     */
+    public EngineFactory getEngineFactory(){
+        return this.engineFactory;
+    }
+    
     //</editor-fold>
     
     private File directory;
@@ -75,7 +93,11 @@ public class XFlatDatabase implements Database {
     private final Thread shutdownHook = new Thread(new Runnable(){
                 @Override
                 public void run() {
-                    XFlatDatabase.this.shutdown();
+                    try {
+                        XFlatDatabase.this.shutdown(1000);
+                    } catch (TimeoutException ex) {
+                        log.warn("Timed out while shutting down database " + directory);
+                    }
                 }
             });
     
@@ -133,7 +155,7 @@ public class XFlatDatabase implements Database {
             
         }catch(Exception ex){
             this.state.set(DatabaseState.Uninitialized);
-            throw new XflatException("Initialization error");
+            throw new XflatException("Initialization error", ex);
         }
     }
     
@@ -144,7 +166,7 @@ public class XFlatDatabase implements Database {
      */
     public void shutdown(){
         try{
-            this.shutdown(500);
+            this.shutdown(0);
         }catch(TimeoutException ex){
             throw new RuntimeException("A timeout occured that should never have happened", ex);
         }
@@ -163,6 +185,9 @@ public class XFlatDatabase implements Database {
             return;
         }
         
+        if(log.isTraceEnabled())
+            log.trace(String.format("Shutting down, timeout %dms", timeout));
+        
         //by default, wait as long as it takes
         Long lTimeout = Long.MAX_VALUE;
         if(timeout > 0){
@@ -171,9 +196,12 @@ public class XFlatDatabase implements Database {
         }
 
         //spin them all down
+        Set<EngineBase> engines = new HashSet<>();
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
             try{
-                table.getValue().spinDown();
+                EngineBase e = table.getValue().spinDown();
+                if(e != null)
+                    engines.add(e);
             }catch(Exception ex){
                 //eat
             }
@@ -184,12 +212,14 @@ public class XFlatDatabase implements Database {
             saveTableMetadata(table.getKey(), table.getValue().saveTableMetadata());
         }
         
+        this.tables.clear();
+        
         //wait for the engines to finish spinning down
         do{
-            Iterator<Map.Entry<String, TableMetadata>> it = this.tables.entrySet().iterator();
+            Iterator<EngineBase> it = engines.iterator();
             while(it.hasNext()){
-                Map.Entry<String, TableMetadata> table = it.next();
-                EngineState state = table.getValue().getEngineState();
+                EngineBase e = it.next();
+                EngineState state = e.getState();
                 if(state == EngineState.Uninitialized ||
                         state == EngineState.SpunDown){
                     it.remove();
@@ -197,7 +227,7 @@ public class XFlatDatabase implements Database {
                 }
             }
 
-            if(this.tables.isEmpty()){
+            if(engines.isEmpty()){
                 //COOL! we're done
                 return;
             }
@@ -206,10 +236,9 @@ public class XFlatDatabase implements Database {
 
         //force any remaining tables to spin down now
         boolean anyLeft = false;
-        for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
+        for(EngineBase engine : engines){
             anyLeft = true;
             try{
-                EngineBase engine = table.getValue().engine.get();
                 if(engine != null)
                     engine.forceSpinDown();
             }catch(Exception ex){
@@ -372,6 +401,7 @@ public class XFlatDatabase implements Database {
             
             TableMetadata weWereSlow = this.tables.putIfAbsent(name, table);
             if(weWereSlow != null){
+                //this thread was slower than another thread, use the other thread's table metadata
                 table = weWereSlow;
             }
         }

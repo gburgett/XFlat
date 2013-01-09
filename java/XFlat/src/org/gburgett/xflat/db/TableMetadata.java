@@ -6,12 +6,13 @@ package org.gburgett.xflat.db;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.db.EngineBase.EngineState;
 import org.gburgett.xflat.db.EngineBase.SpinDownEvent;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
-import org.gburgett.xflat.engine.CachedDocumentEngine;
 import org.jdom2.Document;
 import org.jdom2.Element;
 
@@ -80,7 +81,8 @@ public class TableMetadata implements EngineProvider {
     private EngineBase makeNewEngine(){
         synchronized(this){
             //TODO: engines will in the future be configurable & based on a strategy
-            EngineBase ret = new CachedDocumentEngine(new File(db.getDirectory(), name + ".xml"), name);
+            File file = new File(db.getDirectory(), name + ".xml");
+            EngineBase ret = db.getEngineFactory().newEngine(file, name, config);
 
             ret.setConversionService(db.getConversionService());
             ret.setExecutorService(db.getExecutorService());
@@ -99,11 +101,14 @@ public class TableMetadata implements EngineProvider {
                 (state = engine.getState()) == EngineState.SpinningDown ||
                 state == EngineState.SpunDown){
             EngineBase newEngine = makeNewEngine();
-            if(!this.engine.compareAndSet(newEngine, engine)){
+            if(!this.engine.compareAndSet(engine, newEngine)){
                 //another thread has changed the engine - spinwait and retry if necessary
-                long waitUntil = System.currentTimeMillis() + 1;
-                while(System.currentTimeMillis() < waitUntil){
+                long waitUntil = System.nanoTime() + 250;
+                while(System.nanoTime() - waitUntil < 0){
                     engine = this.engine.get();
+                    if(engine == null)
+                        continue;
+                    
                     if(engine.getState() == EngineState.SpinningUp ||
                             engine.getState() == EngineState.SpunUp ||
                             engine.getState() == EngineState.Running){
@@ -112,6 +117,8 @@ public class TableMetadata implements EngineProvider {
                     //still in the wrong state, retry recursive
                     return this.ensureSpinUp();
                 }
+            }else{
+                engine = newEngine;
             }
         }
         else if(state == EngineState.SpinningUp ||
@@ -128,7 +135,7 @@ public class TableMetadata implements EngineProvider {
         return engine;
     }
     
-    public void spinDown(){
+    public EngineBase spinDown(){
         synchronized(this){
             final EngineBase engine = this.engine.getAndSet(null);
             EngineState state;
@@ -136,12 +143,17 @@ public class TableMetadata implements EngineProvider {
                     (state = engine.getState()) == EngineState.SpinningDown ||
                     state == EngineState.SpunDown)
                 //another thread already spinning it down
-                return;
+                return engine;
 
+            Log l = LogFactory.getLog(getClass());
+            if(l.isTraceEnabled())
+                l.trace(String.format("Spinning down table %s", this.name));
+        
+            
             if(engine.spinDown(new SpinDownEventHandler(){
                     @Override
                     public void spinDownComplete(SpinDownEvent event) {
-                        engine.forceSpinDown();
+                        engine.forceSpinDown();                        
                     }
                 }))
             {
@@ -151,6 +163,8 @@ public class TableMetadata implements EngineProvider {
             else{
                 engine.forceSpinDown();
             }
+            
+            return engine;
         }
     }
 
@@ -196,8 +210,7 @@ public class TableMetadata implements EngineProvider {
             }
         }
 
-        //make engine
-        
+        ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
         
         return ret;
     }
@@ -238,6 +251,9 @@ public class TableMetadata implements EngineProvider {
 
         //load engine
         ret.engineMetadata = metadata.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
+        if(ret.engineMetadata == null){
+            ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
+        }
         
         return ret;
     }
@@ -263,9 +279,8 @@ public class TableMetadata implements EngineProvider {
         doc.getRootElement().addContent(g);
         
         //save engine
-        Element e = new Element("engine", XFlatDatabase.xFlatNs);
-        e.setAttribute("class", this.engine.getClass().getName(), XFlatDatabase.xFlatNs);
-        this.engine.get().saveMetadata(e);
+        Element e = this.engineMetadata.clone();
+        
         doc.getRootElement().addContent(e);
         
         return doc;

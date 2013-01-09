@@ -134,7 +134,7 @@ public class DatabaseConfig {
      */
     public static DatabaseConfig defaultConfig = new DatabaseConfig()
             .setThreadCount(4)
-            .setPojoConverterClass("org.gburgett.xflat.convert.JAXBPojoConverter")
+            .setPojoConverterClass("org.gburgett.xflat.convert.converters.JAXBPojoConverter")
             .setDefaultTableConfig(TableConfig.defaultConfig)
             .setIdGeneratorStrategy(Arrays.asList(
                 UuidIdGenerator.class,

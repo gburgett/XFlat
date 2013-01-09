@@ -59,7 +59,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         this.file = new DocumentFileWrapper(file);
     }
     
-    protected CachedDocumentEngine(DocumentFileWrapper file, String tableName){
+    public CachedDocumentEngine(DocumentFileWrapper file, String tableName){
         super(tableName);
         this.file = file;
     }
@@ -336,6 +336,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             //we're in the wrong state.
             return false;
         }
+
+        if(log.isTraceEnabled())
+            log.trace("Spinning down");
+        
         
         final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
         if(this.cache != null && lastModified.get() >= lastDump.get()){
@@ -356,6 +360,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         
         if(openCursors.isEmpty() && cacheDumpTask.get() == null || cacheDumpTask.get().isDone()){
             this.state.set(EngineState.SpunDown);
+            
+            if(log.isTraceEnabled())
+                log.trace("Spin down complete (immediate)");
+            
             if(completionEventHandler != null)
                 completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
 
@@ -378,6 +386,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         throw new RuntimeException("cancel task - in wrong state");
                     }
 
+                    if(log.isTraceEnabled())
+                        log.trace(String.format("Spin down complete (task)"));
+        
                     if(completionEventHandler != null)
                         completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
                     //we're ok to finish our spin down now
@@ -427,7 +438,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     
     private AtomicReference<Future<?>> scheduledDump = new AtomicReference<>(null);
-    private AtomicLong lastDump = new AtomicLong(System.currentTimeMillis());
+    private AtomicLong lastDump = new AtomicLong(0);
     private AtomicLong lastModified = new AtomicLong(System.currentTimeMillis());
     private AtomicInteger dumpFailures = new AtomicInteger();
     
@@ -492,6 +503,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 return;
             }
             
+            long lastDump = System.currentTimeMillis();
+            
             //take a 'snapshot' of the detached elements
             Document doc = new Document();
             Element root = new Element("table", XFlatDatabase.xFlatNs)
@@ -513,7 +526,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
             finally {
                 scheduledDump.set(null);
-                lastDump.set(System.currentTimeMillis());
+                this.lastDump.set(lastDump);
             }
 
             //success!
