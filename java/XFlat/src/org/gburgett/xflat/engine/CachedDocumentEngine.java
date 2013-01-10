@@ -29,6 +29,7 @@ import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.db.Engine;
 import org.gburgett.xflat.db.EngineBase;
+import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.gburgett.xflat.util.DocumentFileWrapper;

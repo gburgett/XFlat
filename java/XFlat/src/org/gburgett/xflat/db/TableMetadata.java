@@ -4,36 +4,55 @@
  */
 package org.gburgett.xflat.db;
 
+import org.gburgett.xflat.DatabaseConfig;
+import org.gburgett.xflat.TableConfig;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
-import org.gburgett.xflat.db.EngineBase.EngineState;
+import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.db.EngineBase.SpinDownEvent;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
 import org.jdom2.Document;
 import org.jdom2.Element;
 
 /**
- *
+ * A class containing metadata about a Table, and providing the ability to spin up
+ * engines for that table.
+ * 
+ * TODO: this class really performs two responsibilities, one is managing the spin-up
+ * and spin-down of the engine for the table, the other is creating {@link TableBase} instances.
+ * The two responsibilities should be separated.  You can see where the line is inside the
+ * {@link TableMetadataFactory} class.
  * @author gordon
  */
 public class TableMetadata implements EngineProvider {
+
+    //<editor-fold desc="EngineProvider dependencies">
     String name;
+    public String getName(){
+        return name;
+    }
+    
+    File engineFile;
 
     AtomicReference<EngineBase> engine = new AtomicReference<>();
     
     Element engineMetadata;
 
-    IdGenerator idGenerator;
-
     XFlatDatabase db;
+    //</editor-fold>
+    
+    IdGenerator idGenerator;
     
     TableConfig config;
     
     long lastActivity = System.currentTimeMillis();
+    public long getLastActivity(){
+        return lastActivity;
+    }
     
     EngineState getEngineState(){
         EngineBase engine = this.engine.get();
@@ -43,11 +62,14 @@ public class TableMetadata implements EngineProvider {
         return engine.getState();
     }
 
-    public TableMetadata(String name, XFlatDatabase db){
+    public TableMetadata(String name, XFlatDatabase db, File engineFile){
         this.name = name;
         this.db = db;
+        this.engineFile = engineFile;
     }
 
+    //<editor-fold desc="table creation">
+    
     public TableBase getTable(Class<?> clazz){
         if(clazz == null){
             throw new IllegalArgumentException("clazz cannot be null");
@@ -61,16 +83,18 @@ public class TableMetadata implements EngineProvider {
 
         return table;
     }
-
-    @Override
-    public Engine provideEngine(){
-        this.lastActivity = System.currentTimeMillis();
-        return this.ensureSpinUp();
-    }
     
     private <T> TableBase makeTableForClass(Class<T> clazz){
         if(Element.class.equals(clazz)){
             return new ElementTable(this.db, this.name);
+        }
+        
+        IdAccessor accessor = IdAccessor.forClass(clazz);
+        if(accessor.hasId()){
+            if(!this.idGenerator.supports(accessor.getIdType())){
+                throw new XflatException(String.format("Cannot serialize class %s to table %s: ID type %s not supported by the table's Id generator %s.",
+                                clazz, this.name, accessor.getIdType(), this.idGenerator));
+            }
         }
 
         ConvertingTable<T> ret = new ConvertingTable<>(this.db, clazz, this.name);
@@ -78,15 +102,31 @@ public class TableMetadata implements EngineProvider {
         return ret;
     }
     
-    private EngineBase makeNewEngine(){
+    //</editor-fold>
+    
+    //<editor-fold desc="EngineProvider implementation">
+    
+    @Override
+    public EngineBase provideEngine(){
+        this.lastActivity = System.currentTimeMillis();
+        return this.ensureSpinUp();
+    }
+    
+    private EngineBase makeNewEngine(File file){
         synchronized(this){
             //TODO: engines will in the future be configurable & based on a strategy
-            File file = new File(db.getDirectory(), name + ".xml");
+            
             EngineBase ret = db.getEngineFactory().newEngine(file, name, config);
 
             ret.setConversionService(db.getConversionService());
             ret.setExecutorService(db.getExecutorService());
+            //give it a metadata factory centered in its own file.  If it uses this,
+            //it must also use the file as a directory.
+            ret.setMetadataFactory(new TableMetadataFactory(this.db, file));
+            
             ret.loadMetadata(engineMetadata);
+            
+            
             
             return ret;
         }
@@ -100,7 +140,7 @@ public class TableMetadata implements EngineProvider {
         if(engine == null ||
                 (state = engine.getState()) == EngineState.SpinningDown ||
                 state == EngineState.SpunDown){
-            EngineBase newEngine = makeNewEngine();
+            EngineBase newEngine = makeNewEngine(engineFile);
             if(!this.engine.compareAndSet(engine, newEngine)){
                 //another thread has changed the engine - spinwait and retry if necessary
                 long waitUntil = System.nanoTime() + 250;
@@ -168,122 +208,8 @@ public class TableMetadata implements EngineProvider {
         }
     }
 
-    private static IdGenerator makeIdGenerator(Class<? extends IdGenerator> generatorClass){
-        if(generatorClass == null){
-            throw new XflatException("generator class could not be loaded");
-        }
+    //</editor-fold>
 
-        try {
-            return generatorClass.newInstance();
-        } catch (InstantiationException | IllegalAccessException ex) {
-            throw new XflatException("Cannot load metadata: generator class could not be instantiated", ex);
-        }
-    }
 
-    public static TableMetadata makeNewTableMetadata(String name, XFlatDatabase db, DatabaseConfig dbConfig, TableConfig config, Class<?> idType){
-
-        TableMetadata ret = new TableMetadata(name, db);
-        
-        config = config == null ? TableConfig.defaultConfig : config;
-        ret.config = config;
-
-        //make ID Generator
-        Class<? extends IdGenerator> generatorClass = config.getIdGenerator();
-        if(generatorClass != null){
-            ret.idGenerator = makeIdGenerator(generatorClass);
-            if(!ret.idGenerator.supports(idType)){
-                throw new XflatException("Id Generator " + generatorClass.getName() +
-                        " does not support type " + idType);
-            }
-        }
-        else {
-            //pick using our strategy
-            for(Class<? extends IdGenerator> g : dbConfig.getIdGeneratorStrategy()){
-                IdGenerator gen = makeIdGenerator(g);
-                if(gen.supports(idType)){
-                    ret.idGenerator = gen;
-                    break;
-                }
-            }
-            if(ret.idGenerator == null){
-                throw new XflatException("Could not pick id generator for type " + idType);
-            }
-        }
-
-        ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
-        
-        return ret;
-    }
-
-    public static TableMetadata makeTableMetadataFromDocument(String name, XFlatDatabase db, Document metadata, TableConfig config, Class<?> idType){
-        TableMetadata ret = new TableMetadata(name, db);
-        if(config == null){
-            Element c = metadata.getRootElement().getChild("config", XFlatDatabase.xFlatNs);
-            try {
-                config = TableConfig.FromElementConverter.convert(c);
-            } catch (ConversionException ex) {
-                throw new XflatException("Cannot deserialize metadata for table " + name, ex);
-            }
-        }
-        //else we already verified that config was equal to that stored in metadata
-
-        ret.config = config;
-        
-        //load ID generator
-        Class<? extends IdGenerator> generatorClass = null;
-        Element g = metadata.getRootElement().getChild("generator", XFlatDatabase.xFlatNs);
-        if(g != null){
-            String gClassStr = g.getAttributeValue("class", XFlatDatabase.xFlatNs);
-            if(gClassStr != null){
-                try {
-                    generatorClass = (Class<? extends IdGenerator>) TableMetadata.class.getClassLoader().loadClass(gClassStr);
-                } catch (ClassNotFoundException ex) {
-                    throw new XflatException("Cannot load metadata: generator class could not be loaded", ex);
-                }
-            }
-        }
-        ret.idGenerator = makeIdGenerator(generatorClass);
-        if(!ret.idGenerator.supports(idType)){
-            throw new XflatException("Id Generator " + generatorClass + " does not support " + 
-                    " ID type " + idType);
-        }
-        ret.idGenerator.loadState(g);
-
-        //load engine
-        ret.engineMetadata = metadata.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
-        if(ret.engineMetadata == null){
-            ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
-        }
-        
-        return ret;
-    }
-
-    public Document saveTableMetadata(){
-        Document doc = new Document();
-        doc.setRootElement(new Element("metadata", XFlatDatabase.xFlatNs));
-        
-        //save config
-        Element cfg;
-        try {
-            cfg = TableConfig.ToElementConverter.convert(this.config);
-        } catch (ConversionException ex) {
-            throw new XflatException("Cannot serialize table metadata", ex);
-        }
-        doc.getRootElement().addContent(cfg);
-        
-        //save generator
-        Element g= new Element("generator", XFlatDatabase.xFlatNs);
-        g.setAttribute("class", this.idGenerator.getClass().getName(), XFlatDatabase.xFlatNs);
-        this.idGenerator.saveState(g);
-        
-        doc.getRootElement().addContent(g);
-        
-        //save engine
-        Element e = this.engineMetadata.clone();
-        
-        doc.getRootElement().addContent(e);
-        
-        return doc;
-    }
 
 }

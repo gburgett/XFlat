@@ -44,6 +44,21 @@ public class DocumentFileWrapper {
     }
     
     public Document readFile() throws IOException, JDOMException{
+        if(!this.file.exists())
+            return null;
+        
+        try (InputStream stream = new FileInputStream(file)){
+            Document doc = builder.build(stream);
+            return doc;
+        }
+    }
+    
+    public Document readFile(String fileName) throws IOException, JDOMException{
+        File file = new File(this.file, fileName);
+        
+        if(!file.exists())
+            return null;
+        
         try (InputStream stream = new FileInputStream(file)){
             Document doc = builder.build(stream);
             return doc;
@@ -51,21 +66,36 @@ public class DocumentFileWrapper {
     }
     
     public void writeFile(Document doc) throws IOException{
-        this.ensureDirectoryExists();
+        this.ensureDirectoryExists(file);
         
         try(OutputStream out = new FileOutputStream(file)) {
             outputter.output(doc, out);
         }
     }
     
-    private void ensureDirectoryExists(){
-        if(this.file.exists()){
+    public void writeFile(String fileName, Document doc) throws IOException{
+        File file = new File(this.file, fileName);
+        
+        this.ensureDirectoryExists(file);
+        
+        try(OutputStream out = new FileOutputStream(file)) {
+            outputter.output(doc, out);
+        }
+    }
+    
+    private void ensureDirectoryExists(File file){
+        if(file.exists()){
             return;
         }
         
-        File parent = this.file.getParentFile();
+        File parent = file.getParentFile();
         if(!parent.exists()){
             parent.mkdirs();
         }
+    }
+    
+    @Override
+    public String toString(){
+        return this.file.toString();
     }
 }

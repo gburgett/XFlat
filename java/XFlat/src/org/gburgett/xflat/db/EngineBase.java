@@ -141,6 +141,24 @@ public abstract class EngineBase implements Engine {
         this.conversionService = conversionService;
     }
     
+    private TableMetadataFactory metadataFactory;
+    /**
+     * Gets a metadata factory which can be used to generate {@link TableMetadata} objects.
+     * This allows the engine to spawn additional engines as necessary.
+     * The metadata factory is set up to read and write metadata from the same
+     * {@link File} given to the {@link EngineFactory#newEngine(java.io.File, java.lang.String, org.gburgett.xflat.TableConfig) } method,
+     * so if the engine uses this it must also use that file as a directory.
+     * @return 
+     */
+    protected TableMetadataFactory getMetadataFactory(){
+        return this.metadataFactory;
+    }
+    /** @see #getMetadataFactory() */
+    protected void setMetadataFactory(TableMetadataFactory metadataFactory){
+        this.metadataFactory = metadataFactory;
+    }
+    
+    
     /**
      * Saves metadata to the given element.  Metadata is things like indexes
      * and other configuration.
@@ -156,14 +174,5 @@ public abstract class EngineBase implements Engine {
      */
     protected void loadMetadata(Element metatdataElement){
         
-    }
- 
-    public enum EngineState{
-        Uninitialized,
-        SpinningUp,
-        SpunUp,
-        Running,
-        SpinningDown,
-        SpunDown
     }
 }

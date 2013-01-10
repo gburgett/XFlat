@@ -4,6 +4,7 @@
  */
 package org.gburgett.xflat.db;
 
+import org.gburgett.xflat.TableConfig;
 import java.io.File;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
 import org.gburgett.xflat.engine.CachedDocumentEngine;

@@ -4,7 +4,7 @@
  */
 package org.gburgett.xflat;
 
-import org.gburgett.xflat.db.EngineBase.EngineState;
+import org.gburgett.xflat.db.EngineState;
 
 /**
  *

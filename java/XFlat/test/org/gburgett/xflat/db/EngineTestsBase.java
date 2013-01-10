@@ -24,7 +24,7 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
-import org.gburgett.xflat.db.EngineBase.EngineState;
+import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.hamcrest.Description;

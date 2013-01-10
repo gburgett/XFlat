@@ -4,6 +4,9 @@
  */
 package org.gburgett.xflat.db;
 
+import org.gburgett.xflat.engine.DefaultEngineFactory;
+import org.gburgett.xflat.DatabaseConfig;
+import org.gburgett.xflat.TableConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -18,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Database;
@@ -29,7 +34,6 @@ import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
-import org.gburgett.xflat.db.EngineBase.EngineState;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -78,6 +82,15 @@ public class XFlatDatabase implements Database {
         return this.engineFactory;
     }
     
+    private TableMetadataFactory metadataFactory;
+    TableMetadataFactory getMetadataFactory(){
+        return metadataFactory;
+    }
+    
+    void setMetadataFactory(TableMetadataFactory factory){
+        this.metadataFactory = factory;
+    }
+    
     //</editor-fold>
     
     private File directory;
@@ -106,8 +119,15 @@ public class XFlatDatabase implements Database {
     
     private DatabaseConfig config = DatabaseConfig.defaultConfig;
     public void setConfig(DatabaseConfig config){
+        if(this.state.get() != DatabaseState.Uninitialized){
+            throw new XflatException("Cannot configure database after initialization");
+        }
         this.config = config;
     }
+    public DatabaseConfig getConfig(){
+        return config;
+    }
+    
     private Map<String, TableConfig> tableConfigs = new HashMap<>();
     /**
      * Configures a table with the given table configuration.
@@ -115,6 +135,10 @@ public class XFlatDatabase implements Database {
      * @param config The configuration to apply.
      */
     public void configureTable(String tableName, TableConfig config){
+        if(this.state.get() != DatabaseState.Uninitialized){
+            throw new XflatException("Cannot configure table after initialization");
+        }
+        
         this.tableConfigs.put(tableName, config);
     }
     
@@ -131,6 +155,8 @@ public class XFlatDatabase implements Database {
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
+        this.metadataFactory = new TableMetadataFactory(this, new File(directory, "xflat_metadata"));
+        
         this.state = new AtomicReference<>(DatabaseState.Uninitialized);
     }
     
@@ -144,8 +170,8 @@ public class XFlatDatabase implements Database {
             if(!this.directory.exists())
                 this.directory.mkdirs();
         
-            this.validateConfig();
-
+            this.validateConfig();            
+            
             this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
 
             this.InitializeScheduledTasks();
@@ -209,7 +235,11 @@ public class XFlatDatabase implements Database {
 
         //save all metadata
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
-            saveTableMetadata(table.getKey(), table.getValue().saveTableMetadata());
+            try {
+                this.metadataFactory.saveTableMetadata(table.getValue());
+            } catch (IOException ex) {
+                this.log.warn("Unable to save metadata for table " + table.getKey(), ex);
+            }
         }
         
         this.tables.clear();
@@ -259,7 +289,7 @@ public class XFlatDatabase implements Database {
     private void validateConfig(){
         
         for(Map.Entry<String, TableConfig> entry : this.tableConfigs.entrySet()){
-            Document existing = this.getTableMetadata(entry.getKey());
+            Document existing = this.metadataFactory.getMetadataDoc(entry.getKey());
             if(existing == null || existing.getRootElement() == null){
                 //we're good here.
                 continue;
@@ -322,30 +352,7 @@ public class XFlatDatabase implements Database {
             this.conversionService = extender.extend(conversionService);
         }
     }
-    
-    private Document getTableMetadata(String tableName){
-        File file = new File(this.directory, tableName + ".config.xml");
-        if(!file.exists()){
-            return null;
-        }
-        try {
-            return new DocumentFileWrapper(file).readFile();
-        } catch (IOException | JDOMException ex) {
-            log.warn("Metadata for table " + tableName + " is corrupt, rewriting", ex);
-            return null;
-        }
-    }
-    
-    private void saveTableMetadata(String tableName, Document metadata){
-        File file = new File(this.directory, tableName + ".config.xml");
         
-        try {
-            new DocumentFileWrapper(file).writeFile(metadata);
-        } catch(IOException ex){
-            throw new XflatException("Error saving metadata for table " + tableName, ex);
-        }
-    }
-    
     @Override
     public <T> Table<T> getTable(Class<T> type){
         return this.getTable(type, type.getSimpleName());
@@ -358,6 +365,10 @@ public class XFlatDatabase implements Database {
         }
         if(this.state.get() == DatabaseState.ShuttingDown){
             throw new IllegalStateException("Database is shutting down");
+        }
+        
+        if(name == null || name.startsWith("xflat_")){
+            throw new IllegalArgumentException("Table name cannot be null or start with 'xflat_': " + name);
         }
         
         if(!this.getConversionService().canConvert(type, Element.class) ||
@@ -389,15 +400,7 @@ public class XFlatDatabase implements Database {
                 idType = accessor.getIdType();
             }
             
-            //see if there's existing metadata
-            Document metadata = getTableMetadata(name);
-            if(metadata == null){
-                //use the configuration data
-                table = TableMetadata.makeNewTableMetadata(name, this, this.config, tblConfig, idType);
-            }
-            else{
-                table = TableMetadata.makeTableMetadataFromDocument(name, this, metadata, tblConfig, idType);
-            }
+            table = this.metadataFactory.makeTableMetadata(name, new File(getDirectory(), name + ".xml"), tblConfig, idType);
             
             TableMetadata weWereSlow = this.tables.putIfAbsent(name, table);
             if(weWereSlow != null){

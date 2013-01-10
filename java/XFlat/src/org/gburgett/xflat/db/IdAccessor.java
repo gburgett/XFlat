@@ -69,7 +69,7 @@ public class IdAccessor<T> {
         
         verify(ret, pojoType);
         
-        cachedAccessors.put(pojoType, ret);
+        cachedAccessors.putIfAbsent(pojoType, ret);
         
         return ret;
     }

@@ -2,13 +2,22 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.gburgett.xflat.db;
+package org.gburgett.xflat;
 
+import org.gburgett.xflat.TableConfig;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.gburgett.xflat.convert.PojoConverter;
+import org.gburgett.xflat.db.IdGenerator;
+import org.gburgett.xflat.db.IdGenerator;
+import org.gburgett.xflat.db.IntegerIdGenerator;
+import org.gburgett.xflat.db.IntegerIdGenerator;
+import org.gburgett.xflat.db.TimestampIdGenerator;
+import org.gburgett.xflat.db.TimestampIdGenerator;
+import org.gburgett.xflat.db.UuidIdGenerator;
+import org.gburgett.xflat.db.UuidIdGenerator;
 
 /**
  *

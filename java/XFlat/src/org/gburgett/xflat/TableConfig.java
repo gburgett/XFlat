@@ -2,13 +2,15 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.gburgett.xflat.db;
+package org.gburgett.xflat;
 
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.Converter;
+import org.gburgett.xflat.db.IdGenerator;
+import org.gburgett.xflat.db.XFlatDatabase;
 import org.jdom2.Element;
 
 /**
@@ -26,6 +28,7 @@ public class TableConfig {
     private TableConfig(TableConfig other){
         this.idGenerator = other.idGenerator;
         this.inactivityShutdownMs = other.inactivityShutdownMs;
+        this.shardsetConfig = other.shardsetConfig;
     }
     
     private Class<? extends IdGenerator> idGenerator;
@@ -66,6 +69,23 @@ public class TableConfig {
     public TableConfig setInactivityShutdownMs(long inactivityShutdownMs) {
         TableConfig ret = new TableConfig(this);
         ret.inactivityShutdownMs = inactivityShutdownMs;
+        return ret;
+    }
+    
+    private ShardsetConfig<?> shardsetConfig;
+    public ShardsetConfig<?> getShardsetConfig(){
+        return shardsetConfig;
+    }
+    /**
+     * Sets that this table will be sharded according to the given sharding configuration.
+     * Sharding is when the table splits its data up into multiple files to reduce the amount
+     * in-memory at any time.
+     * @param config The sharding configuration
+     * @return A new table config with this sharding configuration.
+     */
+    public TableConfig sharded(ShardsetConfig<?> config){
+        TableConfig ret = new TableConfig(this);
+        ret.shardsetConfig = config;
         return ret;
     }
     

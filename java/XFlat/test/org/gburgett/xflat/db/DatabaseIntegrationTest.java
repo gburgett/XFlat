@@ -4,6 +4,7 @@
  */
 package org.gburgett.xflat.db;
 
+import org.gburgett.xflat.TableConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
