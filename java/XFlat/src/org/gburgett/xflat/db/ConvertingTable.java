@@ -40,8 +40,8 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     
     private Map<T, String> idMap;
     
-    ConvertingTable(XFlatDatabase db, Class<T> type, String name){
-        super(db, type, name);
+    ConvertingTable(Class<T> type, String name){
+        super(type, name);
         
         this.accessor = IdAccessor.forClass(type);
         if(!this.accessor.hasId()){

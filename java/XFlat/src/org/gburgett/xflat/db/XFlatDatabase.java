@@ -149,6 +149,16 @@ public class XFlatDatabase implements Database {
      * @param directory The flat-file directory in which tables should be stored.
      */
     public XFlatDatabase(File directory){
+        this(directory, null);
+    }
+    
+    /**
+     * Creates a new database in the given directory.
+     * @param directory The flat-file directory in which tables should be stored.
+     * @param executorService The executor service to use for all database-related
+     * tasks.  If null, the database will create one in Initialize.
+     */
+    public XFlatDatabase(File directory, ScheduledExecutorService executorService){
         this.directory = directory;
         
         this.conversionService = new DefaultConversionService();
@@ -172,7 +182,8 @@ public class XFlatDatabase implements Database {
         
             this.validateConfig();            
             
-            this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
+            if(this.executorService == null)
+                this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
 
             this.InitializeScheduledTasks();
 

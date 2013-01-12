@@ -224,16 +224,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     
     
-    private String getId(Element row){
+    protected String getId(Element row){
         return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
     }
     
-    private Element setId(Element row, String id){
+    protected Element setId(Element row, String id){
         row.setAttribute("id", id, XFlatDatabase.xFlatNs);
         return row;
     }
     
-    private Element findId(Iterable<Element> rows, String id){
+    protected Element findId(Iterable<Element> rows, String id){
         for(Element r : rows){
             if(id.equals(getId(r)))
                 return r;
@@ -258,10 +258,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        ctx.instance.insertRow("test id", rowData);
+        ctx.instance.insertRow("1", rowData);
         
         //ASSERT
-        Element fromEngine = ctx.instance.readRow("test id");
+        Element fromEngine = ctx.instance.readRow("1");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
@@ -296,10 +296,10 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        ctx.instance.insertRow("test id", rowData);
+        ctx.instance.insertRow("1", rowData);
         
         
-        Element fromEngine = ctx.instance.readRow("test id");
+        Element fromEngine = ctx.instance.readRow("1");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
 
@@ -313,7 +313,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Should have 2 rows", 2, children.size());
         
-        Element data = findId(children, "test id");
+        Element data = findId(children, "1");
         assertNotNull("doc should have the row", data);
         assertEquals("row should have the data", "some text data", data.getChild("data").getText());
     }//end testInsert_HasValues_Inserts
@@ -606,7 +606,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         boolean didThrow = false;
         try {
             //ACT
-            ctx.instance.replaceRow("test id", rowData);
+            ctx.instance.replaceRow("1", rowData);
         } catch (KeyNotFoundException expected) {
             didThrow = true;
         }
@@ -976,12 +976,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        boolean inserted = ctx.instance.upsertRow("test id", rowData);
+        boolean inserted = ctx.instance.upsertRow("1", rowData);
                 
         //ASSERT
         assertTrue("Should report inserted", inserted);
         
-        Element fromEngine = ctx.instance.readRow("test id");
+        Element fromEngine = ctx.instance.readRow("1");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
         
@@ -1055,7 +1055,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         boolean didThrow = false;
         try {
             //ACT
-            ctx.instance.deleteRow("test id");
+            ctx.instance.deleteRow("1");
         } catch (KeyNotFoundException expected) {
             didThrow = true;
         }

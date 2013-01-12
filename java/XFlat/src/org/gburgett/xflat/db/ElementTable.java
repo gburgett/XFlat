@@ -25,8 +25,8 @@ import org.jdom2.Element;
 public class ElementTable extends TableBase<Element> implements Table<Element> {
 
     
-    ElementTable(XFlatDatabase db, String tableName){
-        super(db, Element.class, tableName);
+    ElementTable(String tableName){
+        super(Element.class, tableName);
     }
     
     @Override

@@ -12,8 +12,10 @@ import org.gburgett.xflat.Range;
  * @author Gordon
  */
 class NumericRange<T extends Comparable<T>> implements Range<T> {
-    private T lower;
-    private T upper;
+    private final T lower;
+    private final T upper;
+    
+    private String name;
 
     public T getLower() {
         return lower;
@@ -72,7 +74,11 @@ class NumericRange<T extends Comparable<T>> implements Range<T> {
 
     @Override
     public String getName() {
-        return lower.toString();
+        if(this.name == null){
+            this.name = this.lower.toString() + '_' + this.upper.toString();
+        }
+        
+        return this.name;
     }
     
 }

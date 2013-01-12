@@ -41,12 +41,11 @@ public class ElementTableTest {
     ConversionService conversionService;
     Engine engine;
     IdGenerator idGenerator;
-    XFlatDatabase database;
     
     private XPathFactory xpath;
     
     ElementTable getInstance(){
-        ElementTable ret = new ElementTable(database, "test");
+        ElementTable ret = new ElementTable("test");
         ret.setIdGenerator(idGenerator);
         ret.setEngineProvider(new EngineProvider() {
             @Override
@@ -63,7 +62,6 @@ public class ElementTableTest {
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
-        database = mock(XFlatDatabase.class);
         engine = mock(Engine.class);
         idGenerator = mock(IdGenerator.class);
         

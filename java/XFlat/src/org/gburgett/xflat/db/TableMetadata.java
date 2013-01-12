@@ -86,7 +86,7 @@ public class TableMetadata implements EngineProvider {
     
     private <T> TableBase makeTableForClass(Class<T> clazz){
         if(Element.class.equals(clazz)){
-            return new ElementTable(this.db, this.name);
+            return new ElementTable(this.name);
         }
         
         IdAccessor accessor = IdAccessor.forClass(clazz);
@@ -97,7 +97,7 @@ public class TableMetadata implements EngineProvider {
             }
         }
 
-        ConvertingTable<T> ret = new ConvertingTable<>(this.db, clazz, this.name);
+        ConvertingTable<T> ret = new ConvertingTable<>(clazz, this.name);
         ret.setConversionService(this.db.getConversionService());
         return ret;
     }
@@ -207,7 +207,7 @@ public class TableMetadata implements EngineProvider {
             return engine;
         }
     }
-
+    
     //</editor-fold>
 
 

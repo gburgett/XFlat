@@ -41,7 +41,6 @@ public class ConvertingTableTest {
     ConversionService conversionService;
     Engine engine;
     IdGenerator idGenerator;
-    XFlatDatabase database;
     
     private XPathFactory xpath;
     
@@ -49,7 +48,7 @@ public class ConvertingTableTest {
         conversionService.addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         conversionService.addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        ConvertingTable<Foo> fooInstance = new ConvertingTable<>(database, Foo.class, "foo");
+        ConvertingTable<Foo> fooInstance = new ConvertingTable<>(Foo.class, "foo");
         fooInstance.setConversionService(conversionService);
         fooInstance.setEngineProvider(new EngineProvider() {
             @Override
@@ -65,7 +64,7 @@ public class ConvertingTableTest {
         conversionService.addConverter(Bar.class, Element.class, new Bar.ToElementConverter());
         conversionService.addConverter(Element.class, Bar.class, new Bar.FromElementConverter());
         
-        ConvertingTable<Bar> barInstance = new ConvertingTable<>(database, Bar.class, "foo");
+        ConvertingTable<Bar> barInstance = new ConvertingTable<>(Bar.class, "foo");
         barInstance.setConversionService(conversionService);
         barInstance.setEngineProvider(new EngineProvider() {
             @Override
@@ -84,7 +83,6 @@ public class ConvertingTableTest {
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
-        database = mock(XFlatDatabase.class);
         engine = mock(Engine.class);
         idGenerator = mock(IdGenerator.class);
         

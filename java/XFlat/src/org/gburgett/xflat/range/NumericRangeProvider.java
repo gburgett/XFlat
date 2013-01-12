@@ -21,6 +21,11 @@ import org.gburgett.xflat.Range;
  * @author Gordon
  */
 public class NumericRangeProvider {
+    
+    private NumericRangeProvider(){
+        
+    }
+    
     /**
      * Creates a RangeProvider for {@link Integer} based ranges.
      * @param base The base from which ranges should be calculated.  Usually 0.

@@ -175,4 +175,35 @@ public abstract class EngineBase implements Engine {
     protected void loadMetadata(Element metatdataElement){
         
     }
+    
+    /**
+     * gets the string ID from a row element.
+     * @param row The row whose ID is needed
+     * @return The ID attached to the row
+     */
+    protected String getId(Element row) {
+        return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
+    }
+    
+    /**
+     * set the Id of the given row element to the given ID
+     * @param row The row whose Id to set
+     * @param id The new value of the ID.
+     */
+    protected void setId(Element row, String id){
+        row.setAttribute("id", id, XFlatDatabase.xFlatNs);
+    }
+    
+    /**
+     * Wraps some element data in a row element with the given ID
+     * @param data The data to wrap
+     * @param id The ID to use for the row
+     * @return The data wrapped in a row element
+     */
+    protected Element wrapInRow(Element data, String id){
+        Element row = new Element("row", XFlatDatabase.xFlatNs).setContent(data);
+        setId(row, id);
+        
+        return row;
+    }
 }

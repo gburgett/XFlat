@@ -284,9 +284,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     protected boolean beginOperations() {
+        //could happen before spin up complete, in that case spinUp will handle the notifying
+        operationsReady.set(true);
+        
         if(this.state.compareAndSet(EngineState.SpunUp, EngineState.Running)){
             synchronized(operationsReady){
-                operationsReady.set(true);
                 operationsReady.notifyAll();
             }
             
@@ -308,12 +310,12 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             throw new EngineStateException("Write operations not supported on an engine that is spinning down", state);
         }
         
-        if(operationsReady.get()){
+        if(operationsReady.get() && state == EngineState.Running){
             return;
         }
         
         synchronized(operationsReady){
-            while(!operationsReady.get()){
+            while(!operationsReady.get() && this.state.get() != EngineState.Running){
                 try {
                     operationsReady.wait();
                 } catch (InterruptedException ex) {
@@ -399,14 +401,14 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
                 }
             };
-        this.getExecutorService().scheduleAtFixedRate(
+        this.getExecutorService().scheduleWithFixedDelay(
             spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
 
         return true;
     }
 
     @Override
-    protected boolean forceSpinDown() {
+    public boolean forceSpinDown() {
         //drop all remaining references to the cache, replace with a cache
         //that throws exceptions on access.
         this.cache = new InactiveCache();
@@ -422,20 +424,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     
-    private String getId(Element row) {
-        return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
-    }
     
-    private void setId(Element row, String id){
-        row.setAttribute("id", id, XFlatDatabase.xFlatNs);
-    }
-    
-    private Element wrapInRow(Element data, String id){
-        Element row = new Element("row", XFlatDatabase.xFlatNs).setContent(data);
-        setId(row, id);
-        
-        return row;
-    }
     
     
     private AtomicReference<Future<?>> scheduledDump = new AtomicReference<>(null);

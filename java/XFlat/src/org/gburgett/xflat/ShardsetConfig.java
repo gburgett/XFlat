@@ -30,8 +30,8 @@ public class ShardsetConfig<T> {
         return shardPropertyClass;
     }
     
-    private XPathExpression<Object> shardPropertySelector;
-    public XPathExpression<Object> getShardPropertySelector(){
+    private XPathExpression<?> shardPropertySelector;
+    public XPathExpression<?> getShardPropertySelector(){
         return shardPropertySelector;
     }
     
@@ -66,7 +66,7 @@ public class ShardsetConfig<T> {
      * property, each range will have its own file.
      * @return A new shardset config.
      */
-    public static <U> ShardsetConfig<U> create(XPathExpression<Object> xpathProperty, Class<U> propertyClass, RangeProvider<U> rangeProvider){
+    public static <U> ShardsetConfig<U> create(XPathExpression<?> xpathProperty, Class<U> propertyClass, RangeProvider<U> rangeProvider){
         ShardsetConfig<U> ret =  new ShardsetConfig<>();
         ret.shardPropertySelector = xpathProperty;
         ret.shardPropertyClass = propertyClass;

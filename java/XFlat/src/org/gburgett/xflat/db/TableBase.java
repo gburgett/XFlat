@@ -11,12 +11,7 @@ import org.gburgett.xflat.EngineStateException;
  * @author gordon
  */
 public abstract class TableBase<T> {
-    
-    private XFlatDatabase database;
-    protected XFlatDatabase getDatabase(){
-        return this.database;
-    }
-    
+        
     private Class<T> tableType;
     protected Class<T> getTableType(){
         return this.tableType;
@@ -37,9 +32,9 @@ public abstract class TableBase<T> {
     
     private EngineProvider engineProvider;
     
-    protected TableBase(XFlatDatabase db, Class<T> tableType, String tableName){
-        this.database = db;
+    protected TableBase(Class<T> tableType, String tableName){
         this.tableType = tableType;
+        this.tableName = tableName;
     }
     
     /**

@@ -8,8 +8,10 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
+import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery.QueryType;
 import org.jdom2.Element;
+import org.jdom2.filter.AttributeFilter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 import static org.junit.Assert.*;
@@ -328,6 +330,27 @@ public class XpathQueryTest {
         //assert
         assertFalse(matches);
     }//end testEq_Foo_ElementNotEqualByValue_DoesntMatch
+    
+    @Test
+    public void testEq_Id_MatchesRowId() throws Exception {
+        System.out.println("testEq_Id_MatchesRowId");
+        
+        //setup data
+        Element row = new Element("row", XFlatDatabase.xFlatNs);
+        row.setAttribute("id", "17", XFlatDatabase.xFlatNs);
+        
+        row.addContent(new Element("data").setText("textData"));
+        
+        XpathQuery query = XpathQuery.eq(XpathQuery.Id, 17);
+        query.setConversionService(conversionService);
+        
+        
+        //act
+        boolean matches = query.getRowMatcher().matches(row);
+        
+        //assert
+        assertTrue(matches);
+    }
     
     //</editor-fold>
     
