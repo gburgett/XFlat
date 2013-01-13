@@ -4,27 +4,34 @@
  */
 package org.gburgett.xflat.convert.converters;
 
-import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionNotSupportedException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.Converter;
 import org.gburgett.xflat.convert.PojoConverter;
+import org.gburgett.xflat.db.IdAccessor;
 import org.gburgett.xflat.util.JDOMStreamReader;
 import org.gburgett.xflat.util.JDOMStreamWriter;
 import org.jdom2.Document;
 import org.jdom2.Element;
+import org.jdom2.Namespace;
+import org.jdom2.filter.Filters;
 import org.jdom2.output.XMLOutputter;
+import org.jdom2.xpath.XPathExpression;
+import org.jdom2.xpath.XPathFactory;
 
 /**
  * A PojoConverter that extends a ConversionService to convert all unknown
@@ -48,6 +55,65 @@ public class JAXBPojoConverter implements PojoConverter {
         }
         
         return new JAXBConversionService(service);
+    }
+
+    private Map<Class<?>, XPathExpression<?>> idSelectorCache = new ConcurrentHashMap<>();
+    
+    @Override
+    public XPathExpression<?> idSelector(Class<?> clazz) {
+        XPathExpression<?> ret = idSelectorCache.get(clazz);
+        if(ret == null){
+            ret = makeIdSelector(clazz);
+            idSelectorCache.put(clazz, ret);
+        }
+        return ret;
+    }
+    
+    private XPathExpression<?> makeIdSelector(Class<?> clazz){
+        IdAccessor accessor = IdAccessor.forClass(clazz);
+        
+        if(!accessor.hasId()){
+            return null;
+        }
+        
+        Namespace ns = null;
+        StringBuilder ret = new StringBuilder(clazz.getSimpleName());
+        
+        XmlAttribute attribute = (XmlAttribute) accessor.getIdPropertyAnnotation(XmlAttribute.class);
+        if(attribute != null){
+            ret.append("/@");
+            if(attribute.namespace() != null){
+                 ns = Namespace.getNamespace("id", attribute.namespace());
+                 ret.append(ns.getPrefix()).append(":");
+            }
+            if(attribute.name() != null){
+                ret.append(attribute.name());
+            }
+            else{
+                ret.append(accessor.getIdPropertyName());
+            }
+        }
+        else{
+            ret.append("/");
+            XmlElement element = (XmlElement) accessor.getIdPropertyAnnotation(XmlElement.class);
+            if(element != null){
+                if(element.namespace() != null){
+                    ns = Namespace.getNamespace("id", attribute.namespace());
+                    ret.append(ns.getPrefix()).append(":");
+                }
+                if(element.name() != null){
+                    ret.append(element.name());
+                }
+                else{
+                    ret.append(accessor.getIdPropertyName());
+                }
+            }
+        }
+        
+        if(ns == null){
+            return XPathFactory.instance().compile(ret.toString());
+        }
+        return XPathFactory.instance().compile(ret.toString(), Filters.fpassthrough(), null, ns);
     }
     
     

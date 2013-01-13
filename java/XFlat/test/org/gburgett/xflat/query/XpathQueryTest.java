@@ -11,13 +11,13 @@ import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery.QueryType;
 import org.jdom2.Element;
-import org.jdom2.filter.AttributeFilter;
+import org.jdom2.Namespace;
+import org.jdom2.filter.Filters;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Matchers;
 import test.Foo;
 
 /**

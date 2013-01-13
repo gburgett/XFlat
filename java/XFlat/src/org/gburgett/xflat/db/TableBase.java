@@ -70,12 +70,4 @@ public abstract class TableBase<T> {
             return action.act(this.engineProvider.provideEngine());
         }
     }
-    
-    /**
-     * Represents an action that a table can perform with an engine.
-     * @param <T> 
-     */
-    protected interface EngineAction<T>{
-        public T act(Engine engine);
-    }
 }

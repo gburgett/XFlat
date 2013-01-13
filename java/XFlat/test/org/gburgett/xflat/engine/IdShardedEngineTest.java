@@ -27,6 +27,7 @@ import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
+import org.jdom2.xpath.XPathExpression;
 import static org.junit.Assert.*;
 
 /**
@@ -47,6 +48,11 @@ public class IdShardedEngineTest extends EngineTestsBase {
             @Override
             public ConversionService extend(ConversionService service) {
                 return conversionService;
+            }
+
+            @Override
+            public XPathExpression<?> idSelector(Class<?> clazz) {
+                return null;
             }
         });
         db.setEngineFactory(new EngineFactory(){

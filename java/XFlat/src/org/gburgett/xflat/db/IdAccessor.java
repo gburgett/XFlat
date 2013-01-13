@@ -7,6 +7,7 @@ package org.gburgett.xflat.db;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.gburgett.xflat.Id;
 import org.gburgett.xflat.XflatException;
+import org.jdom2.Attribute;
 
 /**
  * A helper class that accesses the IDs of an object.
@@ -234,5 +236,29 @@ public class IdAccessor<T> {
         }
             
         throw new UnsupportedOperationException("Cannot get ID value when object has no ID");
+    }
+
+    public String getIdPropertyName(){
+        if(this.idProperty != null){
+            return this.idProperty.getName();
+        }
+        
+        if(this.idField != null){
+            return this.idField.getName();
+        }
+        
+        throw new UnsupportedOperationException("Cannot get field name when object has no ID");
+    }
+    
+    public <U extends Annotation> U getIdPropertyAnnotation(Class<U> annotationClass){
+        if(this.idProperty != null){
+            return this.idProperty.getReadMethod().getAnnotation(annotationClass);
+        }
+        
+        if(this.idField != null){
+            return this.idField.getAnnotation(annotationClass);
+        }
+        
+        throw new UnsupportedOperationException("Cannot get annotation when object has no ID");
     }
 }

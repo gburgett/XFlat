@@ -9,14 +9,16 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import org.gburgett.xflat.Cursor;
+import org.gburgett.xflat.EngineStateException;
 import org.gburgett.xflat.Range;
 import org.gburgett.xflat.ShardsetConfig;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
-import org.gburgett.xflat.engine.IdShardedEngine;
 import org.jdom2.Element;
 
 /**
@@ -28,6 +30,8 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     
     //the engines that are spinning down while this engine spins down
     private Map<Range<T>, EngineBase> spinningDownEngines = new HashMap<>();
+    
+    private WeakHashMap<Cursor<Range<T>>, String> openTableCursors = new WeakHashMap<>();
     
     private final Object spinDownSyncRoot = new Object();
     
@@ -77,48 +81,55 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         return ret;
     }
     
-    protected EngineBase getEngine(Range<T> range){
-        
-        EngineState state = getState();
-        if(state == EngineState.Uninitialized || state == EngineState.SpunDown){
-            throw new XflatException("Attempt to read or write to an engine in an uninitialized state");
-        }
-        
-        
-        TableMetadata ret = openShards.get(range);
-        
-        if(ret == null){
+    private EngineBase getEngine(Range<T> range){
+        TableMetadata metadata = openShards.get(range);
+        if(metadata == null){
             //definitely ensure we aren't spinning down before we start up a new engine
             synchronized(spinDownSyncRoot){
                 
-                state = getState();
+                EngineState state = getState();
                 if(state == EngineState.SpunDown){
                     throw new XflatException("Engine has already spun down");
                 }
                 
                 //build the new metadata element so we can use it to provide engines
                 String name = range.getName();
-                ret = this.getMetadataFactory().makeTableMetadata(name, new File(directory, name + ".xml"));
-                TableMetadata weWereLate = openShards.putIfAbsent(range, ret);
+                metadata = this.getMetadataFactory().makeTableMetadata(name, new File(directory, name + ".xml"));
+                TableMetadata weWereLate = openShards.putIfAbsent(range, metadata);
                 if(weWereLate != null){
                     //another thread put the new metadata already
-                    ret = weWereLate;
+                    metadata = weWereLate;
                 }
 
                 if(state == EngineState.SpinningDown){
                     EngineBase eng = spinningDownEngines.get(range);
                     if(eng == null){
-                        //we're requesting a new engine for some kind of read, get it and immediately begin spinning it down.
-                        eng = ret.provideEngine();
+                        //we're requesting a new engine for some kind of read, get it and let the task spin it down.
+                        eng = metadata.provideEngine();
                         spinningDownEngines.put(range, eng);
-                        ret.spinDown();
+                        return eng;
                     }
-                    return eng;
                 }
             }
         }
         
-        return ret.provideEngine();
+        return metadata.provideEngine();
+    }
+    
+    protected <U> U doWithEngine(Range<T> range, EngineAction<U> action){
+        
+        EngineState state = getState();
+        if(state == EngineState.Uninitialized || state == EngineState.SpunDown){
+            throw new XflatException("Attempt to read or write to an engine in an uninitialized state");
+        }
+        
+        try{
+            return action.act(getEngine(range));
+        }
+        catch(EngineStateException ex){
+            //try one more time with a potentially new engine, if we still fail then let it go
+            return action.act(getEngine(range));
+        }
     }
     
     

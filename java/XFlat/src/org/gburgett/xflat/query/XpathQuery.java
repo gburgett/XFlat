@@ -7,6 +7,7 @@ package org.gburgett.xflat.query;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.hamcrest.Description;
@@ -20,6 +21,7 @@ import org.hamcrest.SelfDescribing;
 import org.hamcrest.StringDescription;
 import org.jdom2.Attribute;
 import org.jdom2.Element;
+import org.jdom2.Namespace;
 import org.jdom2.filter.AttributeFilter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
@@ -94,9 +96,121 @@ public class XpathQuery {
         this.queryChain.addAll(Arrays.asList(queries));
     }
     
+    private XpathQuery(){
+    }
+    
+    private static class XPathExpressionEqualsMatcher<U> extends TypeSafeMatcher<XPathExpression<U>>{
+        private final XPathExpression<U> toMatch;
+        
+        public XPathExpressionEqualsMatcher(XPathExpression<U> toMatch){
+            this.toMatch = toMatch;
+        }
+        
+        @Override
+        protected boolean matchesSafely(XPathExpression<U> item) {
+            if(toMatch == null){
+                return item == null; 
+            }
+            
+            if(toMatch.getNamespaces().length != item.getNamespaces().length){
+                return false;
+            }
+            
+            String itemExp = item.getExpression();
+            
+            //match namespaces by prefix
+            for(Namespace n : toMatch.getNamespaces()){
+                boolean didFind = false;
+                for(Namespace i : item.getNamespaces()){
+                    if(n.getURI().equals(i.getURI())){
+                        didFind = true;
+                        if(!n.getPrefix().equals(i.getPrefix())){
+                            //allow for different namespace prefixes
+                            itemExp = itemExp.replace(i.getPrefix() + ":", n.getPrefix() + ":");
+                        }
+                    }
+                }
+                if(!didFind){
+                    return false;
+                }
+            }
+            
+            if(!toMatch.getExpression().equals(itemExp)){
+                return false;
+            }
+            
+            return true;
+        }
+
+        @Override
+        public void describeTo(Description description) {
+            if(toMatch == null){
+                description.appendText("null XPath expression");
+                return;
+            }
+            description.appendText("XPath expression equal to ").appendText(toMatch.getExpression());
+        }
+        
+    
+    }
+    
+    /**
+     * Returns a new query in which the given selector expression is replaced whenever it is found
+     * with the new selector expression.
+     * This is used primarily to replace expressions selecting the Id property of an object
+     * with the {@link #Id} expression, so that engines can take advantage of ID indexes.
+     * @param <U>
+     * @param selector The selector to replace.
+     * @param newSelector The new selector to use.
+     * @return A new XpathQuery with the replaced values.
+     */
+    public <U> XpathQuery replaceExpression(XPathExpression<U> selector, XPathExpression<U> newSelector){
+        return replaceExpression(new XPathExpressionEqualsMatcher<>(selector), newSelector);
+    }
+    
+    /**
+     * Returns a new query in which the given selector expression is replaced whenever it is found
+     * with the new selector expression.
+     * This is used primarily to replace expressions selecting the Id property of an object
+     * with the {@link #Id} expression, so that engines can take advantage of ID indexes.
+     * @param <U>
+     * @param selector A matcher matching the selector expressions to replace.
+     * @param newSelector The new selector to use.
+     * @return A new XpathQuery with the replaced values.
+     */
+    public <U> XpathQuery replaceExpression(Matcher<XPathExpression<U>> selector, XPathExpression<U> newSelector){
+        XpathQuery ret = new XpathQuery();
+        ret.conversionService = this.conversionService;
+        ret.queryType = this.queryType;
+        ret.value = this.value;
+        ret.valueType = this.valueType;
+        ret.rowMatcher = this.rowMatcher;
+        
+        //match expression
+        if(selector.matches(this.selector)){
+            ret.selector = newSelector;
+        }
+        else{
+            ret.selector = this.selector;
+        }
+        
+        //check sub-expressions
+        if(this.queryChain != null){
+            ret.queryChain = new ArrayList<>(this.queryChain.size());
+            for(XpathQuery q : this.queryChain){
+                ret.queryChain.add(q.replaceExpression(selector, newSelector));
+            }
+        }
+        
+        return ret;
+    }
+    
     /**
      * An XPath expression selecting the database ID of a row.
      * This can be used to build queries matching the row's ID.
+     * <p/>
+     * Currently this is the expression "@db:id".
+     * 
      */
     public static final XPathExpression<Attribute> Id = XPathFactory.instance().compile("@db:id", new AttributeFilter(), null, XFlatDatabase.xFlatNs);
     

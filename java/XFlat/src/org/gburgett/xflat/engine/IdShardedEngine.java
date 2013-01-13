@@ -5,25 +5,14 @@
 package org.gburgett.xflat.engine;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
-import org.gburgett.xflat.Range;
 import org.gburgett.xflat.ShardsetConfig;
 import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.db.Engine;
-import org.gburgett.xflat.db.EngineBase;
-import org.gburgett.xflat.db.EngineState;
+import org.gburgett.xflat.db.EngineAction;
 import org.gburgett.xflat.db.ShardedEngineBase;
-import org.gburgett.xflat.db.TableMetadata;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
@@ -46,16 +35,25 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public void insertRow(String id, Element data) throws DuplicateKeyException {
+    public void insertRow(final String id, final Element data) throws DuplicateKeyException {
         
-        Engine e = this.getEngine(getRange(id));
-        e.insertRow(id, data);
+        doWithEngine(getRange(id), new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.insertRow(id, data);
+                return null;
+            }
+        });
     }
 
     @Override
-    public Element readRow(String id) {
-        Engine e = this.getEngine(getRange(id));
-        return e.readRow(id);
+    public Element readRow(final String id) {
+        return doWithEngine(getRange(id), new EngineAction<Element>(){
+            @Override
+            public Element act(Engine engine) {
+                return engine.readRow(id);
+            }
+        });
     }
 
     @Override
@@ -64,13 +62,24 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public void replaceRow(String id, Element data) throws KeyNotFoundException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void replaceRow(final String id, final Element data) throws KeyNotFoundException {
+        doWithEngine(getRange(id), new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.replaceRow(id, data);
+                return null;
+            }
+        });
     }
 
     @Override
-    public boolean update(String id, XpathUpdate update) throws KeyNotFoundException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public boolean update(final String id, final XpathUpdate update) throws KeyNotFoundException {
+        return doWithEngine(getRange(id), new EngineAction<Boolean>(){
+            @Override
+            public Boolean act(Engine engine) {
+                return engine.update(id, update);
+            }
+        });
     }
 
     @Override
@@ -79,13 +88,24 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public boolean upsertRow(String id, Element data) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public boolean upsertRow(final String id, final Element data) {
+        return doWithEngine(getRange(id), new EngineAction<Boolean>(){
+            @Override
+            public Boolean act(Engine engine) {
+                return engine.upsertRow(id, data);
+            }
+        });
     }
 
     @Override
-    public void deleteRow(String id) throws KeyNotFoundException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void deleteRow(final String id) throws KeyNotFoundException {
+        doWithEngine(getRange(id), new EngineAction(){
+            @Override
+            public Object act(Engine engine) {
+                engine.deleteRow(id);
+                return null;
+            }
+        });
     }
 
     @Override
