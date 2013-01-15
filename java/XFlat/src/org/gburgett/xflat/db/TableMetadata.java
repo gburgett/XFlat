@@ -120,9 +120,12 @@ public class TableMetadata implements EngineProvider {
 
             ret.setConversionService(db.getConversionService());
             ret.setExecutorService(db.getExecutorService());
-            //give it a metadata factory centered in its own file.  If it uses this,
-            //it must also use the file as a directory.
-            ret.setMetadataFactory(new TableMetadataFactory(this.db, file));
+            
+            if(ret instanceof ShardedEngineBase){
+                //give it a metadata factory centered in its own file.  If it uses this,
+                //it must also use the file as a directory.
+                ((ShardedEngineBase)ret).setMetadataFactory(new TableMetadataFactory(this.db, file));
+            }
             
             ret.loadMetadata(engineMetadata);
             

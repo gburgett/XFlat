@@ -165,6 +165,8 @@ public class XFlatDatabase implements Database {
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
+        this.executorService = executorService;
+        
         this.metadataFactory = new TableMetadataFactory(this, new File(directory, "xflat_metadata"));
         
         this.state = new AtomicReference<>(DatabaseState.Uninitialized);

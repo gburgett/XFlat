@@ -18,7 +18,8 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.db.EngineFactory;
-import org.gburgett.xflat.db.EngineTestsBase;
+import org.gburgett.xflat.db.ShardedEngineTestsBase;
+import org.gburgett.xflat.db.TableMetadataFactory;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.range.NumericRangeProvider;
@@ -34,11 +35,11 @@ import static org.junit.Assert.*;
  *
  * @author gordon
  */
-public class IdShardedEngineTest extends EngineTestsBase {
+public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine> {
 
     String name = "IdShardedEngineTest";
     @Override
-    protected EngineBase createInstance(TestContext ctx) {
+    protected IdShardedEngine createInstance(TestContext ctx) {
         
         final Map<File, Document> docs = new ConcurrentHashMap<>();
         ctx.additionalContext.put("docs", docs);
@@ -91,13 +92,21 @@ public class IdShardedEngineTest extends EngineTestsBase {
         ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
         
         File file = new File(ctx.workspace, name);
-        return new IdShardedEngine(file, name, cfg);
+        IdShardedEngine ret = new IdShardedEngine(file, name, cfg);
+        setMetadataFactory(ret, new TableMetadataFactory(db, file));
+        return ret;
     }
 
     @Override
     protected void prepFileContents(TestContext ctx, Document contents) throws IOException {
         Map<File, Document> docs = (Map<File, Document>)ctx.additionalContext.get("docs");
         RangeProvider<Integer> provider = (RangeProvider<Integer>)ctx.additionalContext.get("rangeProvider");
+        
+        if(contents == null){
+            docs.clear();
+            return;
+        }
+            
                 
         //shard by integer ID, as we had determined in the setup
         Map<Range<Integer>, Document> files = new HashMap<>();
@@ -140,7 +149,7 @@ public class IdShardedEngineTest extends EngineTestsBase {
         //each range is now in order, add all the rows from each document
         for(Document d : sortedDocs.values()){
             for(Element e : d.getRootElement().getChildren("row", XFlatDatabase.xFlatNs)){
-                ret.addContent(e.detach());
+                ret.getRootElement().addContent(e.detach());
             }
         }
         

@@ -4,12 +4,14 @@
  */
 package org.gburgett.xflat.query;
 
+import javax.management.Query;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery.QueryType;
+import org.gburgett.xflat.util.ComparableComparator;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.jdom2.filter.Filters;
@@ -851,4 +853,102 @@ public class XpathQueryTest {
         //assert
         assertFalse(matches);
     }//end testExists_DoesntExist_DoesntMatch
+    
+    @Test
+    public void testDissect_NoMatchingIndex_ReturnsAll() throws Exception {
+        System.out.println("testDissect_NoMatchingIndex_ReturnsAll");
+        
+        XPathExpression<Object> path = xpath.compile("abc/def");
+        XpathQuery q = XpathQuery.eq(path, 17);
+        
+        XPathExpression<Object> index = xpath.compile("ghi/jkl");
+        
+        IntervalSet<Integer> dissected = q.dissect(index, new ComparableComparator<Integer>(), Integer.class);
+        
+        assertEquals("(-∞, ∞)", dissected.toString());
+    }
+    
+    @Test
+    public void testDissect_IndexMatches_ReturnsEq() throws Exception {
+        System.out.println("testDissect_IndexMatches_ReturnsEq");
+        
+        XPathExpression<Object> path = xpath.compile("abc/def");
+        XpathQuery q = XpathQuery.eq(path, 17);
+        
+        XPathExpression<Object> index = xpath.compile("abc/def");
+        
+        IntervalSet<Integer> dissected = q.dissect(index, new ComparableComparator<Integer>(), Integer.class);
+        
+        assertEquals("[17, 17]", dissected.toString());
+    }
+    
+    @Test
+    public void testDissect_And_IndexMatches_ReturnsIntersection() throws Exception {
+        System.out.println("testDissect_And_IndexMatches_ReturnsIntersection");
+        
+        XPathExpression<Object> path = xpath.compile("abc/def");
+        XpathQuery q = XpathQuery.and(
+                XpathQuery.lt(path, 17),
+                XpathQuery.gte(path, 5)
+            );
+        
+        XPathExpression<Object> index = xpath.compile("abc/def");
+        
+        IntervalSet<Integer> dissected = q.dissect(index, new ComparableComparator<Integer>(), Integer.class);
+        
+        assertEquals("[5, 17)", dissected.toString());
+    }
+    
+    @Test
+    public void testDissect_Or_IndexMatches_ReturnsUnion() throws Exception {
+        System.out.println("testDissect_Or_IndexMatches_ReturnsUnion");
+        
+        XPathExpression<Object> path = xpath.compile("abc/def");
+        XpathQuery q = XpathQuery.or(
+                XpathQuery.lt(path, 4),
+                XpathQuery.gte(path, 5)
+            );
+        
+        XPathExpression<Object> index = xpath.compile("abc/def");
+        
+        IntervalSet<Integer> dissected = q.dissect(index, new ComparableComparator<Integer>(), Integer.class);
+        
+        assertEquals("(-∞, 4) U [5, ∞)", dissected.toString());
+    }
+    
+    @Test
+    public void testDissect_And_OneMatchesOneNot_ReturnsNE() throws Exception {
+        System.out.println("testDissect_And_OneMatchesOneNot_ReturnsNE");
+        
+        XPathExpression<Object> path = xpath.compile("abc/def");
+        XPathExpression<Object> path2 = xpath.compile("abc/ghi");
+        XpathQuery q = XpathQuery.and(
+                XpathQuery.ne(path, 17),
+                XpathQuery.gte(path2, 5)
+            );
+        
+        XPathExpression<Object> index = xpath.compile("abc/def");
+        
+        IntervalSet<Integer> dissected = q.dissect(index, new ComparableComparator<Integer>(), Integer.class);
+        
+        assertEquals("(-∞, 17) U (17, ∞)", dissected.toString());
+    }
+    
+    @Test
+    public void testDissect_Or_OneMatchesOneNot_ReturnsAll() throws Exception {
+        System.out.println("testDissect_Or_OneMatchesOneNot_ReturnsAll");
+        
+        XPathExpression<Object> path = xpath.compile("abc/def");
+        XPathExpression<Object> path2 = xpath.compile("abc/ghi");
+        XpathQuery q = XpathQuery.or(
+                XpathQuery.ne(path, 17),
+                XpathQuery.gte(path2, 5)
+            );
+        
+        XPathExpression<Object> index = xpath.compile("abc/def");
+        
+        IntervalSet<Integer> dissected = q.dissect(index, new ComparableComparator<Integer>(), Integer.class);
+        
+        assertEquals("(-∞, ∞)", dissected.toString());
+    }
 }

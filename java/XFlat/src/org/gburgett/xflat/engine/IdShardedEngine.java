@@ -19,7 +19,8 @@ import org.gburgett.xflat.query.XpathUpdate;
 import org.jdom2.Element;
 
 /**
- *
+ * An engine that shards the table based on ID.  This engine manages several sub-engines,
+ * which each manage one shard.
  * @author Gordon
  */
 public class IdShardedEngine<T> extends ShardedEngineBase<T> {
@@ -112,5 +113,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     public int deleteAll(XpathQuery query) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+    
+    
     
 }

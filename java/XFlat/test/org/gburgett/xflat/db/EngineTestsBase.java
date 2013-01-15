@@ -193,6 +193,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         TEngine instance = this.createInstance(ctx);
         instance.setExecutorService(executorService);
         instance.setConversionService(conversionService);
+        
         return instance;
     }
     

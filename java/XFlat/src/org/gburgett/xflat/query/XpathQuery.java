@@ -4,8 +4,10 @@
  */
 package org.gburgett.xflat.query;
 
+import org.gburgett.xflat.util.XPathExpressionEqualityMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
@@ -33,7 +35,7 @@ import org.jdom2.xpath.XPathFactory;
 public class XpathQuery {
 
     
-    
+    //<editor-fold desc="properties" >
     private XPathExpression<?> selector;
     public XPathExpression<?> getSelector(){
         return selector;
@@ -58,9 +60,13 @@ public class XpathQuery {
     public QueryType getQueryType(){
         return queryType;
     }
-
-    private List<XpathQuery> queryChain;
     
+    private List<XpathQuery> queryChain;
+
+    //</editor-fold>
+    
+    
+    //<editor-fold desc="dependencies">
     private ConversionService conversionService;
     /**
      * Sets the conversion service for the entire query chain.  Necessary for
@@ -77,6 +83,10 @@ public class XpathQuery {
         }
     }
 
+    //</editor-fold>
+    
+    
+    //<editor-fold desc="constructors" >
     private XpathQuery(XPathExpression<?> selector, QueryType type, Object value, Class<?> valueType,
             Matcher<?> valueMatcher)
     {
@@ -87,8 +97,6 @@ public class XpathQuery {
         this.valueType = valueType;
     }
 
-    
-    
     private XpathQuery(QueryType type, Matcher<Element> rowMatcher, XpathQuery... queries){
         this.queryType = type;
         this.rowMatcher = rowMatcher;
@@ -99,60 +107,10 @@ public class XpathQuery {
     private XpathQuery(){
     }
     
-    private static class XPathExpressionEqualsMatcher<U> extends TypeSafeMatcher<XPathExpression<U>>{
-        private final XPathExpression<U> toMatch;
-        
-        public XPathExpressionEqualsMatcher(XPathExpression<U> toMatch){
-            this.toMatch = toMatch;
-        }
-        
-        @Override
-        protected boolean matchesSafely(XPathExpression<U> item) {
-            if(toMatch == null){
-                return item == null; 
-            }
-            
-            if(toMatch.getNamespaces().length != item.getNamespaces().length){
-                return false;
-            }
-            
-            String itemExp = item.getExpression();
-            
-            //match namespaces by prefix
-            for(Namespace n : toMatch.getNamespaces()){
-                boolean didFind = false;
-                for(Namespace i : item.getNamespaces()){
-                    if(n.getURI().equals(i.getURI())){
-                        didFind = true;
-                        if(!n.getPrefix().equals(i.getPrefix())){
-                            //allow for different namespace prefixes
-                            itemExp = itemExp.replace(i.getPrefix() + ":", n.getPrefix() + ":");
-                        }
-                    }
-                }
-                if(!didFind){
-                    return false;
-                }
-            }
-            
-            if(!toMatch.getExpression().equals(itemExp)){
-                return false;
-            }
-            
-            return true;
-        }
-
-        @Override
-        public void describeTo(Description description) {
-            if(toMatch == null){
-                description.appendText("null XPath expression");
-                return;
-            }
-            description.appendText("XPath expression equal to ").appendText(toMatch.getExpression());
-        }
-        
+    //</editor-fold>
     
-    }
+    
+    //<editor-fold desc="methods"> 
     
     /**
      * Returns a new query in which the given selector expression is replaced whenever it is found
@@ -165,7 +123,7 @@ public class XpathQuery {
      * @return A new XpathQuery with the replaced values.
      */
     public <U> XpathQuery replaceExpression(XPathExpression<U> selector, XPathExpression<U> newSelector){
-        return replaceExpression(new XPathExpressionEqualsMatcher<>(selector), newSelector);
+        return replaceExpression(new XPathExpressionEqualityMatcher<>(selector), newSelector);
     }
     
     /**
@@ -206,6 +164,112 @@ public class XpathQuery {
     }
     
     /**
+     * Dissects the query based on the given index.  This returns the Intervals on the index to which
+     * this query should be applied.  If the query is invalid for the index applied, an {@link InvalidQueryException} is thrown.
+     * @param <U>
+     * @param index The XPathExpression describing an index on a table.
+     * @param comparer A Comparator for the expected values of the index.
+     * @param indexClass The class to which the value selected by the index is expected to be convertible.
+     * @return An IntervalSet representing the values on the index to search.
+     * @throws InvalidQueryException if the query is not valid for the given index and index class.
+     */
+    public <U> IntervalSet<U> dissect(XPathExpression index, Comparator<U> comparer, Class<U> indexClass){
+        return dissect(new XPathExpressionEqualityMatcher(index), comparer, indexClass);
+    }
+    
+    /**
+     * Dissects the query based on the given index.  This returns the Intervals on the index to which
+     * this query should be applied.  If the query is invalid for the index applied, an {@link InvalidQueryException} is thrown.
+     * @param <U>
+     * @param index A matcher matching an XPathExpression describing an index on a table.
+     * @param comparer A Comparator for the expected values of the index.
+     * @param indexClass The class to which the value selected by the index is expected to be convertible.
+     * @return An IntervalSet representing the values on the index to search.
+     * @throws InvalidQueryException if the query is not valid for the given index and index class.
+     */
+    public <U> IntervalSet<U> dissect(Matcher<XPathExpression> index, Comparator<U> comparer, Class<U> indexClass){
+        
+        if(this.selector != null && !index.matches(this.selector)){
+            //we don't care about this part of the query, as far as it's concerned a full table scan is in order.
+            return IntervalSet.all();
+        }
+        
+        if(this.value != null && !indexClass.isAssignableFrom(this.valueType)){
+            throw new InvalidQueryException(this, indexClass);
+        }
+        
+        switch(this.queryType){
+            case EQ:
+                if(this.value == null){
+                    //we want one that doesn't exist.  Maybe this index is sparse?
+                    //if so none of the values in this index will contain what we want.
+                    return IntervalSet.none();
+                }
+
+                return IntervalSet.eq((U)value);
+                
+            case NE:
+                if(this.value == null){
+                    //we just want one that exists.  Maybe this index is sparse?
+                    //if so all the values in this index are fair game.
+                    return IntervalSet.all();
+                }
+
+                return IntervalSet.ne((U)value);
+                
+            case LT:
+                return IntervalSet.lt((U) value);
+                
+            case LTE:
+                return IntervalSet.lte((U) value);
+                
+            case GT:
+                return IntervalSet.gt((U) value);
+                
+            case GTE:
+                return IntervalSet.gte((U) value);
+                
+            case EXISTS:
+            case MATCHES:
+                //always a full table scan
+                return IntervalSet.all();
+                
+            case AND:
+                IntervalSet ret = null;
+                for(XpathQuery q : this.queryChain){
+                    if(ret == null){
+                        ret = q.dissect(index, comparer, indexClass);
+                    }
+                    else{
+                        //AND means intersection
+                        ret = ret.intersection(q.dissect(index, comparer, indexClass), comparer);
+                    }
+                }
+                return ret;
+                
+            case OR:
+                ret = null;
+                for(XpathQuery q : this.queryChain){
+                    if(ret == null){
+                        ret = q.dissect(index, comparer, indexClass);
+                    }
+                    else{
+                        //OR means union
+                        ret = ret.union(q.dissect(index, comparer, indexClass), comparer);
+                    }
+                }
+                return ret;
+                
+            default:
+                throw new UnsupportedOperationException("Unknown query type " + this.queryType);
+        }
+    }
+    
+    //</editor-fold>
+    
+    
+    //<editor-fold desc="constants">
+    /**
      * An XPath expression selecting the database ID of a row.
      * This can be used to build queries matching the row's ID.
      * <p/>
@@ -213,6 +277,7 @@ public class XpathQuery {
      * 
      */
     public static final XPathExpression<Attribute> Id = XPathFactory.instance().compile("@db:id", new AttributeFilter(), null, XFlatDatabase.xFlatNs);
+    //</editor-fold>
     
     //<editor-fold desc="builders">
 
@@ -337,6 +402,10 @@ public class XpathQuery {
      * @return  an XpathQuery object
      */
     public static XpathQuery and(XpathQuery... queries){
+        if(queries.length < 2){
+            throw new IllegalArgumentException("AND requires at least 2 queries");
+        }
+        
         List<Matcher<? super Element>> ms = new ArrayList<>();
 
         for(XpathQuery q : queries){
@@ -353,6 +422,10 @@ public class XpathQuery {
      * @return an XpathQuery object.
      */
     public static XpathQuery or(XpathQuery... queries){
+        if(queries.length < 2){
+            throw new IllegalArgumentException("OR requires at least 2 queries");
+        }
+        
         List<Matcher<? super Element>> ms = new ArrayList<>();
 
         for(XpathQuery q : queries){
@@ -390,6 +463,8 @@ public class XpathQuery {
 
     //</editor-fold>
 
+    //<editor-fold desc="inner classes">
+    
     /**
      * The type of the query.
      * Can be used by engines to inspect the query in order to generate an
@@ -407,7 +482,7 @@ public class XpathQuery {
         EXISTS,
         MATCHES
     }
-    
+       
     /**
      * The Hamcrest Matcher that matches a row by evaluating the Xpath expression,
      * and invoking the matcher for the result of the Xpath expression.
@@ -477,15 +552,19 @@ public class XpathQuery {
                     .appendDescriptionOf(this.subMatcher);
         }
     }
-
+    
+    //</editor-fold>
+    
+    //<editor-fold desc="utility">
+    
     @Override
     public String toString(){
         StringBuilder str = new StringBuilder();
-        this.appendToString(str);
+        this.toString(str);
         return str.toString();
     }
     
-    private void appendToString(StringBuilder str){
+    private void toString(StringBuilder str){
         str.append("{");
         
         if(this.queryChain != null && this.queryChain.size() > 0){
@@ -498,7 +577,7 @@ public class XpathQuery {
                 else
                     str.append(", ");
                 
-                q.appendToString(str);
+                q.toString(str);
             }
             str.append("]");
         }
@@ -523,4 +602,6 @@ public class XpathQuery {
         }
         str.append("}");
     }
+    
+    //</editor-fold>
 }

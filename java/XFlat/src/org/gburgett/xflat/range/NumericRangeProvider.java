@@ -4,7 +4,9 @@
  */
 package org.gburgett.xflat.range;
 
+import java.util.Comparator;
 import org.gburgett.xflat.Range;
+import org.gburgett.xflat.util.ComparableComparator;
 
 /**
  * A class containing a number of factory methods for getting RangeProviders for
@@ -52,8 +54,14 @@ public class NumericRangeProvider {
                 int upper = lower + width;
                 return new NumericRange<>(lower, upper);
             }
+
+            @Override
+            public Comparator<Integer> getComparator() {
+                return ComparableComparator.getComparator(Integer.class);
+            }
         };
-    }
+    }    
+    
     /**
      * Creates a RangeProvider for {@link Long} based ranges.
      * @param base The base from which ranges should be calculated.  Usually 0.
@@ -77,6 +85,11 @@ public class NumericRangeProvider {
                 long lower = (r.getLower() + (width * factor));
                 long upper = lower + width;
                 return new NumericRange<>(lower, upper);
+            }
+
+            @Override
+            public Comparator<Long> getComparator() {
+                return ComparableComparator.getComparator(Long.class);
             }
         };
     }
@@ -105,6 +118,11 @@ public class NumericRangeProvider {
                 double lower = (r.getLower() + (width * factor));
                 double upper = lower + width;
                 return new NumericRange<>(lower, upper);
+            }
+
+            @Override
+            public Comparator<Double> getComparator() {
+                return ComparableComparator.getComparator(Double.class);
             }
             
         };
