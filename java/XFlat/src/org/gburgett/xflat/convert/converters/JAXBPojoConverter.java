@@ -57,11 +57,11 @@ public class JAXBPojoConverter implements PojoConverter {
         return new JAXBConversionService(service);
     }
 
-    private Map<Class<?>, XPathExpression<?>> idSelectorCache = new ConcurrentHashMap<>();
+    private Map<Class<?>, XPathExpression<Object>> idSelectorCache = new ConcurrentHashMap<>();
     
     @Override
-    public XPathExpression<?> idSelector(Class<?> clazz) {
-        XPathExpression<?> ret = idSelectorCache.get(clazz);
+    public XPathExpression<Object> idSelector(Class<?> clazz) {
+        XPathExpression<Object> ret = idSelectorCache.get(clazz);
         if(ret == null){
             ret = makeIdSelector(clazz);
             idSelectorCache.put(clazz, ret);
@@ -69,7 +69,7 @@ public class JAXBPojoConverter implements PojoConverter {
         return ret;
     }
     
-    private XPathExpression<?> makeIdSelector(Class<?> clazz){
+    private XPathExpression<Object> makeIdSelector(Class<?> clazz){
         IdAccessor accessor = IdAccessor.forClass(clazz);
         
         if(!accessor.hasId()){
@@ -107,6 +107,9 @@ public class JAXBPojoConverter implements PojoConverter {
                 else{
                     ret.append(accessor.getIdPropertyName());
                 }
+            }
+            else{
+                ret.append(accessor.getIdPropertyName());
             }
         }
         

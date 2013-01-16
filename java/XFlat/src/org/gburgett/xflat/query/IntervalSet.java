@@ -5,19 +5,33 @@
 package org.gburgett.xflat.query;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 /**
- * Represents a set of values defined in terms of several ranges.
- * The set is the union of all the ranges.
+ * Represents an immutable set of values defined in terms of several intervals.
+ * The set is the union of all the intervals.
  * @author gordon
  */
 public class IntervalSet<T> {
     
-    private List<Interval<T>> intervals = new ArrayList<>();
+    private final List<Interval<T>> intervals;
+    
+    public List<Interval<T>> getIntervals(){
+        return intervals;
+    }
+    
+    private IntervalSet(Interval<T>... intervals){
+        this.intervals = Arrays.asList(intervals);
+    }
+    
+    private IntervalSet(List<Interval<T>> intervals){
+        this.intervals = Collections.unmodifiableList(intervals);
+    }
     
     /**
      * Creates an interval set representing all values less than the given value,
@@ -28,10 +42,8 @@ public class IntervalSet<T> {
      * @return An interval set containing one interval
      */
     public static <U> IntervalSet<U> lt(U value){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>((U)null, true, value, true);
-        ret.intervals.add(i);
-        return ret;
+        Interval<U> i = new Interval<>((U)null, false, value, false);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -43,10 +55,8 @@ public class IntervalSet<T> {
      * @return An interval set containing one interval
      */
     public static <U> IntervalSet<U> lte(U value){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>((U)null, true, value, false);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>((U)null, false, value, true);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -58,10 +68,8 @@ public class IntervalSet<T> {
      * @return An interval set containing one interval
      */
     public static <U> IntervalSet<U> gt(U value){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(value, true, null, true);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>(value, false, null, false);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -73,10 +81,8 @@ public class IntervalSet<T> {
      * @return An interval set containing one interval
      */
     public static <U> IntervalSet<U> gte(U value){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(value, false, null, true);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>(value, true, null, false);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -91,10 +97,8 @@ public class IntervalSet<T> {
      * @return 
      */
     public static <U> IntervalSet<U> between(U lower, U upper){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(lower, true, upper, true);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>(lower, false, upper, false);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -105,10 +109,8 @@ public class IntervalSet<T> {
      * @return an IntervalSet containing one Interval
      */
     public static <U> IntervalSet<U> eq(U value){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(value, false, value, false);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>(value, true, value, true);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -119,12 +121,10 @@ public class IntervalSet<T> {
      * @return an IntervalSet containing two Intervals
      */
     public static <U> IntervalSet<U> ne(U value){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(null, true, value, true);
-        ret.intervals.add(i);
-        i = new Interval<>(value, true, null, true);
-        ret.intervals.add(i);
-        return ret;
+        
+        return new IntervalSet<>(
+                new Interval<>(null, false, value, false),
+                new Interval<>(value, false, null, false));
     }
     
     /**
@@ -134,10 +134,8 @@ public class IntervalSet<T> {
      * @return 
      */
     public static <U> IntervalSet<U> all(){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(null, true, null, true);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>(null, false, null, false);
+        return new IntervalSet<>(i);
     }
     
     /**
@@ -147,13 +145,11 @@ public class IntervalSet<T> {
      * @return 
      */
     public static <U> IntervalSet<U> none(){
-        IntervalSet<U> ret = new IntervalSet<>();
-        Interval i = new Interval<>(null, true, null, true);
-        ret.intervals.add(i);
-        return ret;
+        Interval i = new Interval<>(null, false, null, false);
+        return new IntervalSet<>(i);
     }
     
-    
+    //gets a Comparator that compares based on the beginnings of intervals
     private Comparator<Interval<T>> sortingComparer(final Comparator<T> itemComparer){
         return new Comparator<Interval<T>>(){
             @Override
@@ -169,25 +165,26 @@ public class IntervalSet<T> {
                 
                 int ret = itemComparer.compare(o1.begin, o2.begin);
                 if(ret == 0){
-                    //gotta take exclusivity into account
-                    if(o1.beginExclusive){
-                        //if o1 is exclusive, then o2 is before o1 if it is inclusive
-                        return o2.beginExclusive ? 0 : 1;
+                    //gotta take inclusivity into account
+                    if(o1.beginInclusive){
+                        //if o1 is inclusive of beginning, then o2 is after o1 if it is exclusive
+                        return o2.beginInclusive ? 0 : -1;
                     }
-                    //if o1 is inclusive, then o1 is before o2 if it is exclusive
-                    return o2.beginExclusive ? -1 : 0;
+                    //if o1 is exclusive, then o1 is after o2 if it is inclusive
+                    return o2.beginInclusive ? 1 : 0;
                 }
                 return ret;
             }
         };
     }
     
+    //compares like a comparator based on the ends of intervals
     private int compareEnds(Interval<T> val1, Interval<T> val2, Comparator<T> comparer){
         
         if(val1.end == null){
             if(val2.end == null){
                 //val1 == val2;
-                return compareEndExclusivity(val1.endExclusive, val2.endExclusive);
+                return compareEndExclusivity(val1.endInclusive, val2.endInclusive);
             }
             //if val2 != null, then val1 > val2 cause we're comparing ends
             return 1;
@@ -200,18 +197,18 @@ public class IntervalSet<T> {
         
         int ret = comparer.compare(val1.end, val2.end);
         if(ret == 0){
-            return compareEndExclusivity(val1.endExclusive, val2.endExclusive);
+            return compareEndExclusivity(val1.endInclusive, val2.endInclusive);
         }
         return ret;
     }
     
-    private int compareEndExclusivity(boolean val1Exclusive, boolean val2Exclusive){
-        if(val1Exclusive){
-            //if val2 is inclusive of end, val 1 is smaller
-            return val2Exclusive ? 0 : -1;
+    private int compareEndExclusivity(boolean val1Inclusive, boolean val2Inclusive){
+        if(val1Inclusive){
+            //if val2 is exclusive of end, val 1 is greater
+            return val2Inclusive ? 0 : 1;
         }
-        //val1 is inclusive of end, val2 is smaller if exclusive
-        return val2Exclusive ? 1 : 0;
+        //val1 is exclusive of end, val2 is greater if inclusive
+        return val2Inclusive ? -1 : 0;
     }
     
     /**
@@ -222,16 +219,17 @@ public class IntervalSet<T> {
      * @return A new interval set containing the union.
      */
     public IntervalSet<T> union(IntervalSet<T> other, final Comparator<T> comparer){
-        IntervalSet<T> ret = new IntervalSet<>();
+        Comparator<Interval<T>> sorter = sortingComparer(comparer);
         
         List<Interval<T>> allIntervals = new ArrayList<>(this.intervals.size() + other.intervals.size());
         allIntervals.addAll(this.intervals);
         allIntervals.addAll(other.intervals);
-        Collections.sort(allIntervals, this.sortingComparer(comparer));
+        Collections.sort(allIntervals, sorter);
         
-        collapseIntervals(allIntervals, comparer, ret.intervals);
+        List<Interval<T>> ret = new ArrayList<>();
+        collapseIntervals(allIntervals, comparer, ret);
         
-        return ret;
+        return new IntervalSet<>(ret);
     }
     
     /**
@@ -242,18 +240,15 @@ public class IntervalSet<T> {
      * @return 
      */
     public IntervalSet<T> intersection(IntervalSet<T> other, final Comparator<T> comparer){
-        IntervalSet<T> ret = new IntervalSet<>();
-        
         Comparator<Interval<T>> sorter = sortingComparer(comparer);
-        Collections.sort(this.intervals, sorter);
-        Collections.sort(other.intervals, sorter);
         
         List<Interval<T>> temp = new ArrayList<>();
         getIntersections(this.intervals, other.intervals, sorter, comparer, temp);
         
-        collapseIntervals(temp, comparer, ret.intervals);
+        List<Interval<T>> ret = new ArrayList<>();
+        collapseIntervals(temp, comparer, ret);
         
-        return ret;
+        return new IntervalSet<>(ret);
     }
     
     private void getIntersections(Iterable<Interval<T>> myIntervals, Iterable<Interval<T>> theirIntervals, Comparator<Interval<T>> sorter, Comparator<T> comparer, List<Interval<T>> addTo){
@@ -284,12 +279,12 @@ public class IntervalSet<T> {
             if(doesIntersect(first, second, comparer)){
                 //intersecting interval is begin of second to end of the smaller end value
                 if(endCompare <= 0){
-                    addTo.add(new Interval<>(second.begin, second.beginExclusive,
-                        mine.end, mine.endExclusive));
+                    addTo.add(new Interval<>(second.begin, second.beginInclusive,
+                        mine.end, mine.endInclusive));
                 }
                 else{
-                    addTo.add(new Interval<>(second.begin, second.beginExclusive,
-                        theirs.end, theirs.endExclusive));
+                    addTo.add(new Interval<>(second.begin, second.beginInclusive,
+                        theirs.end, theirs.endInclusive));
                 }
             }
             
@@ -329,14 +324,14 @@ public class IntervalSet<T> {
                 //current's lower is already > last,
                 //for union we extend last's end to the greater end
                 int endCompare = compareEnds(last, current, comparer);
-                //if last completely envelops current
-                if(endCompare > 0 || (endCompare == 0 && (!last.endExclusive || current.endExclusive))){
+                //if last completely envelops current (equal to or greater than, comparing inclusivity)
+                if(endCompare > 0 || (endCompare == 0 && (last.endInclusive || !current.endInclusive))){
                     //ignore current
                     continue;
                 }
                 //last must be extended cause it's greater, or it is end inclusive and current is not.
-                last = new Interval<>(last.begin, last.beginExclusive,
-                        current.end, current.endExclusive);
+                last = new Interval<>(last.begin, last.beginInclusive,
+                        current.end, current.endInclusive);
                 continue;
             }
             //does not intersect
@@ -360,138 +355,60 @@ public class IntervalSet<T> {
         int compare = comparer.compare(a.end, b.begin);
         if(compare == 0){
             //if either is inclusive then they touch or intersect, in both cases return true
-            return !a.endExclusive || !b.beginExclusive;
+            return a.endInclusive || b.beginInclusive;
         }
         
         return compare > 0;
         
     }
-    
+
     @Override
-    public String toString(){
-        StringBuilder ret = new StringBuilder();
-        for(int i = 0; i < intervals.size(); i++){
-            if( i > 0){
-                ret.append(" U ");
+    public int hashCode() {
+        int hash = 5;
+        for(int i = 0; i < this.intervals.size(); i++){
+            hash = 59 * hash + Objects.hashCode(this.intervals.get(i));
+        }        
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final IntervalSet<T> other = (IntervalSet<T>) obj;
+        
+        int size = this.intervals.size();
+        if(size != other.intervals.size()){
+            return false;
+        }
+        for(int i = 0; i < size; i++){
+            if(!this.intervals.get(i).equals(other.intervals.get(i))){
+                return false;
             }
-            intervals.get(i).toString(ret);
         }
         
-        return ret.toString();
+        return true;
     }
     
-    /**
-     * Represents one interval within an interval set.  The interval
-     * is represented by two values, the begin and the end,
-     * which can be inclusive or exclusive.
-     * @param <U> 
-     */
-    public static class Interval<U>{
-        private final U begin;
-        private final U end;
-        
-        /**
-         * Gets the begin value of this interval.  A null value means negative infinity.
-         * @return 
-         */
-        public U getBegin(){
-            return begin;
-        }
-        
-        /**
-         * Gets the end value of this interval.  A null value means positive infinity.
-         * @return 
-         */
-        public U getEnd(){
-            return end;
-        }
-        
-        private boolean beginExclusive;
-        /**
-         * Gets whether the interval is inclusive of the beginning.
-         * True means inclusive, false means exclusive.
-         * @return 
-         */
-        public boolean getBeginInclusive() {
-            //Too late I realized it would have been better to do this having the booleans mean inclusive.
-            //Unfortunately too much work to undo it now, fortunately I hadn't written any public facing
-            //stuff based on that paradigm yet.
-            return !this.beginExclusive;
-        }
-        
-        private boolean endExclusive;
-        /**
-         * Gets whether the interval is inclusive of the end.
-         * True means inclusive, false means exclusive.
-         * @return 
-         */
-        public boolean getEndInclusive() {
-            return !this.endExclusive;
-        }
-        
-        public Interval(U begin, boolean beginExclusive, U end, boolean endExclusive){
-            this.begin = begin;
-            this.end = end;
-            this.beginExclusive = beginExclusive;
-            this.endExclusive = endExclusive;
-        }
-        
-        /**
-         * Returns true iff the given value is contained by this Interval, according
-         * to the given comparator.
-         * @param value The value to test.
-         * @param comparator The comparator used to compare values.
-         * @return true if the value is contained by the Interval, false otherwise.
-         */
-        public boolean contains(U value, Comparator<U> comparator){
-            int lower = comparator.compare(value, begin);
-            if(lower < 0){
-                return false;
+    
+    private String stringValue = null;    
+    @Override
+    public String toString(){
+        if(stringValue == null){
+            StringBuilder ret = new StringBuilder();
+            for(int i = 0; i < intervals.size(); i++){
+                if( i > 0){
+                    ret.append(" U ");
+                }
+                intervals.get(i).toString(ret);
             }
-            if(lower == 0){
-                return !this.beginExclusive;
-            }
-            
-            int upper = comparator.compare(value, end);
-            if(upper > 0){
-                return false;
-            }
-            if(upper == 0){
-                return !this.endExclusive;
-            }
-            
-            return true;
+            stringValue = ret.toString();
         }
         
-        public void toString(StringBuilder sb){
-            if(beginExclusive)
-                sb.append('(');
-            else
-                sb.append('[');
-            
-            if(begin != null)
-                sb.append(begin);
-            else
-                sb.append("-∞");
-            
-            sb.append(", ");
-            
-            if(end != null)
-                sb.append(end);
-            else
-                sb.append("∞");
-            
-            if(endExclusive)
-                sb.append(')');
-            else
-                sb.append(']');
-        }
-        
-        @Override
-        public String toString(){
-            StringBuilder sb = new StringBuilder();
-            toString(sb);
-            return sb.toString();
-        }
+        return stringValue;
     }
 }

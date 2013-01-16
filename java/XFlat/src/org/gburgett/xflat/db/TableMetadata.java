@@ -4,18 +4,15 @@
  */
 package org.gburgett.xflat.db;
 
-import org.gburgett.xflat.DatabaseConfig;
 import org.gburgett.xflat.TableConfig;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.convert.ConversionException;
-import org.gburgett.xflat.db.EngineState;
+import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.db.EngineBase.SpinDownEvent;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
-import org.jdom2.Document;
 import org.jdom2.Element;
 
 /**
@@ -98,7 +95,12 @@ public class TableMetadata implements EngineProvider {
         }
 
         ConvertingTable<T> ret = new ConvertingTable<>(clazz, this.name);
+        
         ret.setConversionService(this.db.getConversionService());
+        PojoConverter converter = this.db.getPojoConverter();
+        if(converter != null){
+            ret.setAlternateIdExpression(converter.idSelector(clazz));
+        }
         return ret;
     }
     

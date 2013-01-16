@@ -83,6 +83,20 @@ public class XpathQuery {
         }
     }
 
+    private XPathExpression<Object> alternateIdExpression = null;
+    /**
+     * Sets an expression that represents the DOM node where the object's ID is stored.
+     * Some engines can make use of queries on ID for indexing, so they need to 
+     * know the alternate ID expression in case the user queries on that rather than
+     * {@link #Id}.
+     * <p/>
+     * This is automatically populated by converting tables.
+     * @param expression 
+     */
+    public void setAlternateIdExpression(XPathExpression<Object> expression){
+        this.alternateIdExpression = expression;
+    }
+    
     //</editor-fold>
     
     
@@ -113,54 +127,22 @@ public class XpathQuery {
     //<editor-fold desc="methods"> 
     
     /**
-     * Returns a new query in which the given selector expression is replaced whenever it is found
-     * with the new selector expression.
-     * This is used primarily to replace expressions selecting the Id property of an object
-     * with the {@link #Id} expression, so that engines can take advantage of ID indexes.
+     * A special overload of dissect that is based on an ID index.  Takes advantage
+     * of an {@link #setAlternateIdExpression(org.jdom2.xpath.XPathExpression) alternate ID expression}
+     * if it exists.
      * @param <U>
-     * @param selector The selector to replace.
-     * @param newSelector The new selector to use.
-     * @return A new XpathQuery with the replaced values.
+     * @param comparer A comparer comparing instances of idClass.
+     * @param idClass The class to which the ID is convertible.
+     * @return An IntervalSet representing the values on the index to search.
+     * @throws InvalidQueryException if the query expects the ID to be of a different class.
      */
-    public <U> XpathQuery replaceExpression(XPathExpression<U> selector, XPathExpression<U> newSelector){
-        return replaceExpression(new XPathExpressionEqualityMatcher<>(selector), newSelector);
-    }
-    
-    /**
-     * Returns a new query in which the given selector expression is replaced whenever it is found
-     * with the new selector expression.
-     * This is used primarily to replace expressions selecting the Id property of an object
-     * with the {@link #Id} expression, so that engines can take advantage of ID indexes.
-     * @param <U>
-     * @param selector A matcher matching the selector expressions to replace.
-     * @param newSelector The new selector to use.
-     * @return A new XpathQuery with the replaced values.
-     */
-    public <U> XpathQuery replaceExpression(Matcher<XPathExpression<U>> selector, XPathExpression<U> newSelector){
-        XpathQuery ret = new XpathQuery();
-        ret.conversionService = this.conversionService;
-        ret.queryType = this.queryType;
-        ret.value = this.value;
-        ret.valueType = this.valueType;
-        ret.rowMatcher = this.rowMatcher;
-        
-        //match expression
-        if(selector.matches(this.selector)){
-            ret.selector = newSelector;
-        }
-        else{
-            ret.selector = this.selector;
+    public <U> IntervalSet<U> dissectId(Comparator<U> comparer, Class<U> idClass){
+        Matcher<XPathExpression> index = new XPathExpressionEqualityMatcher(Id);
+        if(this.alternateIdExpression != null){
+            index = org.hamcrest.Matchers.anyOf(index, new XPathExpressionEqualityMatcher(this.alternateIdExpression));
         }
         
-        //check sub-expressions
-        if(this.queryChain != null){
-            ret.queryChain = new ArrayList<>(this.queryChain.size());
-            for(XpathQuery q : this.queryChain){
-                ret.queryChain.add(q.replaceExpression(selector, newSelector));
-            }
-        }
-        
-        return ret;
+        return this.dissect(index, comparer, idClass);
     }
     
     /**

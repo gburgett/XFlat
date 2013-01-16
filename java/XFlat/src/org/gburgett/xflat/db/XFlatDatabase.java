@@ -426,9 +426,14 @@ public class XFlatDatabase implements Database {
         return (Table<T>)ret;
     }
     
-    private AtomicBoolean pojoConverter = new AtomicBoolean(false);
+    private AtomicBoolean pojoConverterLoaded = new AtomicBoolean(false);
+    private volatile PojoConverter pojoConverter;
+    public PojoConverter getPojoConverter(){
+        return pojoConverter;
+    }
+    
     private void loadPojoConverter() throws ClassNotFoundException, InstantiationException, IllegalAccessException{
-        if(!pojoConverter.compareAndSet(false, true)){
+        if(!pojoConverterLoaded.compareAndSet(false, true)){
             return;
         }
         Class<?> converter;
@@ -439,9 +444,9 @@ public class XFlatDatabase implements Database {
             return;
         }
         
-        PojoConverter obj = (PojoConverter)converter.newInstance();
+        this.pojoConverter = (PojoConverter)converter.newInstance();
         
-        this.extendConversionService(obj);
+        this.extendConversionService(this.pojoConverter);
     }
     
     public enum DatabaseState{

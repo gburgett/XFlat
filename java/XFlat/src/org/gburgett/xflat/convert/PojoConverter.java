@@ -39,5 +39,5 @@ public interface PojoConverter {
      * @param clazz
      * @return 
      */
-    public XPathExpression<?> idSelector(Class<?> clazz);
+    public XPathExpression<Object> idSelector(Class<?> clazz);
 }

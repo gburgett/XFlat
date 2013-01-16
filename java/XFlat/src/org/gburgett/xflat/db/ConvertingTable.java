@@ -23,6 +23,7 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.jdom2.Element;
+import org.jdom2.xpath.XPathExpression;
 
 /**
  * A table implementation that converts objects to elements
@@ -36,9 +37,14 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         this.conversionService = conversionService;
     }
     
-    private IdAccessor accessor;
+    private final IdAccessor accessor;
     
-    private Map<T, String> idMap;
+    private final Map<T, String> idMap;
+    
+    private XPathExpression<Object> alternateIdExpression;
+    void setAlternateIdExpression(XPathExpression<Object> expression){        
+        this.alternateIdExpression = expression;
+    }
     
     ConvertingTable(Class<T> type, String name){
         super(type, name);
@@ -48,6 +54,10 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             //we need to keep a reference to the ID in a weak cache
             idMap = Collections.synchronizedMap(new WeakHashMap<T, String>());
         }
+        else{
+            idMap = null;
+        }
+        
     }
         
     //<editor-fold desc="helpers">
@@ -220,6 +230,8 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     private Cursor<Element> queryTable(final XpathQuery query){
+        query.setAlternateIdExpression(alternateIdExpression);
+        
         return this.doWithEngine(new EngineAction<Cursor<Element>>(){
             @Override
             public Cursor<Element> act(Engine engine) {
@@ -230,6 +242,8 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     
     @Override
     public Cursor<T> find(final XpathQuery query) {
+        query.setAlternateIdExpression(alternateIdExpression);
+        
         return this.doWithEngine(new EngineAction<Cursor<T>>(){
             @Override
             public Cursor<T> act(Engine engine) {
@@ -367,6 +381,8 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     @Override
     public int update(final XpathQuery query, final XpathUpdate update) {
+        query.setAlternateIdExpression(alternateIdExpression);
+        
         return this.doWithEngine(new EngineAction<Integer>(){
             @Override
             public Integer act(Engine engine) {
@@ -393,6 +409,8 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     @Override
     public int deleteAll(final XpathQuery query) {
+        query.setAlternateIdExpression(alternateIdExpression);
+        
         return this.doWithEngine(new EngineAction<Integer>(){
             @Override
             public Integer act(Engine engine) {
