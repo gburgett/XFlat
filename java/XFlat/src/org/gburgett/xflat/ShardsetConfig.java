@@ -4,7 +4,7 @@
  */
 package org.gburgett.xflat;
 
-import org.gburgett.xflat.range.RangeProvider;
+import org.gburgett.xflat.query.IntervalProvider;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 
@@ -22,7 +22,7 @@ public class ShardsetConfig<T> {
     private ShardsetConfig(ShardsetConfig other){
         this.shardPropertyClass  = other.shardPropertyClass;
         this.shardPropertySelector = other.shardPropertySelector;
-        this.rangeProvider = other.rangeProvider;
+        this.intervalProvider = other.intervalProvider;
     }
     
     private Class<T> shardPropertyClass;
@@ -35,9 +35,9 @@ public class ShardsetConfig<T> {
         return shardPropertySelector;
     }
     
-    private RangeProvider<T> rangeProvider;
-    public RangeProvider<T> getRangeProvider(){
-        return rangeProvider;
+    private IntervalProvider<T> intervalProvider;
+    public IntervalProvider<T> getIntervalProvider(){
+        return intervalProvider;
     }
     
         
@@ -48,12 +48,12 @@ public class ShardsetConfig<T> {
      * @param <U>
      * @param xpathProperty An XPath expression selecting a property of the data to shard on.
      * @param propertyClass The class of the property selected by the xpath expression.
-     * @param rangeProvider A RangeProvider that determines the static ranges for the
+     * @param intervalProvider A RangeProvider that determines the static ranges for the
      * property, each range will have its own file.
      * @return A new shardset config.
      */
-    public static <U> ShardsetConfig<U> create(String xpathProperty, Class<U> propertyClass, RangeProvider<U> rangeProvider){
-        return create(XPathFactory.instance().compile(xpathProperty), propertyClass, rangeProvider);
+    public static <U> ShardsetConfig<U> create(String xpathProperty, Class<U> propertyClass, IntervalProvider<U> intervalProvider){
+        return create(XPathFactory.instance().compile(xpathProperty), propertyClass, intervalProvider);
     }
     
     /**
@@ -66,11 +66,11 @@ public class ShardsetConfig<T> {
      * property, each range will have its own file.
      * @return A new shardset config.
      */
-    public static <U> ShardsetConfig<U> create(XPathExpression<?> xpathProperty, Class<U> propertyClass, RangeProvider<U> rangeProvider){
+    public static <U> ShardsetConfig<U> create(XPathExpression<?> xpathProperty, Class<U> propertyClass, IntervalProvider<U> rangeProvider){
         ShardsetConfig<U> ret =  new ShardsetConfig<>();
         ret.shardPropertySelector = xpathProperty;
         ret.shardPropertyClass = propertyClass;
-        ret.rangeProvider = rangeProvider;
+        ret.intervalProvider = rangeProvider;
         
         
         

@@ -260,4 +260,48 @@ public class IntervalSetTest {
         
         assertEquals("(0, 5) U (9, 12]", a.toString());
     }
+    
+    @Test
+    public void testIntersects_IntersectingValues_True() throws Exception {
+        System.out.println("testIntersects_IntersectingValues_True");
+        
+        IntervalSet<Integer> a = IntervalSet.between(1, 3);
+        IntervalSet<Integer> b = IntervalSet.between(2, 4);
+        
+        assertTrue("should intersect", a.intersects(b, comparator));
+        assertTrue("should intersect", b.intersects(a, comparator));
+    }//end testIntersects_IntersectingValues_True
+    
+    @Test
+    public void testIntersects_NonIntersecting_False() throws Exception {
+        System.out.println("testIntersects_NonIntersecting_False");
+        
+        IntervalSet<Integer> a = IntervalSet.between(1, 2);
+        IntervalSet<Integer> b = IntervalSet.between(3, 4);
+        
+        assertFalse("should not intersect", a.intersects(b, comparator));
+        assertFalse("should not intersect", b.intersects(a, comparator));
+    }//end testIntersects_NonIntersecting_False
+    
+    @Test
+    public void testIntersects_NonInclusiveOfSingleValue_False() throws Exception {
+        System.out.println("testIntersects_NonInclusiveOfSingleValue_False");
+        
+        IntervalSet<Integer> a = IntervalSet.eq(1);
+        IntervalSet<Integer> b = IntervalSet.gt(1);
+        
+        assertFalse("should not intersect", a.intersects(b, comparator));
+        assertFalse("should not intersect", b.intersects(a, comparator));
+    }//end testIntersects_NonInclusiveOfSingleValue_False
+    
+    @Test
+    public void testIntersects_InclusiveOfSingleValue_True() throws Exception {
+        System.out.println("testIntersects_InclusiveOfSingleValue_True");
+        
+        IntervalSet<Integer> a = IntervalSet.eq(-3);
+        IntervalSet<Integer> b = IntervalSet.lte(-3);
+        
+        assertTrue("should intersect", a.intersects(b, comparator));
+        assertTrue("should intersect", b.intersects(a, comparator));
+    }//end testIntersects_InclusiveOfSingleValue_True
 }

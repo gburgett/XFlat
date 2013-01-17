@@ -15,10 +15,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.EngineStateException;
-import org.gburgett.xflat.Range;
 import org.gburgett.xflat.ShardsetConfig;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
+import org.gburgett.xflat.query.Interval;
 import org.jdom2.Element;
 
 /**
@@ -26,12 +26,12 @@ import org.jdom2.Element;
  * @author Gordon
  */
 public abstract class ShardedEngineBase<T> extends EngineBase {
-    protected ConcurrentMap<Range<T>, TableMetadata> openShards = new ConcurrentHashMap<>();
+    protected ConcurrentMap<Interval<T>, TableMetadata> openShards = new ConcurrentHashMap<>();
     
     //the engines that are spinning down while this engine spins down
-    private Map<Range<T>, EngineBase> spinningDownEngines = new HashMap<>();
+    private Map<Interval<T>, EngineBase> spinningDownEngines = new HashMap<>();
     
-    private WeakHashMap<Cursor<Range<T>>, String> openTableCursors = new WeakHashMap<>();
+    private WeakHashMap<Cursor<Interval<T>>, String> openTableCursors = new WeakHashMap<>();
     
     private final Object spinDownSyncRoot = new Object();
     
@@ -69,12 +69,12 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         }
     }
     
-    protected Range<T> getRangeForRow(Element row){
+    protected Interval<T> getRangeForRow(Element row){
         Object selected = config.getShardPropertySelector().evaluateFirst(row);
-        return getRange(selected);
+        return getInterval(selected);
     }
     
-    protected Range<T> getRange(Object value){
+    protected Interval<T> getInterval(Object value){
         T converted;
         try {
             converted = this.getConversionService().convert(value, this.config.getShardPropertyClass());
@@ -83,9 +83,9 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                     " selected non-convertible value " + value, ex);
         }
         
-        Range<T> ret;
+        Interval<T> ret;
         try{
-            ret = this.config.getRangeProvider().getRange(converted);
+            ret = this.config.getIntervalProvider().getInterval(converted);
         }catch(java.lang.NullPointerException ex){
             throw new XflatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
                     " selected null value which cannot be mapped to a range");
@@ -99,8 +99,8 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         return ret;
     }
     
-    private EngineBase getEngine(Range<T> range){
-        TableMetadata metadata = openShards.get(range);
+    private EngineBase getEngine(Interval<T> interval){
+        TableMetadata metadata = openShards.get(interval);
         if(metadata == null){
             //definitely ensure we aren't spinning down before we start up a new engine
             synchronized(spinDownSyncRoot){
@@ -111,20 +111,20 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 }
                 
                 //build the new metadata element so we can use it to provide engines
-                String name = range.getName();
+                String name = this.config.getIntervalProvider().getName(interval);
                 metadata = this.getMetadataFactory().makeTableMetadata(name, new File(directory, name + ".xml"));
-                TableMetadata weWereLate = openShards.putIfAbsent(range, metadata);
+                TableMetadata weWereLate = openShards.putIfAbsent(interval, metadata);
                 if(weWereLate != null){
                     //another thread put the new metadata already
                     metadata = weWereLate;
                 }
 
                 if(state == EngineState.SpinningDown){
-                    EngineBase eng = spinningDownEngines.get(range);
+                    EngineBase eng = spinningDownEngines.get(interval);
                     if(eng == null){
                         //we're requesting a new engine for some kind of read, get it and let the task spin it down.
                         eng = metadata.provideEngine();
-                        spinningDownEngines.put(range, eng);
+                        spinningDownEngines.put(interval, eng);
                         return eng;
                     }
                 }
@@ -134,7 +134,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         return metadata.provideEngine();
     }
     
-    protected <U> U doWithEngine(Range<T> range, EngineAction<U> action){
+    protected <U> U doWithEngine(Interval<T> range, EngineAction<U> action){
         
         EngineState state = getState();
         if(state == EngineState.Uninitialized || state == EngineState.SpunDown){
@@ -214,7 +214,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         }
         
         synchronized(spinDownSyncRoot){
-            for(Map.Entry<Range<T>, TableMetadata> m : this.openShards.entrySet()){
+            for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
                 EngineBase spinningDown = m.getValue().spinDown();
                 this.spinningDownEngines.put(m.getKey(), spinningDown);
             }
@@ -228,7 +228,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 }
                 
                 synchronized(spinDownSyncRoot){
-                    if(spinningDownEngines.isEmpty()){
+                    if(isSpunDown()){
                         if(state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
                             completionEventHandler.spinDownComplete(new SpinDownEvent(ShardedEngineBase.this));
                         }
@@ -258,13 +258,23 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         
         return true;
     }
+    
+    /**
+     * Invoked in a synchronized context to see if the sharded engine is 
+     * fully spun down.  Default implementation checks whether the spinning
+     * down engines have all spun down.
+     * @return 
+     */
+    protected boolean isSpunDown(){
+        return spinningDownEngines.isEmpty();
+    }
 
     @Override
     protected boolean forceSpinDown() {
         this.state.set(EngineState.SpunDown);
         
         synchronized(spinDownSyncRoot){
-            for(Map.Entry<Range<T>, TableMetadata> m : this.openShards.entrySet()){
+            for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
                 EngineBase spinningDown = m.getValue().spinDown();
                 this.spinningDownEngines.put(m.getKey(), spinningDown);
             }

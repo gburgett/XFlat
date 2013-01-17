@@ -11,11 +11,11 @@ import java.util.Objects;
  * Represents one interval within an interval set.  The interval
  * is represented by two values, the begin and the end,
  * which can be inclusive or exclusive.
- * @param <U>
+ * @param T
  */
-public class Interval<U> {
-    final U begin;
-    final U end;
+public class Interval<T> {
+    final T begin;
+    final T end;
 
     boolean endInclusive;
     boolean beginInclusive;
@@ -24,7 +24,7 @@ public class Interval<U> {
      * Gets the begin value of this interval.  A null value means negative infinity.
      * @return
      */
-    public U getBegin() {
+    public T getBegin() {
         return begin;
     }
 
@@ -32,7 +32,7 @@ public class Interval<U> {
      * Gets the end value of this interval.  A null value means positive infinity.
      * @return
      */
-    public U getEnd() {
+    public T getEnd() {
         return end;
     }
 
@@ -58,7 +58,7 @@ public class Interval<U> {
         return this.endInclusive;
     }
 
-    public Interval(U begin, boolean beginInclusive, U end, boolean endInclusive) {
+    public Interval(T begin, boolean beginInclusive, T end, boolean endInclusive) {
         this.begin = begin;
         this.end = end;
         this.beginInclusive = beginInclusive;
@@ -72,7 +72,7 @@ public class Interval<U> {
      * @param comparator The comparator used to compare values.
      * @return true if the value is contained by the Interval, false otherwise.
      */
-    public boolean contains(U value, Comparator<U> comparator) {
+    public boolean contains(T value, Comparator<T> comparator) {
         int lower = comparator.compare(value, begin);
         if (lower < 0) {
             return false;
@@ -89,7 +89,97 @@ public class Interval<U> {
         }
         return true;
     }
+    
+    static <U> int compareBegin(Interval<U> val1, Interval<U> val2, Comparator<U> itemComparer){
+        if(val1.begin == null){
+            if(val2.begin == null){
+                //val1 == val2;
+                return compareExclusivity(val1.beginInclusive, val2.beginInclusive);
+            }
+            //if val2 != null, then val1 < val2 cause we're comparing beginning
+            return -1;
+        }
+        
+        if(val2.begin == null){
+            //val1 is not null, so val1 is > val2
+            return 1;
+        }
 
+        int ret = itemComparer.compare(val1.begin, val2.begin);
+        if(ret == 0){
+            return compareExclusivity(val1.beginInclusive, val2.beginInclusive);
+        }
+        return ret;
+    }
+    
+    static <U> int compareEnd(Interval<U> val1, Interval<U> val2, Comparator<U> itemComparer){
+        if(val1.end == null){
+            if(val2.end == null){
+                //val1 == val2;
+                return -1 * compareExclusivity(val1.beginInclusive, val2.beginInclusive);
+            }
+            //if val2 != null, then val1 > val2 cause we're comparing ends
+            return 1;
+        }
+        
+        if(val2.end == null){
+            //val1 is not null, so val1 is < val2
+            return -1;
+        }
+
+        int ret = itemComparer.compare(val1.end, val2.end);
+        if(ret == 0){
+            return -1 * compareExclusivity(val1.endInclusive, val2.endInclusive);
+        }
+        return ret;
+    }
+    
+    private static int compareExclusivity(boolean val1Inclusive, boolean val2Inclusive){
+        if(val1Inclusive){
+            //if val2 is exclusive of beginning, val 1 is less
+            return val2Inclusive ? 0 : -1;
+        }
+        //val1 is exclusive of begin, val2 is less if inclusive
+        return val2Inclusive ? 1 : 0;
+    }
+    
+    
+    /**
+     * Returns true iff the given interval intersects this interval, according
+     * to the given comparator.
+     * @param other The other interval to test against this interval.
+     * @param comparator The comparator used to compare values.
+     * @return true if the other interval intersects this one, false otherwise.
+     */
+    public boolean intersects(Interval<T> other, Comparator<T> comparator){
+        int compare = compareBegin(this, other, comparator);
+        
+        if(compare <= 0){
+            compare = comparator.compare(this.end, other.begin);
+            if(compare < 0){
+                return false;
+            }
+            else if(compare == 0){
+                return this.endInclusive && other.beginInclusive;
+            }
+            else{
+                return true;
+            }
+        }
+        else {
+            compare = comparator.compare(other.end, this.begin);
+            if(compare < 0){
+                return false;
+            }
+            else if(compare == 0){
+                return this.beginInclusive && other.endInclusive;
+            }
+            else{
+                return true;
+            }
+        }
+    }
+    
     @Override
     public int hashCode() {
         int hash = 3;
@@ -108,7 +198,7 @@ public class Interval<U> {
         if (getClass() != obj.getClass()) {
             return false;
         }
-        final Interval<U> other = (Interval<U>) obj;
+        final Interval<T> other = (Interval<T>) obj;
         if (!Objects.equals(this.begin, other.begin)) {
             return false;
         }

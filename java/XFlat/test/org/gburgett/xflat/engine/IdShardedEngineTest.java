@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import org.gburgett.xflat.Range;
 import org.gburgett.xflat.ShardsetConfig;
 import org.gburgett.xflat.TableConfig;
 import org.gburgett.xflat.convert.ConversionService;
@@ -21,9 +20,10 @@ import org.gburgett.xflat.db.EngineFactory;
 import org.gburgett.xflat.db.ShardedEngineTestsBase;
 import org.gburgett.xflat.db.TableMetadataFactory;
 import org.gburgett.xflat.db.XFlatDatabase;
+import org.gburgett.xflat.query.Interval;
 import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.range.NumericRangeProvider;
-import org.gburgett.xflat.range.RangeProvider;
+import org.gburgett.xflat.query.NumericIntervalProvider;
+import org.gburgett.xflat.query.IntervalProvider;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -52,7 +52,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             }
 
             @Override
-            public XPathExpression<?> idSelector(Class<?> clazz) {
+            public XPathExpression<Object> idSelector(Class<?> clazz) {
                 return null;
             }
         });
@@ -87,7 +87,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             }
         });
         
-        RangeProvider provider = NumericRangeProvider.forInteger(1, 100);
+        IntervalProvider provider = NumericIntervalProvider.forInteger(1, 100);
         ctx.additionalContext.put("rangeProvider", provider);
         ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
         
@@ -100,7 +100,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
     @Override
     protected void prepFileContents(TestContext ctx, Document contents) throws IOException {
         Map<File, Document> docs = (Map<File, Document>)ctx.additionalContext.get("docs");
-        RangeProvider<Integer> provider = (RangeProvider<Integer>)ctx.additionalContext.get("rangeProvider");
+        IntervalProvider<Integer> provider = (IntervalProvider<Integer>)ctx.additionalContext.get("rangeProvider");
         
         if(contents == null){
             docs.clear();
@@ -109,24 +109,24 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             
                 
         //shard by integer ID, as we had determined in the setup
-        Map<Range<Integer>, Document> files = new HashMap<>();
+        Map<Interval<Integer>, Document> files = new HashMap<>();
         for(Element row : contents.getRootElement().getChildren("row", XFlatDatabase.xFlatNs)){
             String id = getId(row);
             int iId = Integer.parseInt(id);
             
-            Document shard = files.get(provider.getRange(iId));
+            Document shard = files.get(provider.getInterval(iId));
             if(shard == null){
                 shard = new Document();
                 shard.setRootElement(new Element("db", XFlatDatabase.xFlatNs));
-                files.put(provider.getRange(iId), shard);
+                files.put(provider.getInterval(iId), shard);
             }
             
             shard.getRootElement().addContent(row.detach());
         }
         
         //put the sharded documents in the docs collection
-        for(Map.Entry<Range<Integer>, Document> doc : files.entrySet()){
-            File f = new File(doc.getKey().getName() + ".xml");
+        for(Map.Entry<Interval<Integer>, Document> doc : files.entrySet()){
+            File f = new File(provider.getName(doc.getKey()) + ".xml");
             docs.put(f, doc.getValue());
         }
     }
@@ -134,7 +134,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
     @Override
     protected Document getFileContents(TestContext ctx) throws IOException, JDOMException {
         Map<File, Document> docs = (Map<File, Document>)ctx.additionalContext.get("docs");
-        RangeProvider<Integer> provider = (RangeProvider<Integer>)ctx.additionalContext.get("rangeProvider");
+        IntervalProvider<Integer> provider = (IntervalProvider<Integer>)ctx.additionalContext.get("rangeProvider");
         
         Document ret = new Document();
         ret.setRootElement(new Element("db", XFlatDatabase.xFlatNs));

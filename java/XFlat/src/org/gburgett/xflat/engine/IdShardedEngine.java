@@ -24,8 +24,7 @@ import org.jdom2.Element;
  * @author Gordon
  */
 public class IdShardedEngine<T> extends ShardedEngineBase<T> {
-
-
+    
     public IdShardedEngine(File file, String tableName, ShardsetConfig<T> config){
         super(file, tableName, config);
         
@@ -38,7 +37,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     @Override
     public void insertRow(final String id, final Element data) throws DuplicateKeyException {
         
-        doWithEngine(getRange(id), new EngineAction(){
+        doWithEngine(getInterval(id), new EngineAction(){
             @Override
             public Object act(Engine engine) {
                 engine.insertRow(id, data);
@@ -49,7 +48,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public Element readRow(final String id) {
-        return doWithEngine(getRange(id), new EngineAction<Element>(){
+        return doWithEngine(getInterval(id), new EngineAction<Element>(){
             @Override
             public Element act(Engine engine) {
                 return engine.readRow(id);
@@ -64,7 +63,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public void replaceRow(final String id, final Element data) throws KeyNotFoundException {
-        doWithEngine(getRange(id), new EngineAction(){
+        doWithEngine(getInterval(id), new EngineAction(){
             @Override
             public Object act(Engine engine) {
                 engine.replaceRow(id, data);
@@ -75,7 +74,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public boolean update(final String id, final XpathUpdate update) throws KeyNotFoundException {
-        return doWithEngine(getRange(id), new EngineAction<Boolean>(){
+        return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
             @Override
             public Boolean act(Engine engine) {
                 return engine.update(id, update);
@@ -90,7 +89,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public boolean upsertRow(final String id, final Element data) {
-        return doWithEngine(getRange(id), new EngineAction<Boolean>(){
+        return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
             @Override
             public Boolean act(Engine engine) {
                 return engine.upsertRow(id, data);
@@ -100,7 +99,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public void deleteRow(final String id) throws KeyNotFoundException {
-        doWithEngine(getRange(id), new EngineAction(){
+        doWithEngine(getInterval(id), new EngineAction(){
             @Override
             public Object act(Engine engine) {
                 engine.deleteRow(id);

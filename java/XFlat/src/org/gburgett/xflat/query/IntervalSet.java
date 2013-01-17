@@ -154,62 +154,13 @@ public class IntervalSet<T> {
         return new Comparator<Interval<T>>(){
             @Override
             public int compare(Interval<T> o1, Interval<T> o2) {
-                if(o1.begin == null){
-                    //o1 < o2 ? -1 : 0
-                    return o2.begin == null ? 0 : -1;
-                }
-                if(o2.begin == null){
-                    //o1 > o2
-                    return 1;
-                }
-                
-                int ret = itemComparer.compare(o1.begin, o2.begin);
-                if(ret == 0){
-                    //gotta take inclusivity into account
-                    if(o1.beginInclusive){
-                        //if o1 is inclusive of beginning, then o2 is after o1 if it is exclusive
-                        return o2.beginInclusive ? 0 : -1;
-                    }
-                    //if o1 is exclusive, then o1 is after o2 if it is inclusive
-                    return o2.beginInclusive ? 1 : 0;
-                }
-                return ret;
+                return Interval.compareBegin(o1, o2, itemComparer);
             }
         };
     }
     
     //compares like a comparator based on the ends of intervals
-    private int compareEnds(Interval<T> val1, Interval<T> val2, Comparator<T> comparer){
-        
-        if(val1.end == null){
-            if(val2.end == null){
-                //val1 == val2;
-                return compareEndExclusivity(val1.endInclusive, val2.endInclusive);
-            }
-            //if val2 != null, then val1 > val2 cause we're comparing ends
-            return 1;
-        }
-        
-        if(val2.end == null){
-            //val1 is not null, so val1 is < val2
-            return -1;
-        }
-        
-        int ret = comparer.compare(val1.end, val2.end);
-        if(ret == 0){
-            return compareEndExclusivity(val1.endInclusive, val2.endInclusive);
-        }
-        return ret;
-    }
     
-    private int compareEndExclusivity(boolean val1Inclusive, boolean val2Inclusive){
-        if(val1Inclusive){
-            //if val2 is exclusive of end, val 1 is greater
-            return val2Inclusive ? 0 : 1;
-        }
-        //val1 is exclusive of end, val2 is greater if inclusive
-        return val2Inclusive ? -1 : 0;
-    }
     
     /**
      * Gets the union of this IntervalSet with the other IntervalSet, using the given comparer.
@@ -274,9 +225,9 @@ public class IntervalSet<T> {
                 second = mine;
             }
 
-            int endCompare = compareEnds(mine, theirs, comparer);
+            int endCompare = Interval.compareEnd(mine, theirs, comparer);
             
-            if(doesIntersect(first, second, comparer)){
+            if(intersectOrTouching(first, second, comparer)){
                 //intersecting interval is begin of second to end of the smaller end value
                 if(endCompare <= 0){
                     addTo.add(new Interval<>(second.begin, second.beginInclusive,
@@ -320,10 +271,10 @@ public class IntervalSet<T> {
         while(it.hasNext()){
             Interval<T> current = it.next();
             
-            if(doesIntersect(last, current, comparer)){
+            if(intersectOrTouching(last, current, comparer)){
                 //current's lower is already > last,
                 //for union we extend last's end to the greater end
-                int endCompare = compareEnds(last, current, comparer);
+                int endCompare = Interval.compareEnd(last, current, comparer);
                 //if last completely envelops current (equal to or greater than, comparing inclusivity)
                 if(endCompare > 0 || (endCompare == 0 && (last.endInclusive || !current.endInclusive))){
                     //ignore current
@@ -342,7 +293,7 @@ public class IntervalSet<T> {
         addTo.add(last);
     }
     
-    private boolean doesIntersect(Interval<T> a, Interval<T> b, Comparator<T> comparer){
+    private boolean intersectOrTouching(Interval<T> a, Interval<T> b, Comparator<T> comparer){
         //we can assume that a's begin is <= b's begin, so we need to see if b's begin is < a's end
         
         
@@ -362,6 +313,25 @@ public class IntervalSet<T> {
         
     }
 
+    /**
+     * Tests whether this IntervalSet intersects another IntervalSet.
+     * @param other The other interval set to test against
+     * @param comparer The comparer comparing values.
+     * @return true if any interval in this interval set intersects any value on the other.
+     */
+    public boolean intersects(IntervalSet<T> other, Comparator<T> comparer){
+        // O(n^2), but theres not gonna be very many in any interval set.
+        // Any other algorithms would be too much overhead.
+        for(int i = 0; i < this.intervals.size(); i++){
+            for(int j = 0; j < other.intervals.size(); j++){
+                if(this.intervals.get(i).intersects(other.intervals.get(j), comparer)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
     @Override
     public int hashCode() {
         int hash = 5;

@@ -2,10 +2,9 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.gburgett.xflat.range;
+package org.gburgett.xflat.query;
 
 import java.util.Comparator;
-import org.gburgett.xflat.Range;
 import org.gburgett.xflat.util.ComparableComparator;
 
 /**
@@ -22,9 +21,9 @@ import org.gburgett.xflat.util.ComparableComparator;
  * ... [-175, -75) [-75, 25) [25, 125) [125, 225) ...
  * @author Gordon
  */
-public class NumericRangeProvider {
+public class NumericIntervalProvider {
     
-    private NumericRangeProvider(){
+    private NumericIntervalProvider(){
         
     }
     
@@ -34,30 +33,35 @@ public class NumericRangeProvider {
      * @param width The width of one range.
      * @return A RangeProvider providing ranges based on these settings.
      */
-    public static RangeProvider<Integer> forInteger(final int base, final int width){
-        return new RangeProvider<Integer>(){
+    public static IntervalProvider<Integer> forInteger(final int base, final int width){
+        return new IntervalProvider<Integer>(){
             @Override
-            public Range<Integer> getRange(Integer value) {
+            public Interval<Integer> getInterval(Integer value) {
                 
                 //972 - 50 % 100 = 22, lower = 950 upper = 1050
                 int diff = (value - base) % width; 
                 int lower = value - diff;
                 int upper = lower + width;
                 
-                return new NumericRange<>(lower, upper);
+                return new Interval<>(lower, true, upper, false);
             }
 
             @Override
-            public Range<Integer> nextRange(Range<Integer> currentRange, long factor) {
-                NumericRange<Integer> r = (NumericRange<Integer>) currentRange;
-                int lower = (int) (r.getLower() + (width * factor));
+            public Interval<Integer> nextInterval(Interval<Integer> current, long factor) {
+                
+                int lower = (int) (current.getBegin() + (width * factor));
                 int upper = lower + width;
-                return new NumericRange<>(lower, upper);
+                return new Interval<>(lower, true, upper, false);
             }
 
             @Override
             public Comparator<Integer> getComparator() {
                 return ComparableComparator.getComparator(Integer.class);
+            }
+            
+            @Override
+            public String getName(Interval<Integer> interval){
+                return interval.getBegin() + "_" + interval.getEnd();
             }
         };
     }    
@@ -68,28 +72,32 @@ public class NumericRangeProvider {
      * @param width The width of one range.
      * @return A RangeProvider providing ranges based on these settings.
      */
-    public static RangeProvider<Long> forLong(final long base, final long width){
-        return new RangeProvider<Long>(){
+    public static IntervalProvider<Long> forLong(final long base, final long width){
+        return new IntervalProvider<Long>(){
             @Override
-            public Range<Long> getRange(Long value) {
+            public Interval<Long> getInterval(Long value) {
                 long diff = (value - base) % width; 
                 long lower = value - diff;
                 long upper = lower + width;
                 
-                return new NumericRange<>(lower, upper);
+                return new Interval<>(lower, true, upper, false);
             }
 
             @Override
-            public Range<Long> nextRange(Range<Long> currentRange, long factor) {
-                NumericRange<Long> r = (NumericRange<Long>) currentRange;
-                long lower = (r.getLower() + (width * factor));
+            public Interval<Long> nextInterval(Interval<Long> current, long factor) {
+                long lower = (current.getBegin() + (width * factor));
                 long upper = lower + width;
-                return new NumericRange<>(lower, upper);
+                return new Interval<>(lower, true, upper, false);
             }
 
             @Override
             public Comparator<Long> getComparator() {
                 return ComparableComparator.getComparator(Long.class);
+            }
+            
+            @Override
+            public String getName(Interval<Long> interval){
+                return interval.getBegin() + "_" + interval.getEnd();
             }
         };
     }
@@ -100,24 +108,23 @@ public class NumericRangeProvider {
      * @param width The width of one range.
      * @return A RangeProvider providing ranges based on these settings.
      */
-    public static RangeProvider<Double> forDouble(final double base, final double width){
-        return new RangeProvider<Double>(){
+    public static IntervalProvider<Double> forDouble(final double base, final double width){
+        return new IntervalProvider<Double>(){
 
             @Override
-            public Range<Double> getRange(Double value) {
+            public Interval<Double> getInterval(Double value) {
                 double diff = (value - base) % width; 
                 double lower = value - diff;
                 double upper = lower + width;
                 
-                return new NumericRange<>(lower, upper);
+                return new Interval<>(lower, true, upper, false);
             }
 
             @Override
-            public Range<Double> nextRange(Range<Double> currentRange, long factor) {
-                NumericRange<Double> r = (NumericRange<Double>) currentRange;
-                double lower = (r.getLower() + (width * factor));
+            public Interval<Double> nextInterval(Interval<Double> current, long factor) {
+                double lower = (current.getBegin() + (width * factor));
                 double upper = lower + width;
-                return new NumericRange<>(lower, upper);
+                return new Interval<>(lower, true, upper, false);
             }
 
             @Override
@@ -125,6 +132,10 @@ public class NumericRangeProvider {
                 return ComparableComparator.getComparator(Double.class);
             }
             
+            @Override
+            public String getName(Interval<Double> interval){
+                return interval.getBegin() + "_" + interval.getEnd();
+            }
         };
         
     }
