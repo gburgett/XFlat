@@ -10,7 +10,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -26,10 +25,10 @@ import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.EngineStateException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.db.Engine;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.db.EngineState;
+import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.gburgett.xflat.util.DocumentFileWrapper;
@@ -45,8 +44,6 @@ import org.jdom2.JDOMException;
 public class CachedDocumentEngine extends EngineBase implements Engine {
 
     private final AtomicBoolean operationsReady = new AtomicBoolean(false);
-    
-    private final Object syncRoot = new Object();    
     
     private ConcurrentMap<String, Element> cache = null;
     
@@ -100,6 +97,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     public Cursor<Element> queryTable(XpathQuery query) {
         query.setConversionService(this.getConversionService());
         TableCursor ret = new TableCursor(this.cache.values(), query);
+        
         this.openCursors.put(ret, "");
         setLastActivity(System.currentTimeMillis());
         
@@ -329,7 +327,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         }
     }
     
-    private WeakHashMap<Cursor<Element>, String> openCursors = new WeakHashMap<>();
+    private ConcurrentMap<Cursor<Element>, String> openCursors = new ConcurrentHashMap<>();
     
     @Override
     protected boolean spinDown(final SpinDownEventHandler completionEventHandler) {
@@ -423,10 +421,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 this.state.get() == EngineState.SpinningDown;
     }
 
-    
-    
-    
-    
     private AtomicReference<Future<?>> scheduledDump = new AtomicReference<>(null);
     private AtomicLong lastDump = new AtomicLong(0);
     private AtomicLong lastModified = new AtomicLong(System.currentTimeMillis());

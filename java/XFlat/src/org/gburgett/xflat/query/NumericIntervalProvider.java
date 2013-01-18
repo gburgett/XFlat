@@ -38,11 +38,19 @@ public class NumericIntervalProvider {
             @Override
             public Interval<Integer> getInterval(Integer value) {
                 
-                //972 - 50 % 100 = 22, lower = 950 upper = 1050
-                int diff = (value - base) % width; 
-                int lower = value - diff;
-                int upper = lower + width;
+                int diff = Math.abs(value - base) % width; 
                 
+                int lower, upper;
+                if(value < base){
+                    //if the diff was zero, it was an exact mod, then we need to add the width instead of zero.
+                    upper = value + (diff == 0 ? width : diff);
+                    lower = upper - width;
+                }
+                else{
+                    lower = value - diff;
+                    upper = lower + width;
+                }    
+                                
                 return new Interval<>(lower, true, upper, false);
             }
 
@@ -61,7 +69,17 @@ public class NumericIntervalProvider {
             
             @Override
             public String getName(Interval<Integer> interval){
-                return interval.getBegin() + "_" + interval.getEnd();
+                return interval.getBegin().toString();
+            }
+
+            @Override
+            public Interval<Integer> getInterval(String name) {
+                try{
+                    int i = Integer.parseInt(name);
+                    return getInterval(i);
+                }catch(Exception ex){
+                    return null;
+                }
             }
         };
     }    
@@ -76,9 +94,18 @@ public class NumericIntervalProvider {
         return new IntervalProvider<Long>(){
             @Override
             public Interval<Long> getInterval(Long value) {
-                long diff = (value - base) % width; 
-                long lower = value - diff;
-                long upper = lower + width;
+                long diff = Math.abs(value - base) % width; 
+                
+                long lower, upper;
+                if(value < base){
+                    //if the diff was zero, it was an exact mod, then we need to add the width instead of zero.
+                    upper = value + (diff == 0 ? width : diff);
+                    lower = upper - width;
+                }
+                else{
+                    lower = value - diff;
+                    upper = lower + width;
+                }    
                 
                 return new Interval<>(lower, true, upper, false);
             }
@@ -97,7 +124,17 @@ public class NumericIntervalProvider {
             
             @Override
             public String getName(Interval<Long> interval){
-                return interval.getBegin() + "_" + interval.getEnd();
+                return interval.getBegin().toString();
+            }
+
+            @Override
+            public Interval<Long> getInterval(String name) {
+                try{
+                    long i = Long.parseLong(name);
+                    return getInterval(i);
+                }catch(Exception ex){
+                    return null;
+                }
             }
         };
     }
@@ -113,9 +150,18 @@ public class NumericIntervalProvider {
 
             @Override
             public Interval<Double> getInterval(Double value) {
-                double diff = (value - base) % width; 
-                double lower = value - diff;
-                double upper = lower + width;
+                double diff = Math.abs(value - base) % width; 
+                
+                double lower, upper;
+                if(value < base){
+                    //if the diff was zero, it was an exact mod, then we need to add the width instead of zero.
+                    upper = value + (diff == 0 ? width : diff);
+                    lower = upper - width;
+                }
+                else{
+                    lower = value - diff;
+                    upper = lower + width;
+                }    
                 
                 return new Interval<>(lower, true, upper, false);
             }
@@ -134,7 +180,17 @@ public class NumericIntervalProvider {
             
             @Override
             public String getName(Interval<Double> interval){
-                return interval.getBegin() + "_" + interval.getEnd();
+                return interval.getBegin().toString();
+            }
+
+            @Override
+            public Interval<Double> getInterval(String name) {
+                try{
+                    double i = Double.parseDouble(name);
+                    return getInterval(i);
+                }catch(Exception ex){
+                    return null;
+                }
             }
         };
         

@@ -244,5 +244,5 @@ public class Interval<T> {
         toString(sb);
         return sb.toString();
     }
-    
+
 }

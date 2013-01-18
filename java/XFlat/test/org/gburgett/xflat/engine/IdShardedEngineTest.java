@@ -121,7 +121,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 files.put(provider.getInterval(iId), shard);
             }
             
-            shard.getRootElement().addContent(row.detach());
+            shard.getRootElement().addContent(row.clone());
         }
         
         //put the sharded documents in the docs collection
@@ -142,7 +142,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         SortedMap<Integer, Document> sortedDocs = new TreeMap<>();
         //will be spread across multiple documents, sort them by ID
         for(Map.Entry<File, Document> doc : docs.entrySet()){
-            Integer i = Integer.parseInt(doc.getKey().getName().split("_")[0]);
+            Integer i = Integer.parseInt(getShardNameFromFile(doc.getKey()));
             sortedDocs.put(i, doc.getValue());
         }
         
@@ -156,6 +156,11 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         return ret;
     }
     
-    
+    private String getShardNameFromFile(File file){
+        if(!file.getName().endsWith(".xml"))
+            throw new RuntimeException("invalid file name " + file.getName());
+        
+        return file.getName().substring(0, file.getName().length() - 4);
+    }
    
 }

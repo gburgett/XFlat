@@ -21,6 +21,10 @@ public class IntervalSet<T> {
     
     private final List<Interval<T>> intervals;
     
+    /**
+     * Gets all the intervals in this IntervalSet in ascending order.
+     * @return 
+     */
     public List<Interval<T>> getIntervals(){
         return intervals;
     }
@@ -151,16 +155,8 @@ public class IntervalSet<T> {
     
     //gets a Comparator that compares based on the beginnings of intervals
     private Comparator<Interval<T>> sortingComparer(final Comparator<T> itemComparer){
-        return new Comparator<Interval<T>>(){
-            @Override
-            public int compare(Interval<T> o1, Interval<T> o2) {
-                return Interval.compareBegin(o1, o2, itemComparer);
-            }
-        };
+        return new IntervalComparator<>(itemComparer);
     }
-    
-    //compares like a comparator based on the ends of intervals
-    
     
     /**
      * Gets the union of this IntervalSet with the other IntervalSet, using the given comparer.
@@ -332,6 +328,21 @@ public class IntervalSet<T> {
         return false;
     }
     
+    /**
+     * Tests whether this IntervalSet contains any intervals that intersect the other interval set.
+     * @param other The interval to test
+     * @param comparer The comparer comparing values.
+     * @return true if any interval in this interval set intersects the given interval.
+     */
+    public boolean intersects(Interval<T> other, Comparator<T> comparer){
+        for(int i = 0; i < this.intervals.size(); i++){
+            if(this.intervals.get(i).intersects(other, comparer)){
+                return true;
+            }
+        }
+        return false;
+    }
+    
     @Override
     public int hashCode() {
         int hash = 5;
@@ -381,4 +392,6 @@ public class IntervalSet<T> {
         
         return stringValue;
     }
+
+    
 }

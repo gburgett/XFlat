@@ -5,6 +5,7 @@
 package org.gburgett.xflat.db;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,11 +28,11 @@ import org.jdom2.Element;
  */
 public abstract class ShardedEngineBase<T> extends EngineBase {
     protected ConcurrentMap<Interval<T>, TableMetadata> openShards = new ConcurrentHashMap<>();
+    protected ConcurrentMap<Interval<T>, File> knownShards = new ConcurrentHashMap<>();
+    
     
     //the engines that are spinning down while this engine spins down
     private Map<Interval<T>, EngineBase> spinningDownEngines = new HashMap<>();
-    
-    private WeakHashMap<Cursor<Interval<T>>, String> openTableCursors = new WeakHashMap<>();
     
     private final Object spinDownSyncRoot = new Object();
     
@@ -76,11 +77,16 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     
     protected Interval<T> getInterval(Object value){
         T converted;
-        try {
-            converted = this.getConversionService().convert(value, this.config.getShardPropertyClass());
-        } catch (ConversionException ex) {
-            throw new XflatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
-                    " selected non-convertible value " + value, ex);
+        if(value == null || !this.config.getShardPropertyClass().isAssignableFrom(value.getClass())){
+            try {
+                converted = this.getConversionService().convert(value, this.config.getShardPropertyClass());
+            } catch (ConversionException ex) {
+                throw new XflatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
+                        " selected non-convertible value " + value, ex);
+            }
+        }
+        else{
+            converted = (T)value;
         }
         
         Interval<T> ret;
@@ -100,6 +106,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     }
     
     private EngineBase getEngine(Interval<T> interval){
+        
         TableMetadata metadata = openShards.get(interval);
         if(metadata == null){
             //definitely ensure we aren't spinning down before we start up a new engine
@@ -112,7 +119,10 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 
                 //build the new metadata element so we can use it to provide engines
                 String name = this.config.getIntervalProvider().getName(interval);
-                metadata = this.getMetadataFactory().makeTableMetadata(name, new File(directory, name + ".xml"));
+                File file = new File(directory, name + ".xml");
+                this.knownShards.put(interval, file);
+                
+                metadata = this.getMetadataFactory().makeTableMetadata(name, file);
                 TableMetadata weWereLate = openShards.putIfAbsent(interval, metadata);
                 if(weWereLate != null){
                     //another thread put the new metadata already
@@ -150,7 +160,6 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         }
     }
     
-    
     protected void update(){
         Iterator<TableMetadata> it = openShards.values().iterator();
         while(it.hasNext()){
@@ -170,8 +179,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             }
         }
     }
-    
-    
+        
     @Override
     protected boolean spinUp() {
         if(!this.state.compareAndSet(EngineState.Uninitialized, EngineState.SpinningUp)){
@@ -180,6 +188,20 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         
         if(!directory.exists()){
             directory.mkdirs();
+        }
+        else{
+            //need to scan the directory for existing known shards.
+            for(File f : directory.listFiles()){
+                if(!f.getName().endsWith(".xml")){
+                    continue;
+                }
+                
+                String shardName = f.getName().substring(0, f.getName().length() - 4);
+                Interval<T> i = config.getIntervalProvider().getInterval(shardName);
+                if(i != null){
+                    knownShards.put(i, f);
+                }
+            }
         }
         
         //we'll spin up tables as we need them.
