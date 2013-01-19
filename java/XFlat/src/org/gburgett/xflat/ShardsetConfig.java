@@ -67,12 +67,20 @@ public class ShardsetConfig<T> {
      * @return A new shardset config.
      */
     public static <U> ShardsetConfig<U> create(XPathExpression<?> xpathProperty, Class<U> propertyClass, IntervalProvider<U> rangeProvider){
+        if(xpathProperty == null){
+            throw new IllegalArgumentException("xpathProperty cannot be null");
+        }
+        if(propertyClass == null){
+            throw new IllegalArgumentException("propertyClass cannot be null");
+        }
+        if(rangeProvider == null){
+            throw new IllegalArgumentException("rangeProvider cannot be null");
+        }
+        
         ShardsetConfig<U> ret =  new ShardsetConfig<>();
         ret.shardPropertySelector = xpathProperty;
         ret.shardPropertyClass = propertyClass;
         ret.intervalProvider = rangeProvider;
-        
-        
         
         return ret;
     }

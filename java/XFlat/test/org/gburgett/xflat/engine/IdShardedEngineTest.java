@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.ShardsetConfig;
 import org.gburgett.xflat.TableConfig;
 import org.gburgett.xflat.convert.ConversionService;
@@ -30,6 +32,10 @@ import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.xpath.XPathExpression;
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.jdom2.output.XMLOutputter;
 
 /**
  *
@@ -37,11 +43,16 @@ import static org.junit.Assert.*;
  */
 public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine> {
 
+    Log log = LogFactory.getLog(getClass());
+    
     String name = "IdShardedEngineTest";
+    
+    XMLOutputter outputter = new XMLOutputter();
+            
     @Override
     protected IdShardedEngine createInstance(TestContext ctx) {
         
-        final Map<File, Document> docs = new ConcurrentHashMap<>();
+        final Map<String, Document> docs = new ConcurrentHashMap<>();
         ctx.additionalContext.put("docs", docs);
         
         XFlatDatabase db = new XFlatDatabase(workspace, executorService);
@@ -62,12 +73,20 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 DocumentFileWrapper wrapper = new DocumentFileWrapper(file){
                     @Override
                     public Document readFile(){
-                        return docs.get(file);
+                        return docs.get(file.getName());
                     }
                     
                     @Override
                     public void writeFile(Document doc){
-                        docs.put(file, doc);
+                        log.debug("writing file " + file.getName());
+                        if(log.isTraceEnabled())
+                            log.trace(outputter.outputString(doc));
+                        docs.put(file.getName(), doc);
+                    }
+                    
+                    @Override
+                    public boolean exists(){
+                        return docs.containsKey(file.getName());
                     }
                     
                     @Override
@@ -91,7 +110,24 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         ctx.additionalContext.put("rangeProvider", provider);
         ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
         
-        File file = new File(ctx.workspace, name);
+        File file = spy(new File(ctx.workspace, name));
+        when(file.exists()).thenReturn(true);
+        when(file.isDirectory()).thenReturn(true);
+        when(file.listFiles())
+                .then(new Answer<File[]>(){
+
+            @Override
+            public File[] answer(InvocationOnMock invocation) throws Throwable {
+                File[] ret = new File[docs.size()];
+                int i = 0;
+                for(String name : docs.keySet()){
+                    ret[i++] = new File(name);
+                }
+                return ret;
+            }
+        });
+        
+        
         IdShardedEngine ret = new IdShardedEngine(file, name, cfg);
         setMetadataFactory(ret, new TableMetadataFactory(db, file));
         return ret;
@@ -99,7 +135,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
 
     @Override
     protected void prepFileContents(TestContext ctx, Document contents) throws IOException {
-        Map<File, Document> docs = (Map<File, Document>)ctx.additionalContext.get("docs");
+        Map<String, Document> docs = (Map<String, Document>)ctx.additionalContext.get("docs");
         IntervalProvider<Integer> provider = (IntervalProvider<Integer>)ctx.additionalContext.get("rangeProvider");
         
         if(contents == null){
@@ -127,13 +163,15 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         //put the sharded documents in the docs collection
         for(Map.Entry<Interval<Integer>, Document> doc : files.entrySet()){
             File f = new File(provider.getName(doc.getKey()) + ".xml");
-            docs.put(f, doc.getValue());
+            docs.put(f.getName(), doc.getValue());
         }
     }
 
     @Override
     protected Document getFileContents(TestContext ctx) throws IOException, JDOMException {
-        Map<File, Document> docs = (Map<File, Document>)ctx.additionalContext.get("docs");
+        log.debug("getting file contents");
+        
+        Map<String, Document> docs = (Map<String, Document>)ctx.additionalContext.get("docs");
         IntervalProvider<Integer> provider = (IntervalProvider<Integer>)ctx.additionalContext.get("rangeProvider");
         
         Document ret = new Document();
@@ -141,7 +179,10 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         
         SortedMap<Integer, Document> sortedDocs = new TreeMap<>();
         //will be spread across multiple documents, sort them by ID
-        for(Map.Entry<File, Document> doc : docs.entrySet()){
+        for(Map.Entry<String, Document> doc : docs.entrySet()){
+            if(log.isTraceEnabled())
+                log.trace(outputter.outputString(doc.getValue()));
+            
             Integer i = Integer.parseInt(getShardNameFromFile(doc.getKey()));
             sortedDocs.put(i, doc.getValue());
         }
@@ -149,18 +190,21 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         //each range is now in order, add all the rows from each document
         for(Document d : sortedDocs.values()){
             for(Element e : d.getRootElement().getChildren("row", XFlatDatabase.xFlatNs)){
-                ret.getRootElement().addContent(e.detach());
+                ret.getRootElement().addContent(e.clone());
             }
         }
+        
+        if(log.isTraceEnabled())
+            log.trace(outputter.outputString(ret));
         
         return ret;
     }
     
-    private String getShardNameFromFile(File file){
-        if(!file.getName().endsWith(".xml"))
-            throw new RuntimeException("invalid file name " + file.getName());
+    private String getShardNameFromFile(String file){
+        if(!file.endsWith(".xml"))
+            throw new RuntimeException("invalid file name " + file);
         
-        return file.getName().substring(0, file.getName().length() - 4);
+        return file.substring(0, file.length() - 4);
     }
    
 }

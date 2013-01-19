@@ -1256,10 +1256,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         public long id;
         
-        public final Map<String, Object> additionalContext = new HashMap<>();
+        public final Map<String, Object> additionalContext;
         
         public TestContext(){
             this.id = Thread.currentThread().getId();
+            additionalContext = new HashMap<>();
         }
     }
 }

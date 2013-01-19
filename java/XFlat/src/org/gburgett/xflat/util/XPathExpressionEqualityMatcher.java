@@ -39,7 +39,7 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
         this.toMatch = toMatch;        
     }
 
-    private List<String> tokenizeExpression(XPathExpression<U> expression){
+    private static List<String> tokenizeExpression(XPathExpression<?> expression){
         String exp = expression.getExpression();
         
         List<String> ret = new ArrayList<>();
@@ -66,27 +66,18 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
     
     @Override
     protected boolean matchesSafely(XPathExpression<U> item) {
-        if (toMatch == null) {
-            return item == null;
+        if (item == null) {
+            return toMatch == null;
+        }
+        if(toMatch == null){
+            return false;
         }
         
         if(myExpTokens == null){
             myExpTokens = tokenizeExpression(toMatch);
         }
-        List<String> itemTokens = tokenizeExpression(item);
         
-        
-        if(itemTokens.size() != myExpTokens.size()){
-            return false;
-        }
-        
-        for(int i = 0; i < myExpTokens.size(); i++){
-            if(!myExpTokens.get(i).equals(itemTokens.get(i))){
-                return false;
-            }
-        }
-        
-        return true;
+        return equals(toMatch, myExpTokens, item, tokenizeExpression(item));
     }
 
     @Override
@@ -98,4 +89,38 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
         description.appendText("XPath expression equal to ").appendText(toMatch.getExpression());
     }
     
+    private static boolean equals(XPathExpression<?> left, List<String> leftSideTokens, XPathExpression<?> right, List<String> rightSideTokens){
+        
+        
+        
+        if(rightSideTokens.size() != leftSideTokens.size()){
+            return false;
+        }
+        
+        for(int i = 0; i < leftSideTokens.size(); i++){
+            if(!leftSideTokens.get(i).equals(rightSideTokens.get(i))){
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Compares two XPath expressions for equality by tokenizing their expressions
+     * and expanding namespace prefixes.
+     * @param left
+     * @param right
+     * @return true iff the two expressions are equal.
+     */
+    public static boolean equals(XPathExpression<?> left, XPathExpression<?> right){
+        if (left == null) {
+            return right == null;
+        }
+        if(right == null){
+            return false;
+        }
+        
+        return equals(left, tokenizeExpression(left), right, tokenizeExpression(right));
+    }
 }

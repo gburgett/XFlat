@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.EngineStateException;
 import org.gburgett.xflat.ShardsetConfig;
+import org.gburgett.xflat.TableConfig;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.query.Interval;
@@ -123,6 +124,8 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 this.knownShards.put(interval, file);
                 
                 metadata = this.getMetadataFactory().makeTableMetadata(name, file);
+                metadata.config = TableConfig.defaultConfig; //not even really used for our purposes
+                
                 TableMetadata weWereLate = openShards.putIfAbsent(interval, metadata);
                 if(weWereLate != null){
                     //another thread put the new metadata already
@@ -161,6 +164,8 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     }
     
     protected void update(){
+        
+        
         Iterator<TableMetadata> it = openShards.values().iterator();
         while(it.hasNext()){
             TableMetadata table = it.next();
@@ -268,6 +273,9 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                         EngineState state = spinningDown.getState();
                         if(state == EngineState.SpunDown || state == EngineState.Uninitialized){
                             it.remove();
+                        }
+                        else if(state == EngineState.Running){
+                            spinningDown.spinDown(null);
                         }
                     }
                     //give it a few more ms just in case

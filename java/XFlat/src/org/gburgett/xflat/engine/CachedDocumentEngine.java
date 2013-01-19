@@ -359,7 +359,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 }, 0, TimeUnit.MILLISECONDS));
         }
         
-        if(openCursors.isEmpty() && cacheDumpTask.get() == null || cacheDumpTask.get().isDone()){
+        if(openCursors.isEmpty() && (cacheDumpTask.get() == null || cacheDumpTask.get().isDone())){
             this.state.set(EngineState.SpunDown);
             
             if(log.isTraceEnabled())

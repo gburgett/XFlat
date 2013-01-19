@@ -134,6 +134,28 @@ public class Interval<T> {
         return ret;
     }
     
+    static <U> int compareEndBegin(Interval<U> val1, Interval<U> val2, Comparator<U> itemComparer){
+        if(val1.end == null){
+            //val2 begin cannot be +∞, so val1 end > val2 begin
+            return 1;
+        }
+        
+        if(val2.begin == null){
+            //val1 end cannot be -∞, so val1 end > val2 begin
+            return 1;
+        }
+
+        int ret = itemComparer.compare(val1.end, val2.begin);
+        if(ret == 0){
+            if(val1.endInclusive && val2.beginInclusive){
+                return  0;
+            }
+            //else val1 is lower than val2
+            return -1;
+        }
+        return ret;
+    }
+    
     private static int compareExclusivity(boolean val1Inclusive, boolean val2Inclusive){
         if(val1Inclusive){
             //if val2 is exclusive of beginning, val 1 is less
@@ -142,6 +164,7 @@ public class Interval<T> {
         //val1 is exclusive of begin, val2 is less if inclusive
         return val2Inclusive ? 1 : 0;
     }
+    
     
     
     /**
@@ -155,24 +178,18 @@ public class Interval<T> {
         int compare = compareBegin(this, other, comparator);
         
         if(compare <= 0){
-            compare = comparator.compare(this.end, other.begin);
+            compare = compareEndBegin(this, other, comparator);
             if(compare < 0){
                 return false;
-            }
-            else if(compare == 0){
-                return this.endInclusive && other.beginInclusive;
             }
             else{
                 return true;
             }
         }
         else {
-            compare = comparator.compare(other.end, this.begin);
+            compare = compareEndBegin(other, this, comparator);
             if(compare < 0){
                 return false;
-            }
-            else if(compare == 0){
-                return this.beginInclusive && other.endInclusive;
             }
             else{
                 return true;

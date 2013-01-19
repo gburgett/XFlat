@@ -122,7 +122,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         //we need a cursor that will cross multiple shards.
         Cursor<Element> ret = new CrossShardQueryCursor(query, shardIntervals);
         //remember it so we don't spin down while it's open
-        this.crossShardQueries.put(ret, null);
+        this.crossShardQueries.put(ret, "");
         return ret;
     }
 
