@@ -141,10 +141,10 @@ public class DatabaseConfig {
     /**
      * The default configuration used by the Database.
      */
-    public static DatabaseConfig defaultConfig = new DatabaseConfig()
+    public static DatabaseConfig Default = new DatabaseConfig()
             .setThreadCount(4)
             .setPojoConverterClass("org.gburgett.xflat.convert.converters.JAXBPojoConverter")
-            .setDefaultTableConfig(TableConfig.defaultConfig)
+            .setDefaultTableConfig(TableConfig.Default)
             .setIdGeneratorStrategy(Arrays.asList(
                 UuidIdGenerator.class,
                 TimestampIdGenerator.class,

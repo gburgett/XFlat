@@ -11,5 +11,7 @@ package org.gburgett.xflat;
  * @author gordon
  */
 public interface Cursor<T> extends Iterable<T>, AutoCloseable {
-    
+ 
+    @Override
+    void close() throws XflatException;
 }

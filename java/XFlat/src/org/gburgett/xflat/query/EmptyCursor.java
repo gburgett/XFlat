@@ -35,7 +35,7 @@ public class EmptyCursor {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             //do nothing
         }
         

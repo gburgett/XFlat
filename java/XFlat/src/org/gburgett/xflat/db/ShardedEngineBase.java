@@ -124,7 +124,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 this.knownShards.put(interval, file);
                 
                 metadata = this.getMetadataFactory().makeTableMetadata(name, file);
-                metadata.config = TableConfig.defaultConfig; //not even really used for our purposes
+                metadata.config = TableConfig.Default; //not even really used for our purposes
                 
                 TableMetadata weWereLate = openShards.putIfAbsent(interval, metadata);
                 if(weWereLate != null){
@@ -169,7 +169,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         Iterator<TableMetadata> it = openShards.values().iterator();
         while(it.hasNext()){
             TableMetadata table = it.next();
-            if(table.getLastActivity() + 3000 < System.currentTimeMillis()){
+            if(table.canSpinDown()){
                 //remove right now - if between the check and the remove we got some activity
                 //then oh well, we can spin up a new instance.
                 it.remove();
@@ -183,6 +183,26 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 }
             }
         }
+    }
+    
+    @Override
+    protected boolean hasUncomittedData() {
+        EngineState state = this.state.get();
+        if(state == EngineState.SpinningDown){
+            for(EngineBase e : this.spinningDownEngines.values()){
+                if(e.hasUncomittedData()){
+                    return true;
+                }
+            }
+        }
+        else if(state == EngineState.Running){
+            for(TableMetadata table : this.openShards.values()){
+                if(table.hasUncommittedData()){
+                    return true;
+                }
+            }
+        }
+        return false;
     }
         
     @Override

@@ -126,7 +126,7 @@ public class TableMetadataFactory {
 
         TableMetadata ret = new TableMetadata(name, db, engineFile);
         
-        config = config == null ? TableConfig.defaultConfig : config;
+        config = config == null ? TableConfig.Default : config;
         ret.config = config;
 
         //make ID Generator

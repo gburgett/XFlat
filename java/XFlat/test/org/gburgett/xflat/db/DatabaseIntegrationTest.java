@@ -142,7 +142,7 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.defaultConfig
+        db.configureTable("Foo", TableConfig.Default
                 .setIdGenerator(IntegerIdGenerator.class));
         
         db.Initialize();
@@ -191,7 +191,7 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.defaultConfig
+        db.configureTable("Foo", TableConfig.Default
                 .setIdGenerator(IntegerIdGenerator.class));
         
         db.Initialize();
@@ -289,7 +289,7 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.defaultConfig
+        db.configureTable("Foo", TableConfig.Default
                 .setIdGenerator(TimestampIdGenerator.class));
         
         db.Initialize();
@@ -311,7 +311,7 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
         //use a different ID generator
-        db.configureTable("Foo", TableConfig.defaultConfig
+        db.configureTable("Foo", TableConfig.Default
                 .setIdGenerator(IntegerIdGenerator.class));
         
         boolean didThrow = false;

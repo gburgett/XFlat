@@ -205,6 +205,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         
         return count;
     }
+
     
     /**
      * A cursor that queries across multiple engines.
@@ -306,7 +307,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() throws XflatException {
             if(this.closed){
                 return;
             }

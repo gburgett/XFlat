@@ -95,7 +95,7 @@ public class TableConfig {
      * The default configuration used by the database when no configuration
      * is specified.
      */
-    public static TableConfig defaultConfig = new TableConfig()
+    public static TableConfig Default = new TableConfig()
             .setIdGenerator(null)
             .setInactivityShutdownMs(3000);
 

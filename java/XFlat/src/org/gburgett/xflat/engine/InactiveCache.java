@@ -8,13 +8,12 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
-import org.jdom2.Element;
 
 /**
  *
  * @author gordon
  */
-public class InactiveCache implements ConcurrentMap<String, Element> {
+public class InactiveCache<T, U> implements ConcurrentMap<T, U> {
     
     @Override
     public int size() {
@@ -37,22 +36,22 @@ public class InactiveCache implements ConcurrentMap<String, Element> {
     }
 
     @Override
-    public Element get(Object key) {
+    public U get(Object key) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public Element put(String key, Element value) {
+    public U put(T key, U value) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public Element remove(Object key) {
+    public U remove(Object key) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public void putAll(Map<? extends String, ? extends Element> m) {
+    public void putAll(Map<? extends T, ? extends U> m) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
@@ -62,22 +61,22 @@ public class InactiveCache implements ConcurrentMap<String, Element> {
     }
 
     @Override
-    public Set<String> keySet() {
+    public Set<T> keySet() {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public Collection<Element> values() {
+    public Collection<U> values() {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public Set<Map.Entry<String, Element>> entrySet() {
+    public Set<Map.Entry<T, U>> entrySet() {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public Element putIfAbsent(String key, Element value) {
+    public U putIfAbsent(T key, U value) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
@@ -87,12 +86,12 @@ public class InactiveCache implements ConcurrentMap<String, Element> {
     }
 
     @Override
-    public boolean replace(String key, Element oldValue, Element newValue) {
+    public boolean replace(T key, U oldValue, U newValue) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 
     @Override
-    public Element replace(String key, Element value) {
+    public U replace(T key, U value) {
         throw new UnsupportedOperationException("Engine is no longer active");
     }
 

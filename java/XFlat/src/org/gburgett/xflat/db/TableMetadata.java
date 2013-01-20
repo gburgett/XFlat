@@ -47,8 +47,16 @@ public class TableMetadata implements EngineProvider {
     TableConfig config;
     
     long lastActivity = System.currentTimeMillis();
-    public long getLastActivity(){
-        return lastActivity;
+    
+    
+    public boolean canSpinDown(){
+        EngineBase engine = this.engine.get();
+        return lastActivity + 3000 < System.currentTimeMillis() && engine == null || !engine.hasUncomittedData();
+    }
+    
+    public boolean hasUncommittedData(){
+        EngineBase engine = this.engine.get();
+        return engine != null && engine.hasUncomittedData();
     }
     
     EngineState getEngineState(){
@@ -182,13 +190,29 @@ public class TableMetadata implements EngineProvider {
     
     public EngineBase spinDown(){
         synchronized(this){
-            final EngineBase engine = this.engine.getAndSet(null);
+            EngineBase engine = this.engine.getAndSet(null);
             EngineState state;
             if(engine == null ||
                     (state = engine.getState()) == EngineState.SpinningDown ||
-                    state == EngineState.SpunDown)
+                    state == EngineState.SpunDown){
                 //another thread already spinning it down
                 return engine;
+                
+            }
+            else{
+                if(engine.hasUncomittedData()){
+                    //whoops! see if we can put it back quick
+                    engine = this.engine.getAndSet(engine);
+                    //continue like we were spinning this one down.
+                    
+                    if(engine == null ||
+                            (state = engine.getState()) == EngineState.SpinningDown ||
+                            state == EngineState.SpunDown){
+                        
+                        return engine;
+                    }
+                }
+            }
 
             Log l = LogFactory.getLog(getClass());
             if(l.isTraceEnabled())
@@ -197,8 +221,7 @@ public class TableMetadata implements EngineProvider {
             
             if(engine.spinDown(new SpinDownEventHandler(){
                     @Override
-                    public void spinDownComplete(SpinDownEvent event) {
-                        engine.forceSpinDown();                        
+                    public void spinDownComplete(SpinDownEvent event) {                                         
                     }
                 }))
             {

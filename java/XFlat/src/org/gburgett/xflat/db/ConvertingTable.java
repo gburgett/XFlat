@@ -432,7 +432,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() throws XflatException {
             this.rowCursor.close();
         }
     }

@@ -42,7 +42,7 @@ public class IdShardedEngineIntegrationTests {
         File dbDir = new File(workspace, testName);
         XFlatDatabase ret = new XFlatDatabase(dbDir);
         
-        ret.configureTable(tbl, TableConfig.defaultConfig
+        ret.configureTable(tbl, TableConfig.Default
                                     .setIdGenerator(IntegerIdGenerator.class)
                                     .sharded(ShardsetConfig.create(XpathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
         

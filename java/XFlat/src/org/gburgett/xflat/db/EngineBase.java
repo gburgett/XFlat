@@ -4,12 +4,20 @@
  */
 package org.gburgett.xflat.db;
 
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.convert.ConversionService;
+import org.gburgett.xflat.transaction.Transaction;
+import org.gburgett.xflat.transaction.TransactionManager;
+import org.jdom2.Attribute;
 import org.jdom2.Element;
 
 /**
@@ -123,6 +131,7 @@ public abstract class EngineBase implements Engine {
 
     //</editor-fold>
     
+    //<editor-fold desc="dependencies">
     private ScheduledExecutorService executorService;
     protected ScheduledExecutorService getExecutorService(){
         return executorService;
@@ -141,6 +150,21 @@ public abstract class EngineBase implements Engine {
         this.conversionService = conversionService;
     }
     
+    private TransactionManager transactionManager;
+    /**
+     * Gets the transactionManager.
+     */
+    public TransactionManager getTransactionManager(){
+        return this.transactionManager;
+    }
+    /**
+     * Sets the transactionManager.
+     */
+    public void setTransactionManager(TransactionManager transactionManager){
+        this.transactionManager = transactionManager;
+    }
+    
+    //</editor-fold>
 
     
     /**
@@ -178,16 +202,155 @@ public abstract class EngineBase implements Engine {
         row.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
+       
+       
     /**
-     * Wraps some element data in a row element with the given ID
-     * @param data The data to wrap
-     * @param id The ID to use for the row
-     * @return The data wrapped in a row element
+     * Checks whether this engine has any transactional updates in an uncommitted 
+     * or unreverted state.
+     * If so, returns true.
+     * @return true if this engine has uncommitted transactional data, false otherwise.
      */
-    protected Element wrapInRow(Element data, String id){
-        Element row = new Element("row", XFlatDatabase.xFlatNs).setContent(data);
-        setId(row, id);
+    protected abstract boolean hasUncomittedData();
+    
+    /**
+     * Represents one row in the database.  The row contains a set of
+     * {@link RowData} which represents the committed and uncommitted data in
+     * the row.  The row data is mapped by its transaction ID.
+     * <p/>
+     * The Row should always be locked before any reading or modification of
+     * the data.
+     */
+    protected class Row{
+        /**
+         * The ID of this row.
+         */
+        public final String rowId;
         
-        return row;
+        /**
+         * A SortedMap of the committed and uncommitted data in the row.
+         * Always lock the row before accessing this data.
+         */
+        public final SortedMap<Long, RowData> rowData = new TreeMap<>();
+        
+        public Row(String id){
+            this.rowId = id;
+        }
+        
+        public Row(String id, RowData data){
+            this.rowId = id;
+            this.rowData.put(data.transactionId, data);
+        }
+        
+        /**
+         * Chooses the most recent committed RowData that was committed before the given transaction.
+         * If the transaction is null, this will choose the most recent committed
+         * RowData globally.
+         * <p/>
+         * ALWAYS invoke this while synchronized on the Row.
+         * @param currentTransaction The current transaction, or null.
+         * @return The most recent committed RowData in this row, committed before the transaction.
+         */
+        public RowData chooseMostRecentCommitted(Transaction currentTransaction){
+            if(currentTransaction == null){
+                return chooseMostRecentCommitted(null, Long.MAX_VALUE);
+            }
+            
+            return chooseMostRecentCommitted(currentTransaction, currentTransaction.getTransactionId());
+        }
+        
+        /**
+         * Chooses the most recent committed RowData that was committed before the given transaction ID.
+         * This prevents dirty reads in a non-transactional context by having a synchronizing transaction ID
+         * which can be obtained from {@link TransactionManager#transactionlessCommitId() }
+         * <p/>
+         * ALWAYS invoke this while synchronized on the Row.
+         * @param snapshotId The Transaction ID representing the time at which a snapshot of the data should be obtained.
+         * @return The most recent committed RowData in this row, committed before the given snapshot.
+         */
+        public RowData chooseMostRecentCommitted(Long snapshotId){
+            return chooseMostRecentCommitted(null, snapshotId);
+        }
+        
+        private RowData chooseMostRecentCommitted(Transaction currentTransaction, long currentTxId){
+        
+            RowData ret = null;
+            long retCommitId = -1;
+
+            Iterator<RowData> it = rowData.values().iterator();
+            while(it.hasNext()){
+                RowData data = it.next();
+                
+                //if we're in a transaction, see if this row is the version for this transaction.
+                //if the transaction is reverted we don't want that, we want the most recent
+                //committed version
+                if(currentTransaction != null && !currentTransaction.isReverted()){
+                    
+                    if(data.transactionId > -1 && currentTxId == data.transactionId){
+                        //this row data is the data in the current transaction
+                        return data;
+                    }
+                }
+
+                if(data.commitId == -1){
+                    //uncommitted row data - doublecheck with the transaction manager
+
+                    data.commitId = transactionManager.isTransactionCommitted(data.transactionId);                    
+                }
+
+                if(data.commitId > -1){
+                    //this row data has been committed
+                    if(currentTxId > data.commitId){
+                        //the current transaction is null or began after the transaction was committed
+
+                        if(retCommitId < data.commitId){
+                            //the last valid version we saw was before this version.
+
+                            ret = data;
+                            retCommitId = data.commitId;
+                        }
+                    }
+                }
+                else{
+                    //check if reverted
+                    if(transactionManager.isTransactionReverted(data.transactionId)){
+                        //remove it from the row
+                        it.remove();
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+        
     }
+    
+    protected class RowData{
+        /**
+         * A snapshot of the data in the row, possibly uncommitted.
+         */
+        public Element data = null;
+        
+        /**
+         * The ID of the transaction that created this data snapshot
+         */
+        public long transactionId = -1;
+        
+        /**
+         * The ID of the transaction commit that caused this row data to become
+         * committed.  If the data is uncommitted, this is -1.
+         */
+        public long commitId = -1;
+     
+        public RowData(long txId){
+            this.transactionId = txId;
+        }
+        
+        public RowData(long txId, Element data){
+            this.data = data;
+            this.transactionId = txId;
+        }
+    }
+    
+    
 }

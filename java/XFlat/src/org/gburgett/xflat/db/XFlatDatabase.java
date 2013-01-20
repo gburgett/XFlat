@@ -117,7 +117,7 @@ public class XFlatDatabase implements Database {
     //the engine cache
     private ConcurrentHashMap<String, TableMetadata> tables = new ConcurrentHashMap<>();
     
-    private DatabaseConfig config = DatabaseConfig.defaultConfig;
+    private DatabaseConfig config = DatabaseConfig.Default;
     public void setConfig(DatabaseConfig config){
         if(this.state.get() != DatabaseState.Uninitialized){
             throw new XflatException("Cannot configure database after initialization");
