@@ -54,9 +54,8 @@ public class TableMetadata implements EngineProvider {
         return lastActivity + 3000 < System.currentTimeMillis() && engine == null || !engine.hasUncomittedData();
     }
     
-    public boolean hasUncommittedData(){
-        EngineBase engine = this.engine.get();
-        return engine != null && engine.hasUncomittedData();
+    public EngineBase getEngine(){
+        return this.engine.get();
     }
     
     EngineState getEngineState(){
@@ -130,6 +129,7 @@ public class TableMetadata implements EngineProvider {
 
             ret.setConversionService(db.getConversionService());
             ret.setExecutorService(db.getExecutorService());
+            ret.setTransactionManager(db.getEngineTransactionManager());
             
             if(ret instanceof ShardedEngineBase){
                 //give it a metadata factory centered in its own file.  If it uses this,
@@ -188,9 +188,10 @@ public class TableMetadata implements EngineProvider {
         return engine;
     }
     
-    public EngineBase spinDown(){
+    public EngineBase spinDown(boolean force){
         synchronized(this){
-            EngineBase engine = this.engine.getAndSet(null);
+            EngineBase engine = this.engine.get();
+            
             EngineState state;
             if(engine == null ||
                     (state = engine.getState()) == EngineState.SpinningDown ||
@@ -199,19 +200,19 @@ public class TableMetadata implements EngineProvider {
                 return engine;
                 
             }
-            else{
-                if(engine.hasUncomittedData()){
-                    //whoops! see if we can put it back quick
-                    engine = this.engine.getAndSet(engine);
-                    //continue like we were spinning this one down.
-                    
-                    if(engine == null ||
-                            (state = engine.getState()) == EngineState.SpinningDown ||
-                            state == EngineState.SpunDown){
-                        
-                        return engine;
-                    }
+            
+            try{
+            engine.getTableLock();
+
+                if(engine.hasUncomittedData() && !force){
+                    //can't spin it down, return the engine
+                    return engine;
                 }
+                
+                this.engine.compareAndSet(engine, null);
+            }finally{
+                //table lock no longer needed 
+                engine.releaseTableLock();
             }
 
             Log l = LogFactory.getLog(getClass());

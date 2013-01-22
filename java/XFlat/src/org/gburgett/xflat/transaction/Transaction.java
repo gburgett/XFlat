@@ -42,4 +42,15 @@ public interface Transaction extends AutoCloseable {
     @Override
     void close();
     
+    /**
+     * Adds a transaction listener for this transaction, if it does not already exist.
+     * @param listener 
+     */
+    void putTransactionListener(TransactionListener listener);
+    
+    /**
+     * Removes a transaction listener for this transaction.
+     * @param listener 
+     */
+    void removeTransactionListener(TransactionListener listener);
 }

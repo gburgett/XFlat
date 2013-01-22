@@ -154,27 +154,33 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             throw new XflatException("Attempt to read or write to an engine in an uninitialized state");
         }
         
+        //all operations are writes for the purposes of the sharded engine.
+        //NOT TRUE! Need to fix this!
+        ensureWriteReady();
         try{
-            return action.act(getEngine(range));
-        }
-        catch(EngineStateException ex){
-            //try one more time with a potentially new engine, if we still fail then let it go
-            return action.act(getEngine(range));
+        
+            try{
+                return action.act(getEngine(range));
+            }
+            catch(EngineStateException ex){
+                //try one more time with a potentially new engine, if we still fail then let it go
+                return action.act(getEngine(range));
+            }
+        
+        }finally{
+            writeComplete();
         }
     }
     
     protected void update(){
-        
-        
         Iterator<TableMetadata> it = openShards.values().iterator();
         while(it.hasNext()){
             TableMetadata table = it.next();
             if(table.canSpinDown()){
-                //remove right now - if between the check and the remove we got some activity
-                //then oh well, we can spin up a new instance.
-                it.remove();
+                EngineBase spinDown = table.spinDown(false);
                 
-                table.spinDown();
+                //don't remove any metadata.  It's too dangerous with the way the concurrency is structured.
+                
                 try {
                     this.getMetadataFactory().saveTableMetadata(table);
                 } catch (IOException ex) {
@@ -183,6 +189,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 }
             }
         }
+        
     }
     
     @Override
@@ -197,7 +204,8 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         }
         else if(state == EngineState.Running){
             for(TableMetadata table : this.openShards.values()){
-                if(table.hasUncommittedData()){
+                EngineBase e = table.getEngine();
+                if(e != null && e.hasUncomittedData()){
                     return true;
                 }
             }
@@ -255,58 +263,67 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
 
     @Override
     protected boolean spinDown(final SpinDownEventHandler completionEventHandler) {
-        if(!this.state.compareAndSet(EngineState.Running, EngineState.SpinningDown)){
-            //we're in the wrong state.
-            return false;
-        }
-        
-        synchronized(spinDownSyncRoot){
-            for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
-                EngineBase spinningDown = m.getValue().spinDown();
-                this.spinningDownEngines.put(m.getKey(), spinningDown);
+        try{
+            this.getTableLock();
+            
+            if(!this.state.compareAndSet(EngineState.Running, EngineState.SpinningDown)){
+                //we're in the wrong state.
+                return false;
             }
-        }
-        
-        Runnable spinDownMonitor = new Runnable(){
-            @Override
-            public void run() {
-                if(getState() != EngineState.SpinningDown){
-                    throw new RuntimeException("task complete");
+
+            synchronized(spinDownSyncRoot){
+                for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
+                    EngineBase spinningDown = m.getValue().spinDown(true);
+                    this.spinningDownEngines.put(m.getKey(), spinningDown);
                 }
-                
-                synchronized(spinDownSyncRoot){
-                    if(isSpunDown()){
-                        if(state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
-                            completionEventHandler.spinDownComplete(new SpinDownEvent(ShardedEngineBase.this));
-                        }
-                        else{
-                            //somehow we weren't in the spinning down state
-                            forceSpinDown();
-                        }
+            }
+
+            Runnable spinDownMonitor = new Runnable(){
+                @Override
+                public void run() {
+                    if(getState() != EngineState.SpinningDown){
                         throw new RuntimeException("task complete");
                     }
-                    
-                    
-                    Iterator<EngineBase> it = spinningDownEngines.values().iterator();
-                    while(it.hasNext()){
-                        EngineBase spinningDown = it.next();
-                        EngineState state = spinningDown.getState();
-                        if(state == EngineState.SpunDown || state == EngineState.Uninitialized){
-                            it.remove();
+
+                    synchronized(spinDownSyncRoot){
+                        if(isSpunDown()){
+                            if(state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
+                                if(completionEventHandler != null)
+                                    completionEventHandler.spinDownComplete(new SpinDownEvent(ShardedEngineBase.this));
+                            }
+                            else{
+                                //somehow we weren't in the spinning down state
+                                forceSpinDown();
+                            }
+                            throw new RuntimeException("task complete");
                         }
-                        else if(state == EngineState.Running){
-                            spinningDown.spinDown(null);
+
+
+                        Iterator<EngineBase> it = spinningDownEngines.values().iterator();
+                        while(it.hasNext()){
+                            EngineBase spinningDown = it.next();
+                            EngineState state = spinningDown.getState();
+                            if(state == EngineState.SpunDown || state == EngineState.Uninitialized){
+                                it.remove();
+                            }
+                            else if(state == EngineState.Running){
+                                spinningDown.spinDown(null);
+                            }
                         }
+                        //give it a few more ms just in case
                     }
-                    //give it a few more ms just in case
                 }
-            }
-        };
+            };
+
+            this.getExecutorService().scheduleWithFixedDelay(spinDownMonitor, 5, 10, TimeUnit.MILLISECONDS);
+
+
+            return true;
         
-        this.getExecutorService().scheduleWithFixedDelay(spinDownMonitor, 5, 10, TimeUnit.MILLISECONDS);
-        
-        
-        return true;
+        }
+        finally{
+            this.releaseTableLock();
+        }
     }
     
     /**
@@ -325,7 +342,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         
         synchronized(spinDownSyncRoot){
             for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
-                EngineBase spinningDown = m.getValue().spinDown();
+                EngineBase spinningDown = m.getValue().spinDown(true);
                 this.spinningDownEngines.put(m.getKey(), spinningDown);
             }
             

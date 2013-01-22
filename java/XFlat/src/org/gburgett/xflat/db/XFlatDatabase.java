@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Database;
@@ -34,10 +32,10 @@ import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
-import org.gburgett.xflat.util.DocumentFileWrapper;
+import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
+import org.gburgett.xflat.transaction.TransactionManager;
 import org.jdom2.Document;
 import org.jdom2.Element;
-import org.jdom2.JDOMException;
 import org.jdom2.Namespace;
 
 /**
@@ -89,6 +87,23 @@ public class XFlatDatabase implements Database {
     
     void setMetadataFactory(TableMetadataFactory factory){
         this.metadataFactory = factory;
+    }
+    
+    private EngineTransactionManager transactionManager;
+    /**
+     * Gets the transactionManager.
+     */
+    @Override
+    public TransactionManager getTransactionManager(){
+        return this.transactionManager;
+    }
+    
+    EngineTransactionManager getEngineTransactionManager(){
+        return this.transactionManager;
+    }
+    
+    public void setTransactionManager(EngineTransactionManager transactionManager){
+        this.transactionManager = transactionManager;
     }
     
     //</editor-fold>
@@ -187,6 +202,10 @@ public class XFlatDatabase implements Database {
             if(this.executorService == null)
                 this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
 
+            if(this.transactionManager == null){
+                this.transactionManager = new ThreadContextTransactionManager();
+            }
+            
             this.InitializeScheduledTasks();
 
             Runtime.getRuntime().addShutdownHook(this.shutdownHook);
@@ -238,9 +257,14 @@ public class XFlatDatabase implements Database {
         Set<EngineBase> engines = new HashSet<>();
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
             try{
-                EngineBase e = table.getValue().spinDown();
-                if(e != null)
+                EngineBase e = table.getValue().spinDown(true);
+                if(e != null){
+                    if(e.getState() == EngineState.Running){
+                        //don't care, force spin down
+                        e.spinDown(null);
+                    }
                     engines.add(e);
+                }
             }catch(Exception ex){
                 //eat
             }
@@ -343,13 +367,14 @@ public class XFlatDatabase implements Database {
      * on the DB.
      */
     private void update(){
-        //TODO: hot-swap engines here
         
         //check on inactivity shutdown
         for(TableMetadata m : this.tables.values()){
-            if(m.lastActivity + m.config.getInactivityShutdownMs() < System.currentTimeMillis()){
-                m.spinDown();
+            if(m.canSpinDown()){
+                //spin down if no uncommitted data
+                m.spinDown(false);
             }
+            //don't ever remove TableMetadata.  It's too dangerous with the way we do locking and isn't worth it.
         }
     }
     

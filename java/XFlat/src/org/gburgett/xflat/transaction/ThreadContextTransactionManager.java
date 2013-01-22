@@ -4,56 +4,24 @@
  */
 package org.gburgett.xflat.transaction;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import org.jdom2.Element;
+import java.util.concurrent.atomic.AtomicReference;
+import org.gburgett.xflat.db.EngineBase;
+import org.gburgett.xflat.db.EngineTransactionManager;
 
 /**
  *
  * @author Gordon
  */
-public class ThreadContextTransactionManager implements TransactionManager {
+public class ThreadContextTransactionManager extends EngineTransactionManager {
 
-    AtomicLong lastId = new AtomicLong();
-    
-    /**
-     * Generates a new Transaction ID.  The ID is composed of the lower
-     * 48 bits of {@link System#currentTimeMillis() } plus a 16-bit uniquifier.
-     * unfortunately this means we have a y10k problem :P  I'll let my descendants
-     * deal with it.
-     * @return A new ID for a transaction.
-     */
-    protected long generateNewId(){
-        long id;
-        long last;
-        do{
-            //bitshifting current time millis still gets us at least to the year 10,000 before it overflows.
-            id = System.currentTimeMillis() << 16;
-            last = lastId.get();
-            if((last & 0xFFFFFFFFFFFF0000l) == (id & 0xFFFFFFFFFFFF0000l)){
-                //the last ID was at the same millisecond as our new ID, need to use uniquifier.
-                int u = (int)(last & 0xFFFFl) + 1;
-                if(u > 0xFFFF){
-                    try {
-                        //we can't roll over, need to slow down rate of transaction generation.
-                         Thread.sleep(1);
-                    } catch (InterruptedException ex) {
-                        //don't care
-                    }
-                    //try again, hopefully currentTimeMillis rolled over.
-                    continue;
-                }
-                
-                id = id | u;
-            }
-        }while(!lastId.compareAndSet(last, id));
-        
-        return id;
-    }
-    
     private Map<Thread, ThreadedTransaction> currentTransactions = new ConcurrentHashMap<>();
     
     private Map<Long, ThreadedTransaction> committedTransactions = new ConcurrentHashMap<>();
@@ -108,13 +76,97 @@ public class ThreadContextTransactionManager implements TransactionManager {
         return true;
     }
 
+    
     @Override
     public long transactionlessCommitId() {
         return generateNewId();
     }
+
+    @Override
+    public long getLowestOpenTransaction() {
+        long lowest = Long.MAX_VALUE;
+        for(Transaction tx : currentTransactions.values()){
+            if(tx.getTransactionId() < lowest){
+                lowest = tx.getTransactionId();
+            }
+        }
+        
+        return lowest;
+    }
+
+    @Override
+    public void bindEngineToCurrentTransaction(EngineBase engine) {
+        
+        ThreadedTransaction tx = currentTransactions.get(Thread.currentThread());
+        if(tx == null){
+            return;
+        }
+                
+        tx.boundEngines.add(engine);
+    }
+
+    @Override
+    public void unbindEngineFromTransaction(EngineBase engine, Long transactionId) {
+        ThreadedTransaction tx = null;
+        for(ThreadedTransaction t : this.currentTransactions.values()){
+            if(t.getTransactionId() == transactionId){
+                tx = t;
+                break;
+            }
+        }
+        
+        if(tx == null){
+            tx = this.committedTransactions.get(transactionId);
+        }
+        
+        if(tx == null){
+            //the transaction was reverted, don't bother unbinding.
+            return;
+        }
+        
+        tx.boundEngines.remove(engine);
+        
+        if(tx.boundEngines.isEmpty()){
+            //remove it from the committed transactions if it is empty.
+            this.committedTransactions.remove(tx.getTransactionId());
+        }
+    }
+
+    @Override
+    public void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds) {
+        for(ThreadedTransaction tx : this.currentTransactions.values()){
+            if(transactionIds.contains(tx.getTransactionId())){
+                continue;
+            }
+            
+            //try to remove its binding
+            tx.boundEngines.remove(engine);
+        }
+        
+        Iterator<ThreadedTransaction> it = this.committedTransactions.values().iterator();
+        while(it.hasNext()){
+            ThreadedTransaction tx = it.next();
+            if(transactionIds.contains(tx.getTransactionId())){
+                continue;
+            }
+            
+            //try to remove its binding
+            tx.boundEngines.remove(engine);
+            
+            if(tx.boundEngines.isEmpty()){
+                //remove it from the committed transactions if it is empty.
+                it.remove();
+            }
+        }
+    }
+    
     
         
-    
+    /**
+     * A Transaction that is meant to exist within the context of one thread.
+     * There should be no cross-thread transactional data access, only cross-thread
+     * state querying.
+     */
     protected class ThreadedTransaction implements Transaction{
 
         private TransactionOptions options;
@@ -123,6 +175,10 @@ public class ThreadContextTransactionManager implements TransactionManager {
         private AtomicBoolean isRollbackOnly = new AtomicBoolean(false);
         
         private final long id;
+        
+        private AtomicReference<Set<TransactionListener>> listeners = new AtomicReference<>(null);
+        
+        final Set<EngineBase> boundEngines = new ConcurrentSkipListSet<>();
         
         private long commitId = -1;
         @Override
@@ -197,6 +253,28 @@ public class ThreadContextTransactionManager implements TransactionManager {
         @Override
         public boolean isReverted() {
             return isCompleted.get() && commitId > -1;
+        }
+
+        @Override
+        public void putTransactionListener(TransactionListener listener) {
+            Set<TransactionListener> l = this.listeners.get();
+            if(l == null){
+                l = new ConcurrentSkipListSet<>();
+                if(!this.listeners.compareAndSet(null, l)){
+                    l = this.listeners.get();
+                }
+            }
+            
+            l.add(listener);
+        }
+
+        @Override
+        public void removeTransactionListener(TransactionListener listener) {
+            Set<TransactionListener> l = this.listeners.get();
+            if(l == null){
+                return;
+            }
+            l.remove(listener);
         }
     }
     

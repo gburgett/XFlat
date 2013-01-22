@@ -6,10 +6,12 @@ package org.gburgett.xflat.engine;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -22,7 +24,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
-import org.gburgett.xflat.EngineStateException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.db.Engine;
@@ -34,7 +35,6 @@ import org.gburgett.xflat.query.XpathUpdate;
 import org.gburgett.xflat.transaction.Transaction;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.hamcrest.Matcher;
-import org.jdom2.Attribute;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
@@ -45,6 +45,7 @@ import org.jdom2.JDOMException;
  */
 public class CachedDocumentEngine extends EngineBase implements Engine {
 
+    //TODO: can we replace this by taking a table lock on spin-up?
     private final AtomicBoolean operationsReady = new AtomicBoolean(false);
     
     private ConcurrentMap<String, Row> cache = null;
@@ -66,10 +67,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         this.file = file;
     }
     
-    private void setTxId(Element data, long txId){        
-        data.setAttribute("tx", Long.toString(txId), XFlatDatabase.xFlatNs);
-    }
-    
     private long getTxId(Transaction tx){
         return tx != null ? 
                 tx.getTransactionId() :
@@ -80,36 +77,39 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     //<editor-fold desc="interface methods">
     @Override
     public void insertRow(String id, Element data) throws DuplicateKeyException {
-        ensureReady();
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
-        
-        RowData rData = new RowData(txId, data);
-        if(tx == null){
-            //transactionless means auto-commit
-            rData.commitId = txId;
-        }
-        
-        Row row = new Row(id, rData);
-        row = this.cache.putIfAbsent(id, row);
-        if(row != null){
-            synchronized(row){
-                //see if all the data was from after this transaction
-                RowData chosen = row.chooseMostRecentCommitted(tx);
-                if(chosen == null || chosen.data == null){
-                    //we're good to insert our transactional data
-                    row.rowData.put(txId, rData);
-                    this.uncommittedRows.put(id, row);
-                }
-                else{
-                    throw new DuplicateKeyException(id);
+        ensureWriteReady();
+        try{
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
+
+            RowData rData = new RowData(txId, data, id);
+            if(tx == null){
+                //transactionless means auto-commit
+                rData.commitId = txId;
+            }
+
+            Row row = new Row(id, rData);
+            row = this.cache.putIfAbsent(id, row);
+            if(row != null){
+                synchronized(row){
+                    //see if all the data was from after this transaction
+                    RowData chosen = row.chooseMostRecentCommitted(tx, txId);
+                    if(chosen == null || chosen.data == null){
+                        //we're good to insert our transactional data
+                        row.rowData.put(txId, rData);
+                        this.uncommittedRows.put(id, row);
+                    }
+                    else{
+                        throw new DuplicateKeyException(id);
+                    }
                 }
             }
-        }
 
-        setLastActivity(System.currentTimeMillis());
-        dumpCache();
+            setLastActivity(System.currentTimeMillis());
+            dumpCache();
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
@@ -124,7 +124,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         //lock the row
         synchronized(row){
             Transaction tx = this.getTransactionManager().getTransaction();
-            RowData ret = row.chooseMostRecentCommitted(tx);
+            //we want either the most recent for this transaction or, if null, the most recent globally.
+            RowData ret = row.chooseMostRecentCommitted(tx, Long.MAX_VALUE);
             
             if(ret == null || ret.data == null){
                 return null;
@@ -149,251 +150,347 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public void replaceRow(String id, Element data) throws KeyNotFoundException {
-        ensureReady();
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
+        ensureWriteReady();
+        try{
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
 
-        
-        Row row = this.cache.get(id);
-        if(row == null){
-            throw new KeyNotFoundException(id);
-        }
-        
-        synchronized(row){
-            RowData toReplace = row.chooseMostRecentCommitted(tx);
-            if(toReplace == null || toReplace.data == null){
+
+            Row row = this.cache.get(id);
+            if(row == null){
                 throw new KeyNotFoundException(id);
             }
-            
-            RowData newData = new RowData(txId, data);
-            if(tx == null){
-                //transactionless means auto-commit
-                newData.commitId = txId;
+
+            synchronized(row){
+                RowData toReplace = row.chooseMostRecentCommitted(tx, txId);
+                if(toReplace == null || toReplace.data == null){
+                    throw new KeyNotFoundException(id);
+                }
+
+                RowData newData = new RowData(txId, data, id);
+                if(tx == null){
+                    //transactionless means auto-commit
+                    newData.commitId = txId;
+                }
+                row.rowData.put(txId, newData);
             }
-            row.rowData.put(txId, newData);
-        }
+
+            setLastActivity(System.currentTimeMillis());
+            dumpCache();
         
-        setLastActivity(System.currentTimeMillis());
-        dumpCache();
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
     public boolean update(String id, XpathUpdate update) throws KeyNotFoundException {
-        ensureReady();
-        
-        Row row = this.cache.get(id);
-        if(row == null){
-            throw new KeyNotFoundException(id);
-        }
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
-
-        update.setConversionService(this.getConversionService());
-        
-        boolean ret;
-        try {
-            //lock the row
-            synchronized(row){
-                RowData data = row.chooseMostRecentCommitted(tx);
-                if(data == null || data.data == null){
-                    throw new KeyNotFoundException(id);
-                }
-                else{
-                    //apply to a copy, store the copy as a transactional state.
-                    RowData newData = new RowData(txId, data.data.clone());
-                    if(tx == null){
-                        //transactionless means auto-commit
-                        newData.commitId = txId;
-                    }
-                    
-                    int updates = update.apply(newData.data);
-                    ret = updates > 0;
-                    if(ret){
-                        //no need to put a new version if no data was modified
-                        row.rowData.put(txId, newData);
-                    }
-                }
+        ensureWriteReady();
+        try{
+            Row row = this.cache.get(id);
+            if(row == null){
+                throw new KeyNotFoundException(id);
             }
-        } catch (JDOMException ex) {
-            if(log.isDebugEnabled())
-                log.debug("Exception while applying update " + update.toString(), ex);
-            
-            ret = false;
+
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
+
+            update.setConversionService(this.getConversionService());
+
+            boolean ret;
+            try {
+                //lock the row
+                synchronized(row){
+                    RowData data = row.chooseMostRecentCommitted(tx, txId);
+                    if(data == null || data.data == null){
+                        throw new KeyNotFoundException(id);
+                    }
+                    else{
+                        //apply to a copy, store the copy as a transactional state.
+                        RowData newData = new RowData(txId, data.data.clone(), row.rowId);
+                        if(tx == null){
+                            //transactionless means auto-commit
+                            newData.commitId = txId;
+                        }
+
+                        int updates = update.apply(newData.rowElement);
+                        ret = updates > 0;
+                        if(ret){
+                            //no need to put a new version if no data was modified
+                            row.rowData.put(txId, newData);
+                            this.uncommittedRows.put(id, row);
+                        }
+                    }
+                }
+            } catch (JDOMException ex) {
+                if(log.isDebugEnabled())
+                    log.debug("Exception while applying update " + update.toString(), ex);
+
+                ret = false;
+            }
+
+            setLastActivity(System.currentTimeMillis());
+
+            if(ret)
+                dumpCache();
+
+            return ret;
+        }finally{
+            writeComplete();
         }
-        
-        setLastActivity(System.currentTimeMillis());
-        
-        if(ret)
-            dumpCache();
-        
-        return ret;
     }
 
     @Override
     public int update(XpathQuery query, XpathUpdate update) {
-        ensureReady();
-        
-        query.setConversionService(this.getConversionService());
-        update.setConversionService(this.getConversionService());
-        
-        Matcher<Element> rowMatcher = query.getRowMatcher();
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
+        ensureWriteReady();
+        try{
+            
+            query.setConversionService(this.getConversionService());
+            update.setConversionService(this.getConversionService());
 
-        
-        int rowsUpdated = 0;
-        
-        for(Row row : this.cache.values()){
-            synchronized(row){
-                RowData rData = row.chooseMostRecentCommitted(tx);
-                if(rData == null || rData.data == null){
-                    continue;
-                }
-                
-                if(!rowMatcher.matches(rData.data))
-                    continue;
-                
-                try {
-                    //apply to a copy, store the copy as a transactional state.
-                    RowData newData = new RowData(txId, rData.data.clone());
-                    if(tx == null){
-                        //transactionless means auto-commit
-                        newData.commitId = txId;
+            Matcher<Element> rowMatcher = query.getRowMatcher();
+
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
+
+
+            int rowsUpdated = 0;
+
+            for(Row row : this.cache.values()){
+                synchronized(row){
+                    RowData rData = row.chooseMostRecentCommitted(tx, txId);
+                    if(rData == null || rData.data == null){
+                        continue;
                     }
-                    
-                    int updates = update.apply(newData.data);
-                    
-                    if(updates > 0){
-                        //no need to put a new version if no data was modified
-                        row.rowData.put(txId, newData);
+
+                    if(!rowMatcher.matches(rData.rowElement))
+                        continue;
+
+                    try {
+                        //apply to a copy, store the copy as a transactional state.
+                        RowData newData = new RowData(txId, rData.data.clone(), row.rowId);
+                        if(tx == null){
+                            //transactionless means auto-commit
+                            newData.commitId = txId;
+                        }
+
+                        int updates = update.apply(newData.rowElement);
+
+                        if(updates > 0){
+                            //no need to put a new version if no data was modified
+                            row.rowData.put(txId, newData);
+                            if(newData.commitId == -1)
+                                this.uncommittedRows.put(row.rowId, row);
+                        }
+
+                        rowsUpdated = updates > 0 ? rowsUpdated + 1 : rowsUpdated;
+                    } 
+                    catch (JDOMException ex) {
+                        if(log.isDebugEnabled())
+                            log.debug("Exception while applying update " + update.toString(), ex);
                     }
-                    
-                    rowsUpdated = updates > 0 ? rowsUpdated + 1 : rowsUpdated;
-                } 
-                catch (JDOMException ex) {
-                    if(log.isDebugEnabled())
-                        log.debug("Exception while applying update " + update.toString(), ex);
                 }
             }
+
+            setLastActivity(System.currentTimeMillis());
+
+            if(rowsUpdated > 0){
+                dumpCache();
+            }
+
+            return rowsUpdated;
+        }finally{
+            writeComplete();
         }
-        
-        setLastActivity(System.currentTimeMillis());
-        
-        if(rowsUpdated > 0){
-            dumpCache();
-        }
-        
-        return rowsUpdated;
     }
 
     @Override
     public boolean upsertRow(String id, Element data) {
-        ensureReady();
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
-        
-        RowData newData = new RowData(txId, data);
-        if(tx == null){
-            //transactionless means auto-commit
-            newData.commitId = txId;
+        ensureWriteReady();
+        try{
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
+
+            RowData newData = new RowData(txId, data, id);
+            if(tx == null){
+                //transactionless means auto-commit
+                newData.commitId = txId;
+            }
+
+            Row newRow = new Row(id, newData);
+
+            boolean didInsert = false;
+            synchronized(newRow){
+                Row existingRow = this.cache.putIfAbsent(id, newRow); //takes care of the insert
+                if(existingRow != null){
+                    synchronized(existingRow){
+                        //we inserted if the most recent committed was null or had null data
+                        RowData mostRecent = existingRow.chooseMostRecentCommitted(tx, txId);
+                        didInsert = mostRecent == null || mostRecent.data == null;
+                        
+                        //takes care of the "or update"
+                        existingRow.rowData.put(txId, newData);
+                        this.uncommittedRows.put(id, existingRow);
+                    }
+                }
+                else{
+                    didInsert = true;
+                    this.uncommittedRows.put(id, newRow);
+                }
+            }
+
+            setLastActivity(System.currentTimeMillis());
+            dumpCache();
+
+            return didInsert; //if none existed, then we inserted
+
+        }finally{
+            writeComplete();
         }
-        
-        Row newRow = new Row(id, newData);
-        
-        Row existed = this.cache.putIfAbsent(id, newRow); //takes care of the insert
-        synchronized(existed){
-            //takes care of the "or update"
-            existed.rowData.put(txId, newData);
-        }
-        
-        setLastActivity(System.currentTimeMillis());
-        dumpCache();
-        
-        return existed == null; //if none existed, then we inserted
     }
 
     @Override
     public void deleteRow(String id) throws KeyNotFoundException {
-        ensureReady();
-        
-        Row toRemove = this.cache.get(id);
-        
-        if(toRemove == null){
-            throw new KeyNotFoundException(id);
-        }
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
-        
-        RowData newData = new RowData(txId, null);
-        if(tx == null){
-            newData.commitId = txId;
-        }
+        ensureWriteReady();
+        try{
 
-        
-        synchronized(toRemove){
-            RowData rData = toRemove.chooseMostRecentCommitted(tx);
-            if(rData == null || rData.data == null){
+            Row row = this.cache.get(id);
+
+            if(row == null){
                 throw new KeyNotFoundException(id);
             }
-            
-            //a RowData that is null means it was deleted.
-            toRemove.rowData.put(txId, newData);
+
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
+
+            RowData newData = new RowData(txId, null, id);
+            if(tx == null){
+                newData.commitId = txId;
+            }
+
+
+            synchronized(row){
+                RowData rData = row.chooseMostRecentCommitted(tx, txId);
+                if(rData == null || rData.data == null){
+                    throw new KeyNotFoundException(id);
+                }
+
+                //a RowData that is null means it was deleted.
+                row.rowData.put(txId, newData);
+                this.uncommittedRows.put(row.rowId, row);
+            }
+
+            setLastActivity(System.currentTimeMillis());
+            dumpCache();
+        }finally{
+            writeComplete();
         }
-        
-        setLastActivity(System.currentTimeMillis());
-        dumpCache();
     }
 
     @Override
     public int deleteAll(XpathQuery query) {
-        ensureReady();
-        
-        query.setConversionService(this.getConversionService());
-        
-        Transaction tx = this.getTransactionManager().getTransaction();
-        long txId = getTxId(tx);
-        
-        Matcher<Element> rowMatcher = query.getRowMatcher();
-        Iterator<Map.Entry<String, Row>> it = this.cache.entrySet().iterator();
-        
-        int numRemoved = 0;
-        
-        while(it.hasNext()){
-            Map.Entry<String, Row> entry = it.next();
-            
-            Row row = entry.getValue();
-            synchronized(row){
-                RowData rData = row.chooseMostRecentCommitted(tx);
-                if(rData == null || rData.data == null){
-                    continue;
-                }
-                
-                if(rowMatcher.matches(rData.data)){
-                    RowData newData = new RowData(txId, null);
-                    if(tx == null){
-                        newData.commitId = txId;
+        ensureWriteReady();
+        try{
+
+            query.setConversionService(this.getConversionService());
+
+            Transaction tx = this.getTransactionManager().getTransaction();
+            long txId = getTxId(tx);
+
+            Matcher<Element> rowMatcher = query.getRowMatcher();
+            Iterator<Map.Entry<String, Row>> it = this.cache.entrySet().iterator();
+
+            int numRemoved = 0;
+
+            while(it.hasNext()){
+                Map.Entry<String, Row> entry = it.next();
+
+                Row row = entry.getValue();
+                synchronized(row){
+                    RowData rData = row.chooseMostRecentCommitted(tx, txId);
+                    if(rData == null || rData.data == null){
+                        continue;
                     }
-                    row.rowData.put(txId, newData);
-                    
-                    numRemoved++;
+
+                    if(rowMatcher.matches(rData.rowElement)){
+                        RowData newData = new RowData(txId, null, row.rowId);
+                        if(tx == null){
+                            newData.commitId = txId;
+                        }
+                        row.rowData.put(txId, newData);
+                        this.uncommittedRows.put(row.rowId, row);
+
+                        numRemoved++;
+                    }
+                }
+            }
+
+            setLastActivity(System.currentTimeMillis());
+
+            if(numRemoved > 0)
+                dumpCache();
+
+            return numRemoved;
+        }finally{
+            writeComplete();
+        }
+    }
+    
+    //</editor-fold>
+    
+    private void update(){
+        
+        Set<Row> rowsToRemove = new HashSet<>();
+        Set<Long> remainingTransactions = new HashSet<>();
+        
+        Iterator<Row> it = this.uncommittedRows.values().iterator();
+        while(it.hasNext()){
+            Row row = it.next();
+            synchronized(row){
+                it.remove();
+                
+                if(row.cleanup()){
+                    rowsToRemove.add(row);
+                }
+                else{
+                    //remember the remaining transactions
+                    for(RowData data : row.rowData.values()){
+                        if(data.commitId == -1){
+                            remainingTransactions.add(data.transactionId);
+                        }
+                    }
                 }
             }
         }
         
-        setLastActivity(System.currentTimeMillis());
+        if(rowsToRemove.size() > 0){
+            //we have to lock the table in order to actually remove any rows.
+            try{
+                this.getTableLock();
+                
+                for(Row row : rowsToRemove){
+                    //doublecheck - do another cleanup, don't want to be sloppy here.
+                    if(row.cleanup()){
+                        this.cache.remove(row.rowId);
+                    }
+                    else{
+                        //remember the remaining transactions
+                        for(RowData data : row.rowData.values()){
+                            if(data.commitId == -1){
+                                remainingTransactions.add(data.transactionId);
+                            }
+                        }
+                    }
+                }
+            }
+            finally{
+                this.releaseTableLock();
+            }
+        }
         
-        if(numRemoved > 0)
-            dumpCache();
-        
-        return numRemoved;
+        //unbind the engine from all transactions except the remaining transactions
+        this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions);
     }
-    
-    //</editor-fold>
 
     @Override
     protected boolean spinUp() {
@@ -411,23 +508,25 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 List<Element> rowList = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
                 
                 for(int i = rowList.size() - 1; i >= 0; i--){
-                    Element row = rowList.get(i).detach();
+                    Element row = rowList.get(i);
                     
                     if(row.getChildren().isEmpty()){
                         continue;
                     }
-                    Element data = row.getChildren().get(0);
+                    Element data = row.getChildren().get(0).detach();
                     
                     String id = getId(row);
-                    long txId = -1;
-                    long commitId = -1;
+                    //default it to zero so that we know it's committed but if we don't get an actual
+                    //value for the commit then we have the lowest value.
+                    long txId = 0;
+                    long commitId = 0;
                     
                     String a = row.getAttributeValue("tx", XFlatDatabase.xFlatNs);
                     if(a != null && !"".equals(a)){
                         try{
                             txId = Long.parseLong(a);
                         }catch(NumberFormatException ex){
-                            //just leave it as -1.
+                            //just leave it as 0.
                         }
                     }
                     a = row.getAttributeValue("commit", XFlatDatabase.xFlatNs);
@@ -435,11 +534,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         try{
                             commitId = Long.parseLong(a);
                         }catch(NumberFormatException ex){
-                            //just leave it as -1.
+                            //just leave it as 0.
                         }
                     }
                     
-                    RowData rData = new RowData(txId, data);
+                    RowData rData = new RowData(txId, data, id);
                     rData.commitId = commitId;
                     
                     Row newRow = new Row(id, rData);
@@ -458,6 +557,18 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 operationsReady.notifyAll();
             }
         }
+        
+        //schedule the update task
+        this.getExecutorService().scheduleWithFixedDelay(new Runnable(){
+                @Override
+                public void run() {
+                    if(state.get() == EngineState.SpinningDown || state.get() == EngineState.SpunDown){
+                        throw new RuntimeException("task termination");
+                    }
+                    
+                    update();
+                }
+            }, 500, 500, TimeUnit.MILLISECONDS);
         
         return true;
     }
@@ -479,112 +590,116 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     /**
-     * Called before every write to ensure we are ready to write.
-     * If the engine is spinning down then we throw because engines are read-only
-     * when spinning down.
+     * Overrides ensureWriteReady to additionally check if the 
+     * engine has fully finished spinning up
      */
-    private void ensureReady(){
-        EngineState state = this.state.get();
-        if(state == EngineState.SpunDown ||
-                state == EngineState.SpinningDown){
-            throw new EngineStateException("Write operations not supported on an engine that is spinning down", state);
-        }
+    @Override
+    protected void ensureWriteReady(){
+        super.ensureWriteReady();
         
-        if(operationsReady.get() && state == EngineState.Running){
-            return;
-        }
-        
-        synchronized(operationsReady){
-            while(!operationsReady.get() && this.state.get() != EngineState.Running){
-                try {
-                    operationsReady.wait();
-                } catch (InterruptedException ex) {
-                    if(operationsReady.get()){
-                        //oh ok we're all good to go
-                        return;
+        //check if we're not yet running, if so wait until we are running
+        if(!operationsReady.get() || state.get() != EngineState.Running){         
+            synchronized(operationsReady){
+                while(!operationsReady.get() && this.state.get() != EngineState.Running){
+                    try {
+                        operationsReady.wait();
+                    } catch (InterruptedException ex) {
+                        if(operationsReady.get()){
+                            //oh ok we're all good to go
+                            return;
+                        }
+                        throw new XflatException("Interrupted while waiting for engine to be ready");
                     }
-                    throw new XflatException("Interrupted while waiting for engine to be ready");
                 }
             }
         }
     }
     
+    
     private ConcurrentMap<Cursor<Element>, String> openCursors = new ConcurrentHashMap<>();
     
     @Override
     protected boolean spinDown(final SpinDownEventHandler completionEventHandler) {
-        //not much to do since everything's in the cache, just dump the cache
-        //and set read-only mode.
-        if(!this.state.compareAndSet(EngineState.Running, EngineState.SpinningDown)){
-            //we're in the wrong state.
-            return false;
-        }
+        
+        try{
+            this.getTableLock();
+        
+            //not much to do since everything's in the cache, just dump the cache
+            //and set read-only mode.
+            if(!this.state.compareAndSet(EngineState.Running, EngineState.SpinningDown)){
+                //we're in the wrong state.
+                return false;
+            }
 
-        if(log.isTraceEnabled())
-            log.trace("Spinning down");
-        
-        
-        final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
-        if(this.cache != null && lastModified.get() >= lastDump.get()){
-            //schedule immediate dump
-             cacheDumpTask.set(this.getExecutorService().schedule(
-                new Runnable(){
+            if(log.isTraceEnabled())
+                log.trace("Spinning down");
+
+
+            final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
+            if(this.cache != null && lastModified.get() >= lastDump.get()){
+                //schedule immediate dump
+                 cacheDumpTask.set(this.getExecutorService().schedule(
+                    new Runnable(){
+                        @Override
+                        public void run() {
+                            try{
+                                dumpCacheNow();
+                            }
+                            catch(Exception ex){
+                                log.warn("Unable to dump cached data", ex);
+                            }
+                        }
+                    }, 0, TimeUnit.MILLISECONDS));
+            }
+
+            if(openCursors.isEmpty() && (cacheDumpTask.get() == null || cacheDumpTask.get().isDone())){
+                this.state.set(EngineState.SpunDown);
+
+                if(log.isTraceEnabled())
+                    log.trace("Spin down complete (immediate)");
+
+                if(completionEventHandler != null)
+                    completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+
+                //we're ok to finish our spin down now
+                return forceSpinDown();
+
+            }
+
+            Runnable spinDownTask = new Runnable(){
                     @Override
                     public void run() {
-                        try{
-                            dumpCacheNow();
+                        if(!openCursors.isEmpty())
+                            return;
+
+                        if(cacheDumpTask.get() != null && !cacheDumpTask.get().isDone()){
+                            return;
                         }
-                        catch(Exception ex){
-                            log.warn("Unable to dump cached data", ex);
+
+                        if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
+                            throw new RuntimeException("cancel task - in wrong state");
                         }
+
+                        if(log.isTraceEnabled())
+                            log.trace(String.format("Spin down complete (task)"));
+
+                        if(completionEventHandler != null)
+                            completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+                        //we're ok to finish our spin down now
+                        forceSpinDown();
+
+                        throw new RuntimeException("Scheduled Task Complete");
+
                     }
-                }, 0, TimeUnit.MILLISECONDS));
+                };
+            this.getExecutorService().scheduleWithFixedDelay(
+                spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
+
+            return true;
         }
-        
-        if(openCursors.isEmpty() && (cacheDumpTask.get() == null || cacheDumpTask.get().isDone())){
-            this.state.set(EngineState.SpunDown);
-            
-            if(log.isTraceEnabled())
-                log.trace("Spin down complete (immediate)");
-            
-            if(completionEventHandler != null)
-                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-
-            //we're ok to finish our spin down now
-            return forceSpinDown();
-            
+        finally{
+            this.releaseTableLock();
         }
-
-        Runnable spinDownTask = new Runnable(){
-                @Override
-                public void run() {
-                    if(!openCursors.isEmpty())
-                        return;
-
-                    if(cacheDumpTask.get() != null && !cacheDumpTask.get().isDone()){
-                        return;
-                    }
-
-                    if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
-                        throw new RuntimeException("cancel task - in wrong state");
-                    }
-
-                    if(log.isTraceEnabled())
-                        log.trace(String.format("Spin down complete (task)"));
-        
-                    if(completionEventHandler != null)
-                        completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-                    //we're ok to finish our spin down now
-                    forceSpinDown();
-
-                    throw new RuntimeException("Scheduled Task Complete");
-
-                }
-            };
-        this.getExecutorService().scheduleWithFixedDelay(
-            spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
-
-        return true;
     }
 
     @Override
@@ -773,12 +888,12 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             while(toIterate.hasNext()){
                 Row next = toIterate.next();
                 synchronized(next){
-                    RowData rData = next.chooseMostRecentCommitted(tx);
+                    RowData rData = next.chooseMostRecentCommitted(tx, txId);
                     if(rData == null || rData.data == null){
                         continue;
                     }
                     
-                    if(rowMatcher.matches(rData.data)){
+                    if(rowMatcher.matches(rData.rowElement)){
                         //found a matching row
                         peekCount++;
                         this.peek = rData.data.clone();

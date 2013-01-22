@@ -27,6 +27,7 @@ import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -39,6 +40,7 @@ import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import test.Utils;
+import static org.mockito.Mockito.*;
 
 /**
  *
@@ -56,7 +58,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     @BeforeClass
     public static void setUpClass() {
         executorService = new ScheduledThreadPoolExecutor(4);
-        conversionService = new DefaultConversionService();
+        conversionService = new DefaultConversionService();        
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
         
@@ -193,6 +195,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         TEngine instance = this.createInstance(ctx);
         instance.setExecutorService(executorService);
         instance.setConversionService(conversionService);
+        instance.setTransactionManager(ctx.transactionManager);
         
         return instance;
     }
@@ -1255,6 +1258,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         public File workspace;
         
         public long id;
+        
+        public EngineTransactionManager transactionManager = new ThreadContextTransactionManager();
         
         public final Map<String, Object> additionalContext;
         

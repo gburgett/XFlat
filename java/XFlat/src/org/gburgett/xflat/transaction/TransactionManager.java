@@ -36,28 +36,5 @@ public interface TransactionManager {
      */
     public Transaction openTransaction(TransactionOptions options);
     
-    /**
-     * Gets a new commit ID for a transactionless write operation.
-     * All transactionless writes can be thought of as transactions that are
-     * automatically committed.  This allows us to provide isolation between
-     * transactions and transactionless writes.
-     * @return 
-     */
-    public long transactionlessCommitId();
     
-    /**
-     * Checks to see if the given transaction ID has been committed.  If so,
-     * returns the transaction's commit ID.  Otherwise returns -1.
-     * @param transactionId The ID of the transaction to check.
-     * @return the transaction's commit ID if committed, -1 otherwise.
-     */
-    public long isTransactionCommitted(long transactionId);
-    
-    /**
-     * Checks to see if the given transaction ID has been reverted.  If so,
-     * returns true, otherwise false.
-     * @param transactionId The ID of the transaction to check.
-     * @return true if the transaction is reverted, false otherwise.
-     */
-    public boolean isTransactionReverted(long transactionId);
 }

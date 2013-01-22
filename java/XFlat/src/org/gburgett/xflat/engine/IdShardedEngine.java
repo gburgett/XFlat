@@ -55,6 +55,13 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         return super.isSpunDown() && crossShardQueries.isEmpty();
     }
     
+    /**
+     * Gets a list of shard intervals over which the query should be executed.
+     * This is obtained by dissecting the query according to ID and then
+     * looking for known shards that intersect the dissected query.
+     * @param query
+     * @return 
+     */
     private List<Interval<T>> getExecutionPlan(XpathQuery query){
         final IntervalProvider<T> provider = config.getIntervalProvider();
         
@@ -74,14 +81,18 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public void insertRow(final String id, final Element data) throws DuplicateKeyException {
-        
-        doWithEngine(getInterval(id), new EngineAction(){
-            @Override
-            public Object act(Engine engine) {
-                engine.insertRow(id, data);
-                return null;
-            }
-        });
+        ensureWriteReady();
+        try{
+            doWithEngine(getInterval(id), new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.insertRow(id, data);
+                    return null;
+                }
+            });
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
@@ -95,13 +106,9 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public Cursor<Element> queryTable(XpathQuery query) {
+    public Cursor<Element> queryTable(final XpathQuery query) {
         query.setConversionService(this.getConversionService());
         
-        return internalQuery(query);
-    }
-    
-    private Cursor<Element> internalQuery(final XpathQuery query){
         List<Interval<T>> shardIntervals = getExecutionPlan(query);
         
         //no known shards intersect the query
@@ -128,82 +135,112 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
 
     @Override
     public void replaceRow(final String id, final Element data) throws KeyNotFoundException {
-        doWithEngine(getInterval(id), new EngineAction(){
-            @Override
-            public Object act(Engine engine) {
-                engine.replaceRow(id, data);
-                return null;
-            }
-        });
+        ensureWriteReady();
+        try{
+            doWithEngine(getInterval(id), new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.replaceRow(id, data);
+                    return null;
+                }
+            });
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
     public boolean update(final String id, final XpathUpdate update) throws KeyNotFoundException {
-        return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
-            @Override
-            public Boolean act(Engine engine) {
-                return engine.update(id, update);
-            }
-        });
+        ensureWriteReady();
+        try{
+            return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
+                @Override
+                public Boolean act(Engine engine) {
+                    return engine.update(id, update);
+                }
+            });
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
     public int update(final XpathQuery query, final XpathUpdate update) {
-        query.setConversionService(this.getConversionService());
-        update.setConversionService(this.getConversionService());
-        
-        EngineAction<Integer> action = new EngineAction<Integer>(){
-            @Override
-            public Integer act(Engine engine) {
-                return engine.update(query, update);
+        ensureWriteReady();
+        try{
+            query.setConversionService(this.getConversionService());
+            update.setConversionService(this.getConversionService());
+
+            EngineAction<Integer> action = new EngineAction<Integer>(){
+                @Override
+                public Integer act(Engine engine) {
+                    return engine.update(query, update);
+                }
+            };
+
+            int updated = 0;
+            for(Interval<T> shardInterval : this.getExecutionPlan(query)){
+                updated += doWithEngine(shardInterval, action);
             }
-        };
-        
-        int updated = 0;
-        for(Interval<T> shardInterval : this.getExecutionPlan(query)){
-            updated += doWithEngine(shardInterval, action);
+
+            return updated;
+        }finally{
+            writeComplete();
         }
-        
-        return updated;
     }
 
     @Override
     public boolean upsertRow(final String id, final Element data) {
-        return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
-            @Override
-            public Boolean act(Engine engine) {
-                return engine.upsertRow(id, data);
-            }
-        });
+        ensureWriteReady();
+        try{
+            return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
+                @Override
+                public Boolean act(Engine engine) {
+                    return engine.upsertRow(id, data);
+                }
+            });
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
     public void deleteRow(final String id) throws KeyNotFoundException {
-        doWithEngine(getInterval(id), new EngineAction(){
-            @Override
-            public Object act(Engine engine) {
-                engine.deleteRow(id);
-                return null;
-            }
-        });
+        ensureWriteReady();
+        try{
+            doWithEngine(getInterval(id), new EngineAction(){
+                @Override
+                public Object act(Engine engine) {
+                    engine.deleteRow(id);
+                    return null;
+                }
+            });
+        }finally{
+            writeComplete();
+        }
     }
 
     @Override
     public int deleteAll(final XpathQuery query) {
-        query.setConversionService(this.getConversionService());
-        EngineAction<Integer> action = new EngineAction<Integer>(){
-            @Override
-            public Integer act(Engine engine) {
-                return engine.deleteAll(query);
+        ensureWriteReady();
+        try{
+            query.setConversionService(this.getConversionService());
+            EngineAction<Integer> action = new EngineAction<Integer>(){
+                @Override
+                public Integer act(Engine engine) {
+                    return engine.deleteAll(query);
+                }
+            };
+
+            int count = 0;
+            for(Interval<T> shard : getExecutionPlan(query)){
+                count += doWithEngine(shard, action);
             }
-        };
-        
-        int count = 0;
-        for(Interval<T> shard : getExecutionPlan(query)){
-            count += doWithEngine(shard, action);
+
+            return count;
+        }finally{
+            writeComplete();
         }
-        
-        return count;
     }
 
     

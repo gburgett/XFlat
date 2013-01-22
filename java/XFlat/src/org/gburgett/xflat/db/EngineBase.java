@@ -4,20 +4,23 @@
  */
 package org.gburgett.xflat.db;
 
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.gburgett.xflat.EngineStateException;
+import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionService;
+import org.gburgett.xflat.db.EngineBase.RowData;
 import org.gburgett.xflat.transaction.Transaction;
 import org.gburgett.xflat.transaction.TransactionManager;
-import org.jdom2.Attribute;
 import org.jdom2.Element;
 
 /**
@@ -150,22 +153,180 @@ public abstract class EngineBase implements Engine {
         this.conversionService = conversionService;
     }
     
-    private TransactionManager transactionManager;
+    private EngineTransactionManager transactionManager;
     /**
      * Gets the transactionManager.
      */
-    public TransactionManager getTransactionManager(){
+    protected EngineTransactionManager getTransactionManager(){
         return this.transactionManager;
     }
     /**
      * Sets the transactionManager.
      */
-    public void setTransactionManager(TransactionManager transactionManager){
+    protected void setTransactionManager(EngineTransactionManager transactionManager){
         this.transactionManager = transactionManager;
     }
     
     //</editor-fold>
 
+    
+    private final AtomicLong tableLock = new AtomicLong(-1);
+    private int tableLockCount = 0;
+    private final Object tableLockSync = new Object();
+    
+    private final AtomicInteger writesInProgress = new AtomicInteger(0);
+    
+    /**
+     * Called before every write to ensure we are ready to write. <br/>
+     * This method also checks if there is a current table lock, and increments
+     * the {@link #writesInProgress} counter.
+     * <p/>
+     * If the engine is spinning down then we throw because engines are read-only
+     * when spinning down.
+     */
+    protected void ensureWriteReady(){
+        //check if there is a write lock on the table
+        long tblLock = tableLock.get();
+        if(tblLock != -1 && tblLock != Thread.currentThread().getId()){
+            synchronized(tableLockSync){
+                tblLock = tableLock.get();
+                while(tblLock != -1 && tblLock != Thread.currentThread().getId()){                    
+                    try {
+                        tableLockSync.wait();
+                    } catch (InterruptedException ex) {                        
+                    }
+                    
+                    tblLock = tableLock.get();
+                }
+            }
+        }
+        
+        //check the engine state
+        EngineState state = this.state.get();
+        if(state == EngineState.SpunDown ||
+                state == EngineState.SpinningDown){
+            throw new EngineStateException("Write operations not supported on an engine that is spinning down", state);
+        }
+        
+        //we're about to write, so the engine must be bound to the current transaction
+        this.transactionManager.bindEngineToCurrentTransaction(this);
+        
+        //increment the number of writes in progress
+        int inprog = this.writesInProgress.incrementAndGet();
+        if(inprog < 1){
+            //dunno how we got here, try to correct
+            this.writesInProgress.compareAndSet(inprog, 1);
+            log.info(String.format("Writes in progress was less than 1: %d", inprog));
+        }
+    }
+    
+    /**
+     * Called inside a finally block within every write operation -
+     * this is a synchronizing measure for write locks
+     */
+    protected void writeComplete(){
+        //decrement the number of writes in progress
+        int inprog = this.writesInProgress.decrementAndGet();
+        if(inprog < 0){
+            this.writesInProgress.compareAndSet(inprog, 0);
+            log.info(String.format("Writes in progress was less than 1: %d", inprog));
+        }
+    }
+    
+    /**
+     * Obtains a write lock on the table for this thread.
+     * <p/>
+     * New write operations will block until the lock is released with {@link #releaseTableLock() }.
+     * This method will wait after obtaining the lock until all in-progress write operations
+     * have terminated.
+     * <p/>
+     * Since I don't exactly trust this to never throw an exception, it would of
+     * course be good practice to always use the following pattern:
+     * <pre>
+     * try{
+     *      engine.getTableLock();
+     * 
+     *      //do stuff
+     * }
+     * finally{
+     *      engine.releaseTableLock();
+     * }
+     * </pre>
+     */
+    protected void getTableLock(){
+        long thread = Thread.currentThread().getId();
+        
+        if(this.tableLock.get() == thread){
+            this.tableLockCount++;
+            return;
+        }
+        
+        synchronized(tableLockSync){
+            while(!this.tableLock.compareAndSet(-1, thread)){
+                if(this.tableLock.get() == thread){
+                    this.tableLockCount++;
+                    return;
+                }
+                
+                try {
+                    //wait until we can obtain the lock for this thread.
+                    tableLockSync.wait();
+                } catch (InterruptedException ex) {
+                }
+            }
+            this.tableLockCount++;
+            
+            //spin wait on writes in progress - this should only decrement while we have a write lock            
+            long start = System.currentTimeMillis();
+            long nanos = System.nanoTime();
+            while(this.writesInProgress.get() > 0){
+                
+                //if we've been waiting longer than 500ms something is amiss
+                if(System.currentTimeMillis() - start > 500){
+                    //release the lock before throwing
+                    this.tableLock.compareAndSet(thread, -1);
+                    this.tableLockCount--;
+                    throw new XflatException(String.format("Cannot obtain table lock - %d long running writes in progress", this.writesInProgress.get()));
+                }
+                
+                //if we've been spin-waiting longer than 500ns then sleep the thread
+                if(System.nanoTime() - nanos > 500){
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        }
+        
+    }
+    
+    /**
+     * Releases a write lock on the table that was obtained by this thread.
+     * If the current thread did not own the lock then this method does nothing.
+     * <p/>
+     * ALWAYS call this in a finally block after calling {@link #getTableLock() }
+     */
+    protected void releaseTableLock(){
+        if(this.tableLock.get() != Thread.currentThread().getId()){
+            return;
+        }
+        
+        synchronized(tableLockSync){
+            if(this.tableLock.get() != Thread.currentThread().getId()){
+                return;
+            }
+            
+            if(--this.tableLockCount == 0){
+                //last reentrant release encountered
+                if(this.tableLock.compareAndSet(Thread.currentThread().getId(), -1)){
+                    //notify of lock released
+                    tableLockSync.notifyAll();
+                }
+            }
+        }
+    }
+    
     
     /**
      * Saves metadata to the given element.  Metadata is things like indexes
@@ -202,8 +363,7 @@ public abstract class EngineBase implements Engine {
         row.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
-       
-       
+
     /**
      * Checks whether this engine has any transactional updates in an uncommitted 
      * or unreverted state.
@@ -248,31 +408,15 @@ public abstract class EngineBase implements Engine {
          * <p/>
          * ALWAYS invoke this while synchronized on the Row.
          * @param currentTransaction The current transaction, or null.
+         * @param transactionId The transaction ID to use if the current transaction is null
          * @return The most recent committed RowData in this row, committed before the transaction.
          */
-        public RowData chooseMostRecentCommitted(Transaction currentTransaction){
-            if(currentTransaction == null){
-                return chooseMostRecentCommitted(null, Long.MAX_VALUE);
+        public RowData chooseMostRecentCommitted(Transaction currentTransaction, long transactionId){
+            if(currentTransaction != null){
+                //override the given transaction ID just in case
+                transactionId = currentTransaction.getTransactionId();
             }
             
-            return chooseMostRecentCommitted(currentTransaction, currentTransaction.getTransactionId());
-        }
-        
-        /**
-         * Chooses the most recent committed RowData that was committed before the given transaction ID.
-         * This prevents dirty reads in a non-transactional context by having a synchronizing transaction ID
-         * which can be obtained from {@link TransactionManager#transactionlessCommitId() }
-         * <p/>
-         * ALWAYS invoke this while synchronized on the Row.
-         * @param snapshotId The Transaction ID representing the time at which a snapshot of the data should be obtained.
-         * @return The most recent committed RowData in this row, committed before the given snapshot.
-         */
-        public RowData chooseMostRecentCommitted(Long snapshotId){
-            return chooseMostRecentCommitted(null, snapshotId);
-        }
-        
-        private RowData chooseMostRecentCommitted(Transaction currentTransaction, long currentTxId){
-        
             RowData ret = null;
             long retCommitId = -1;
 
@@ -285,8 +429,8 @@ public abstract class EngineBase implements Engine {
                 //committed version
                 if(currentTransaction != null && !currentTransaction.isReverted()){
                     
-                    if(data.transactionId > -1 && currentTxId == data.transactionId){
-                        //this row data is the data in the current transaction
+                    if(data.transactionId > -1 && transactionId == data.transactionId){
+                        //this row data is in the current transaction
                         return data;
                     }
                 }
@@ -299,7 +443,7 @@ public abstract class EngineBase implements Engine {
 
                 if(data.commitId > -1){
                     //this row data has been committed
-                    if(currentTxId > data.commitId){
+                    if(transactionId > data.commitId){
                         //the current transaction is null or began after the transaction was committed
 
                         if(retCommitId < data.commitId){
@@ -321,8 +465,89 @@ public abstract class EngineBase implements Engine {
 
             return ret;
         }
-
         
+        /**
+         * Chooses the most recent committed RowData that was committed before the given transaction ID.
+         * This prevents dirty reads in a non-transactional context by having a synchronizing transaction ID
+         * which can be obtained from {@link TransactionManager#transactionlessCommitId() }
+         * <p/>
+         * ALWAYS invoke this while synchronized on the Row.
+         * @param snapshotId The Transaction ID representing the time at which a snapshot of the data should be obtained.
+         * @return The most recent committed RowData in this row, committed before the given snapshot.
+         */
+        public RowData chooseMostRecentCommitted(Long snapshotId){
+            return chooseMostRecentCommitted(null, snapshotId);
+        }
+
+        /**
+         * Cleans up the transactional data in this row.
+         * Returns true if this row can then be removed because it contains no data.
+         * @param (optional) A set of transaction IDs that is added to when it is discovered
+         * that a transaction has been newly committed (and the associated RowData's commit ID
+         * is updated).
+         * @return true if this row has no RowData or its only RowData is "nothing".
+         */
+        public boolean cleanup(){
+            
+            RowData mostRecent = null;
+            long lowest = transactionManager.getLowestOpenTransaction();
+            
+            Set<RowData> toRemove = null;
+                    
+            Iterator<RowData> it = rowData.values().iterator();
+            while(it.hasNext()){
+                RowData data = it.next();
+                
+                if(data.commitId == -1){
+                    data.commitId = transactionManager.isTransactionCommitted(data.transactionId);
+                    if(data.commitId == -1){
+                        //the data is uncommitted
+                        
+                        if(transactionManager.isTransactionReverted(data.transactionId)){
+                            //don't need this anymore
+                            it.remove();
+                        }
+                        continue;
+                    }
+                }
+                
+                //the data is committed
+                
+                if(mostRecent == null){
+                    mostRecent = data;
+                }
+                else{
+                    if(data.commitId <= mostRecent.commitId){
+                        //the most recent data is newer
+                        if(mostRecent.commitId < lowest){
+                            //there is no open transaction that would see this data instead of mostRecent
+                            it.remove();
+                        }
+                    }
+                    else{
+                        //the data is newer
+                        if(data.commitId < lowest){
+                            //there is no open transaction that would see mostRecent instead of this data
+                            if(toRemove == null){
+                                toRemove = new HashSet<>();
+                            }
+                            toRemove.add(mostRecent);
+                            mostRecent = data;
+                        }
+                    }
+                }
+            }
+            
+            //remove the ones we couldn't remove during the iteration
+            if(toRemove != null && toRemove.size() > 0){
+                for(RowData data : toRemove){
+                    rowData.remove(data.commitId);                    
+                }
+            }
+            
+            //if there's no more row datas, or there is only one row data and it's value is "nothing", then return true.
+            return rowData.isEmpty() || (rowData.size() == 1 && rowData.values().iterator().next().data == null);
+        }
     }
     
     protected class RowData{
@@ -330,6 +555,11 @@ public abstract class EngineBase implements Engine {
          * A snapshot of the data in the row, possibly uncommitted.
          */
         public Element data = null;
+        
+        /**
+         * A "db:row" element that wraps the data.  This is useful for queries.
+         */
+        public Element rowElement = null;
         
         /**
          * The ID of the transaction that created this data snapshot
@@ -346,10 +576,16 @@ public abstract class EngineBase implements Engine {
             this.transactionId = txId;
         }
         
-        public RowData(long txId, Element data){
-            this.data = data;
+        public RowData(long txId, Element data, String id){
+            if(data != null){            
+                this.data = data;
+                this.rowElement = new Element("row", XFlatDatabase.xFlatNs)
+                        .setAttribute("id", id, XFlatDatabase.xFlatNs)
+                        .setContent(data);
+            }
             this.transactionId = txId;
         }
+        
     }
     
     

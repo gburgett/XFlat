@@ -26,6 +26,7 @@ import org.gburgett.xflat.query.Interval;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.NumericIntervalProvider;
 import org.gburgett.xflat.query.IntervalProvider;
+import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -105,6 +106,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 return ret;
             }
         });
+        db.setTransactionManager(new ThreadContextTransactionManager());
         
         IntervalProvider provider = NumericIntervalProvider.forInteger(1, 100);
         ctx.additionalContext.put("rangeProvider", provider);
