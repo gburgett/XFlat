@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.ShardsetConfig;
@@ -28,6 +29,7 @@ import org.gburgett.xflat.query.NumericIntervalProvider;
 import org.gburgett.xflat.query.IntervalProvider;
 import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
 import org.gburgett.xflat.util.DocumentFileWrapper;
+import org.gburgett.xflat.util.FakeDocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
@@ -56,7 +58,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         final Map<String, Document> docs = new ConcurrentHashMap<>();
         ctx.additionalContext.put("docs", docs);
         
-        XFlatDatabase db = new XFlatDatabase(workspace, executorService);
+        XFlatDatabase db = new XFlatDatabase(workspace, ctx.executorService);
         db.extendConversionService(new PojoConverter(){
             @Override
             public ConversionService extend(ConversionService service) {
@@ -106,8 +108,8 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 return ret;
             }
         });
-        db.setTransactionManager(new ThreadContextTransactionManager());
-        
+        db.setTransactionManager(ctx.transactionManager);
+                
         IntervalProvider provider = NumericIntervalProvider.forInteger(1, 100);
         ctx.additionalContext.put("rangeProvider", provider);
         ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
@@ -132,6 +134,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         
         IdShardedEngine ret = new IdShardedEngine(file, name, cfg);
         setMetadataFactory(ret, new TableMetadataFactory(db, file));
+        
         return ret;
     }
 

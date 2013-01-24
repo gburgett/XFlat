@@ -16,7 +16,11 @@ public class TransactionException extends RuntimeException {
      *
      * @param msg the detail message.
      */
-    TransactionException(String msg) {
+    protected TransactionException(String msg, Exception inner) {
+        super(msg, inner);
+    }
+    
+    protected TransactionException(String msg) {
         super(msg);
     }
 }

@@ -50,6 +50,11 @@ public class IdAccessor<T> {
      * @return The accessor, which may have already been created and cached.
      */
     public static <U> IdAccessor<U> forClass(Class<U> pojoType){
+        if(pojoType.isPrimitive() ||
+                String.class.equals(pojoType)){
+            return null;
+        }
+        
         IdAccessor<U> ret = (IdAccessor<U>)cachedAccessors.get(pojoType);
         if(ret != null){
             return ret;

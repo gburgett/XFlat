@@ -123,7 +123,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 File file = new File(directory, name + ".xml");
                 this.knownShards.put(interval, file);
                 
-                metadata = this.getMetadataFactory().makeTableMetadata(name, file);
+                metadata = this.getMetadataFactory().makeTableMetadata(this.getTableName(), file);
                 metadata.config = TableConfig.Default; //not even really used for our purposes
                 
                 TableMetadata weWereLate = openShards.putIfAbsent(interval, metadata);
@@ -154,21 +154,12 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             throw new XflatException("Attempt to read or write to an engine in an uninitialized state");
         }
         
-        //all operations are writes for the purposes of the sharded engine.
-        //NOT TRUE! Need to fix this!
-        ensureWriteReady();
         try{
-        
-            try{
-                return action.act(getEngine(range));
-            }
-            catch(EngineStateException ex){
-                //try one more time with a potentially new engine, if we still fail then let it go
-                return action.act(getEngine(range));
-            }
-        
-        }finally{
-            writeComplete();
+            return action.act(getEngine(range));
+        }
+        catch(EngineStateException ex){
+            //try one more time with a potentially new engine, if we still fail then let it go
+            return action.act(getEngine(range));
         }
     }
     
@@ -213,6 +204,19 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         return false;
     }
         
+    @Override
+    public void revert(long txId, boolean isRecovering){
+        if(!isRecovering){
+            //the individual shard engines will also have been registered.
+            return;
+        }
+        
+        //we will need to revert over all known shards in order to recover.
+        for(Interval<T> interval : this.knownShards.keySet()){
+            this.getEngine(interval).revert(txId, isRecovering);
+        }
+    }
+    
     @Override
     protected boolean spinUp() {
         if(!this.state.compareAndSet(EngineState.Uninitialized, EngineState.SpinningUp)){

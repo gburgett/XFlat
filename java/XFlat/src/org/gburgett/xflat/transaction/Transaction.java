@@ -14,7 +14,7 @@ public interface Transaction extends AutoCloseable {
     
     void commit() throws TransactionException;
     
-    void rollback();
+    void revert();
     
     void setRollbackOnly();
     

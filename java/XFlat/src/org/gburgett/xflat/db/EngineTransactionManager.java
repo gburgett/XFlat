@@ -12,7 +12,7 @@ import org.gburgett.xflat.transaction.TransactionManager;
  *
  * @author Gordon
  */
-public abstract class EngineTransactionManager implements TransactionManager {
+public abstract class EngineTransactionManager implements TransactionManager, AutoCloseable {
     
     /**
      * Gets a new commit ID for a transactionless write operation.
@@ -121,5 +121,23 @@ public abstract class EngineTransactionManager implements TransactionManager {
         
         return id;
     }
+
+    /**
+     * Returns true if any transactions are currently open.
+     * @return 
+     */
+    public abstract boolean anyOpenTransactions();
+ 
+    /**
+     * Attempts to recover from an unexpected shutdown if necessary.
+     * @param db 
+     */
+    public abstract void recover(XFlatDatabase db);
     
+    /**
+     * Closes any resources in use by this transaction manager in preparation
+     * for shutdown.  Any exceptions at this point should be logged but not
+     * rethrown since this is only used during shutdown.
+     */
+    public abstract void close();
 }

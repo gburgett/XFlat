@@ -133,20 +133,23 @@ public class TableMetadataFactory {
         Class<? extends IdGenerator> generatorClass = config.getIdGenerator();
         if(generatorClass != null){
             ret.idGenerator = makeIdGenerator(generatorClass);
-            if(!ret.idGenerator.supports(idType)){
+            if(idType != null && !ret.idGenerator.supports(idType)){
                 throw new XflatException("Id Generator " + generatorClass.getName() +
                         " does not support type " + idType);
             }
         }
         else {
+            
             //pick using our strategy
-            for(Class<? extends IdGenerator> g : dbConfig.getIdGeneratorStrategy()){
-                IdGenerator gen = makeIdGenerator(g);
-                if(gen.supports(idType)){
-                    ret.idGenerator = gen;
-                    break;
+            if(idType != null)
+                for(Class<? extends IdGenerator> g : dbConfig.getIdGeneratorStrategy()){
+                    IdGenerator gen = makeIdGenerator(g);
+                    if(gen.supports(idType)){
+                        ret.idGenerator = gen;
+                        break;
+                    }
                 }
-            }
+        
             if(ret.idGenerator == null){
                 throw new XflatException("Could not pick id generator for type " + idType);
             }
@@ -185,7 +188,8 @@ public class TableMetadataFactory {
             }
         }
         ret.idGenerator = makeIdGenerator(generatorClass);
-        if(!ret.idGenerator.supports(idType)){
+        
+        if(idType != null && !ret.idGenerator.supports(idType)){
             throw new XflatException("Id Generator " + generatorClass + " does not support " + 
                     " ID type " + idType);
         }

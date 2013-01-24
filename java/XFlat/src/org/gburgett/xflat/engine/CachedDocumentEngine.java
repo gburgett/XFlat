@@ -52,6 +52,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     private ConcurrentMap<String, Row> uncommittedRows = null;
     
+    private final Object syncRoot = new Object();
+    
     private DocumentFileWrapper file;
     public DocumentFileWrapper getFile(){
         return file;
@@ -97,7 +99,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     if(chosen == null || chosen.data == null){
                         //we're good to insert our transactional data
                         row.rowData.put(txId, rData);
-                        this.uncommittedRows.put(id, row);
+                        
+                        if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                            this.uncommittedRows.put(id, row);
                     }
                     else{
                         throw new DuplicateKeyException(id);
@@ -155,7 +159,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
-
             Row row = this.cache.get(id);
             if(row == null){
                 throw new KeyNotFoundException(id);
@@ -173,6 +176,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     newData.commitId = txId;
                 }
                 row.rowData.put(txId, newData);
+                if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                    this.uncommittedRows.put(id, row);
             }
 
             setLastActivity(System.currentTimeMillis());
@@ -218,7 +223,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         if(ret){
                             //no need to put a new version if no data was modified
                             row.rowData.put(txId, newData);
-                            this.uncommittedRows.put(id, row);
+                            if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                                this.uncommittedRows.put(id, row);
                         }
                     }
                 }
@@ -279,7 +285,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         if(updates > 0){
                             //no need to put a new version if no data was modified
                             row.rowData.put(txId, newData);
-                            if(newData.commitId == -1)
+                            if(newData.commitId == -1 && (tx != null || this.getTransactionManager().anyOpenTransactions()))
                                 this.uncommittedRows.put(row.rowId, row);
                         }
 
@@ -330,12 +336,14 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         
                         //takes care of the "or update"
                         existingRow.rowData.put(txId, newData);
-                        this.uncommittedRows.put(id, existingRow);
+                        if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                            this.uncommittedRows.put(id, existingRow);
                     }
                 }
                 else{
                     didInsert = true;
-                    this.uncommittedRows.put(id, newRow);
+                    if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                        this.uncommittedRows.put(id, newRow);
                 }
             }
 
@@ -377,7 +385,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
                 //a RowData that is null means it was deleted.
                 row.rowData.put(txId, newData);
-                this.uncommittedRows.put(row.rowId, row);
+                if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                    this.uncommittedRows.put(row.rowId, row);
             }
 
             setLastActivity(System.currentTimeMillis());
@@ -418,7 +427,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                             newData.commitId = txId;
                         }
                         row.rowData.put(txId, newData);
-                        this.uncommittedRows.put(row.rowId, row);
+                        if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                            this.uncommittedRows.put(row.rowId, row);
 
                         numRemoved++;
                     }
@@ -438,40 +448,30 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     //</editor-fold>
     
+    
+    
     private void update(){
-        
-        Set<Row> rowsToRemove = new HashSet<>();
-        Set<Long> remainingTransactions = new HashSet<>();
-        
-        Iterator<Row> it = this.uncommittedRows.values().iterator();
-        while(it.hasNext()){
-            Row row = it.next();
-            synchronized(row){
-                it.remove();
-                
-                if(row.cleanup()){
-                    rowsToRemove.add(row);
-                }
-                else{
-                    //remember the remaining transactions
-                    for(RowData data : row.rowData.values()){
-                        if(data.commitId == -1){
-                            remainingTransactions.add(data.transactionId);
-                        }
-                    }
+        synchronized(syncRoot){
+            if(this.currentlyCommitting.get() != -1){
+                if(this.getTransactionManager().isTransactionCommitted(this.currentlyCommitting.get()) == -1 &&
+                        !this.getTransactionManager().isTransactionReverted(this.currentlyCommitting.get())){
+                    //the transaction is neither committed nor reverted, it is in the process of committing.
+                    //We'll have to come back to this update later when it is finished.
+                    return;
                 }
             }
-        }
-        
-        if(rowsToRemove.size() > 0){
-            //we have to lock the table in order to actually remove any rows.
-            try{
-                this.getTableLock();
-                
-                for(Row row : rowsToRemove){
-                    //doublecheck - do another cleanup, don't want to be sloppy here.
+            
+            Set<Row> rowsToRemove = new HashSet<>();
+            Set<Long> remainingTransactions = new HashSet<>();
+
+            Iterator<Row> it = this.uncommittedRows.values().iterator();
+            while(it.hasNext()){
+                Row row = it.next();
+                synchronized(row){
+                    it.remove();
+
                     if(row.cleanup()){
-                        this.cache.remove(row.rowId);
+                        rowsToRemove.add(row);
                     }
                     else{
                         //remember the remaining transactions
@@ -483,15 +483,107 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     }
                 }
             }
-            finally{
-                this.releaseTableLock();
+
+            if(rowsToRemove.size() > 0){
+                //we have to lock the table in order to actually remove any rows.
+                try{
+                    this.getTableLock();
+
+                    for(Row row : rowsToRemove){
+                        //doublecheck - do another cleanup, don't want to be sloppy here.
+                        if(row.cleanup()){
+                            this.cache.remove(row.rowId);
+                        }
+                        else{
+                            //remember the remaining transactions
+                            for(RowData data : row.rowData.values()){
+                                if(data.commitId == -1){
+                                    remainingTransactions.add(data.transactionId);
+                                }
+                            }
+                        }
+                    }
+                }
+                finally{
+                    this.releaseTableLock();
+                }
             }
+
+            //unbind the engine from all transactions except the remaining transactions
+            this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions);
         }
-        
-        //unbind the engine from all transactions except the remaining transactions
-        this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions);
     }
 
+    private AtomicLong currentlyCommitting = new AtomicLong(-1);
+    
+    @Override
+    public void commit(Transaction tx){
+        synchronized(syncRoot){
+            if(!currentlyCommitting.compareAndSet(-1, tx.getTransactionId())){
+                //see if this transaction is completely finished committing, or if it reverted
+                if(this.getTransactionManager().isTransactionCommitted(tx.getTransactionId()) == -1){
+                    throw new IllegalStateException("Cannot commit two transactions simultaneously");
+                }
+                else{
+                    //the transaction successfully committed, we can move on.
+                    currentlyCommitting.set(-1);
+                }
+            }
+            
+            Iterator<Row> it = this.uncommittedRows.values().iterator();
+            while(it.hasNext()){
+                Row row = it.next();
+                
+                this.log.info("committing row " + row.rowId);
+                synchronized(row){
+                    //don't remove the row, only do that in cleanup.  
+                    //We don't want to cleanup cause we still might need the old data,
+                    //just set the transaction status to committed.
+                    
+                    RowData got = row.rowData.get(tx.getTransactionId());
+                    if(got != null){
+                        got.commitId = tx.getCommitId();
+                    }
+                }
+            }
+            
+            //we must immediately dump the cache, we cannot say we are committed
+            //until the data is on disk.
+            dumpCacheNow();
+        }
+    }
+    
+    @Override
+    public void revert(long txId, boolean isRecovering){
+        synchronized(syncRoot){
+            boolean mustDump = false;
+
+            Iterator<Row> it = this.uncommittedRows.values().iterator();
+            while(it.hasNext()){
+                Row row = it.next();
+                synchronized(row){
+                    //remove the row data, since it's now uncommitted.
+
+                    RowData got = row.rowData.remove(txId);
+                    if(got.commitId != -1){
+                        //this transaction was persisted to the DB.  We're going to need
+                        //to dump the cache at the end.
+                        mustDump = true;
+                    }
+                }
+            }
+
+            if(mustDump){
+                this.dumpCacheNow();
+            }
+            //else we can leave dumping the cache for the cleanup task.
+
+            //reset the currently committing if that was set
+            currentlyCommitting.compareAndSet(txId, -1);
+        }
+    }
+    
+    
     @Override
     protected boolean spinUp() {
         if(!this.state.compareAndSet(EngineState.Uninitialized, EngineState.SpinningUp)){
@@ -834,7 +926,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     protected boolean hasUncomittedData() {
-        return this.uncommittedRows == null ? true : this.uncommittedRows.isEmpty();
+        return this.uncommittedRows == null ? false : !this.uncommittedRows.isEmpty();
     }
 
     

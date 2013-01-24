@@ -363,6 +363,7 @@ public abstract class EngineBase implements Engine {
         row.setAttribute("id", id, XFlatDatabase.xFlatNs);
     }
     
+    //<editor-fold desc="transactions">
 
     /**
      * Checks whether this engine has any transactional updates in an uncommitted 
@@ -371,6 +372,29 @@ public abstract class EngineBase implements Engine {
      * @return true if this engine has uncommitted transactional data, false otherwise.
      */
     protected abstract boolean hasUncomittedData();
+    
+    /**
+     * Called when a transaction is committed to write the committed data to disk.
+     * After this method returns, the data should be stored in non-volatile storage.
+     * @param tx 
+     */
+    public void commit(Transaction tx){
+        
+    }
+    
+    /**
+     * Called when a transaction is committed to revert the given transaction ID.
+     * This may be called even if a transaction was previously committed in this engine,
+     * because it was not fully committed across all engines.
+     * @param tx 
+     * @param isRecovering true if this transaction is being reverted during recovery
+     * at startup.
+     */
+    public void revert(long tx, boolean isRecovering){
+        
+    }
+    
+    //</editor-fold>
     
     /**
      * Represents one row in the database.  The row contains a set of

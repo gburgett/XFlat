@@ -51,7 +51,7 @@ public class TableMetadata implements EngineProvider {
     
     public boolean canSpinDown(){
         EngineBase engine = this.engine.get();
-        return lastActivity + 3000 < System.currentTimeMillis() && engine == null || !engine.hasUncomittedData();
+        return lastActivity + config.getInactivityShutdownMs() < System.currentTimeMillis() && engine == null || !engine.hasUncomittedData();
     }
     
     public EngineBase getEngine(){

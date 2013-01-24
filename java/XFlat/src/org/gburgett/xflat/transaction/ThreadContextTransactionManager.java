@@ -4,17 +4,29 @@
  */
 package org.gburgett.xflat.transaction;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.logging.LogFactory;
+import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.convert.ConversionException;
+import org.gburgett.xflat.convert.Converter;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.db.EngineTransactionManager;
+import org.gburgett.xflat.db.XFlatDatabase;
+import org.gburgett.xflat.util.DocumentFileWrapper;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
 
 /**
  *
@@ -22,14 +34,24 @@ import org.gburgett.xflat.db.EngineTransactionManager;
  */
 public class ThreadContextTransactionManager extends EngineTransactionManager {
 
-    private Map<Thread, ThreadedTransaction> currentTransactions = new ConcurrentHashMap<>();
+    private Map<Long, ThreadedTransaction> currentTransactions = new ConcurrentHashMap<>();
     
     private Map<Long, ThreadedTransaction> committedTransactions = new ConcurrentHashMap<>();
     
+    private DocumentFileWrapper journalWrapper;
+    private Document transactionJournal = null;
+    
+    public ThreadContextTransactionManager(DocumentFileWrapper wrapper){
+        this.journalWrapper = wrapper;
+    }
+    
+    protected Long getContextId(){
+        return Thread.currentThread().getId();
+    }
     
     @Override
     public Transaction getTransaction() {
-        return currentTransactions.get(Thread.currentThread());
+        return currentTransactions.get(getContextId());
     }
 
     @Override
@@ -39,12 +61,12 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
 
     @Override
     public Transaction openTransaction(TransactionOptions options) {
-        if(currentTransactions.get(Thread.currentThread()) != null){
+        if(currentTransactions.get(getContextId()) != null){
             throw new IllegalStateException("Transaction already open on current thread.");
         }
         
         ThreadedTransaction ret = new ThreadedTransaction(generateNewId(), options);
-        if(currentTransactions.put(Thread.currentThread(), ret) != null){
+        if(currentTransactions.put(getContextId(), ret) != null){
             //how could this happen? I dunno, programs surprise me all the time.
             throw new IllegalStateException("Transaction already open on current thread");
         }
@@ -57,7 +79,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         ThreadedTransaction tx = committedTransactions.get(transactionId);
         return tx == null ? -1 : tx.getCommitId();
     }
-
+    
     @Override
     public boolean isTransactionReverted(long transactionId) {
         //if we find it in the current transactions, check the transaction
@@ -97,16 +119,22 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     @Override
     public void bindEngineToCurrentTransaction(EngineBase engine) {
         
-        ThreadedTransaction tx = currentTransactions.get(Thread.currentThread());
+        ThreadedTransaction tx = currentTransactions.get(getContextId());
         if(tx == null){
             return;
         }
                 
+        //we can get away with just adding it in an unsynchronized context because
+        //this is never going to be called at the same time as unbind, since unbind
+        //always happens in the context of a commit or revert (which is the same thread as this)
+        //or another thread's cleanup after the transaction is closed.
         tx.boundEngines.add(engine);
+        
+        LogFactory.getLog(getClass()).trace("engines bound to TX " + tx.getTransactionId() + ": " + tx.boundEngines.size());
     }
 
     @Override
-    public void unbindEngineFromTransaction(EngineBase engine, Long transactionId) {
+    public synchronized void unbindEngineFromTransaction(EngineBase engine, Long transactionId) {
         ThreadedTransaction tx = null;
         for(ThreadedTransaction t : this.currentTransactions.values()){
             if(t.getTransactionId() == transactionId){
@@ -133,7 +161,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     }
 
     @Override
-    public void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds) {
+    public synchronized void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds) {
         for(ThreadedTransaction tx : this.currentTransactions.values()){
             if(transactionIds.contains(tx.getTransactionId())){
                 continue;
@@ -159,8 +187,127 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             }
         }
     }
+
+    @Override
+    public boolean anyOpenTransactions() {
+        return !this.currentTransactions.isEmpty();
+    }
     
+    private void loadJournal() throws IOException, JDOMException{
+        transactionJournal = journalWrapper.readFile();
+        if(transactionJournal == null){
+            transactionJournal = new Document();
+            transactionJournal.setRootElement(new Element("transactionJournal"));
+        }
+    }
     
+    private synchronized void commit(ThreadedTransaction tx){
+        //journal the entry so we can recover if catastrophic failure occurs
+        TransactionJournalEntry entry = new TransactionJournalEntry();
+        entry.txId = tx.id;
+        entry.commitId = tx.commitId;
+        for(EngineBase e : tx.boundEngines){
+            entry.tableNames.add(e.getTableName());
+        }
+        
+        try {
+            if(transactionJournal == null){
+                loadJournal();
+            }
+            transactionJournal.getRootElement().addContent(toElement.convert(entry));
+            journalWrapper.writeFile(transactionJournal);
+        } catch (ConversionException | IOException | JDOMException ex) {
+            throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
+        }
+        
+        //commit all, and if any fail revert all.
+        try{
+            for(EngineBase e : tx.boundEngines){
+                LogFactory.getLog(getClass()).trace("committing to bound engine " + e.getTableName());
+                e.commit(tx);            
+            }
+        }catch(Exception ex){
+            try{
+                //uncommit
+                tx.commitId = -1;
+                revert(tx.boundEngines, tx.getTransactionId(), false);
+            }catch(TransactionException ex2){
+                throw new TransactionException("Unable to commit, " + ex2.getMessage(), ex);
+            }
+            throw new TransactionException("Unable to commit", ex);
+        }
+        
+        //we're all committed, so we can finally say so.
+        committedTransactions.put(tx.id, tx);
+    }
+    
+    private void revert(Iterable<EngineBase> boundEngines, long txId, boolean isRecovering){
+        Set<String> failedReverts = null;
+        Exception last = null;
+        for(EngineBase e : boundEngines){
+            
+            try{
+                e.revert(txId, isRecovering);
+            }catch(Exception ex){
+                LogFactory.getLog(getClass()).error(ex);
+                if(failedReverts == null)
+                    failedReverts = new HashSet<>();
+                failedReverts.add(e.getTableName());
+                last = ex;
+            }
+        }
+        if(failedReverts != null && failedReverts.size() > 0){
+            StringBuilder msg = new StringBuilder("Unable to revert all bound engines, the data in the following engines may be corrupt: ");
+            for(String s : failedReverts){
+                msg.append(s).append(", ");
+            }
+            throw new TransactionException(msg.toString(), last);
+        }
+    }
+
+    @Override
+    public void close() {
+    }
+
+    @Override
+    public void recover(XFlatDatabase db) {
+        //open the journal
+        
+        try {
+            if(transactionJournal == null){
+                loadJournal();
+            }            
+        } catch (IOException | JDOMException ex) {
+            throw new XflatException("Unable to recover, could not access journal file " + journalWrapper, ex);
+        }
+        
+        try{
+            Iterator<Element> children = transactionJournal.getRootElement().getChildren().iterator();
+            while(children.hasNext()){
+                TransactionJournalEntry entry;
+                try {
+                     entry = fromElement.convert(children.next());                     
+                } catch (ConversionException ex) {
+                    //entry is corrupt, remove and continue
+                    children.remove();
+                    continue;
+                }
+
+                List<EngineBase> toRevert = new ArrayList<>();
+                for(String table : entry.tableNames){
+                    toRevert.add(db.getEngine(table));
+                }
+                
+                //revert the transaction in all the engines
+                revert(toRevert, entry.txId, true);
+                
+                //save the journal after each successful revert
+                this.journalWrapper.writeFile(transactionJournal);
+            }
+        }catch(TransactionException | IOException ex){
+            throw new XflatException("Unable to recover", ex);
+        }
+    }
         
     /**
      * A Transaction that is meant to exist within the context of one thread.
@@ -178,7 +325,10 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         
         private AtomicReference<Set<TransactionListener>> listeners = new AtomicReference<>(null);
         
-        final Set<EngineBase> boundEngines = new ConcurrentSkipListSet<>();
+        //we can get away with this being an unsynchronized HashSet because it will only ever be added to by one
+        //thread, and then only so long as the transaction is open, and then will be removed from
+        //by a different thread, but only one at a time, synchronized elsewhere, and after all adds are finished.
+        final Set<EngineBase> boundEngines = new HashSet<>();
         
         private long commitId = -1;
         @Override
@@ -204,20 +354,19 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             }
             
             commitId = generateNewId();
-            committedTransactions.put(id, this);
+            ThreadContextTransactionManager.this.commit(this);
+            //soon as commit returns, we are committed.
+            this.isCompleted.set(true);
         }
 
         @Override
-        public void rollback() {
+        public void revert() {
             if(this.isCompleted.get()){
                 throw new IllegalTransactionStateException("Cannot rollback a completed transaction");
             }
             
-            doRollback();
-        }
-        
-        private void doRollback(){
-            //do nothing
+            ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
+            this.isCompleted.set(true);
         }
 
         @Override
@@ -233,7 +382,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         @Override
         public void close() {
             if(isCompleted.compareAndSet(false, true)){
-                doRollback();
+                //we completed in the close, need to revert.
+                ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
             }
             
             //remove the transaction from the current transactions map
@@ -252,7 +402,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
 
         @Override
         public boolean isReverted() {
-            return isCompleted.get() && commitId > -1;
+            return isCompleted.get() && commitId == -1;
         }
 
         @Override
@@ -278,4 +428,55 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         }
     }
     
+    
+    private class TransactionJournalEntry{
+        public long txId;
+        public long commitId;
+        
+        public List<String> tableNames = new ArrayList<>();
+    }
+    
+    private Converter<TransactionJournalEntry, Element> toElement = new Converter<TransactionJournalEntry, Element>(){
+        @Override
+        public Element convert(TransactionJournalEntry source) throws ConversionException {
+            Element ret = new Element("entry");
+            ret.setAttribute("txId", Long.toString(source.txId));
+            ret.setAttribute("commit", Long.toString(source.commitId));
+            
+            for(String s : source.tableNames){
+                ret.addContent(new Element("table").setText(s));
+            }
+            
+            return ret;
+        }
+    };
+    
+    private Converter<Element, TransactionJournalEntry> fromElement = new Converter<Element, TransactionJournalEntry>(){
+        @Override
+        public TransactionJournalEntry convert(Element source) throws ConversionException {
+            TransactionJournalEntry ret = new TransactionJournalEntry();
+            
+            try{
+                String txId = source.getAttributeValue("txId");
+                if(txId == null){
+                    throw new ConversionException("txId attribute required");
+                }
+                ret.txId = Long.parseLong(txId);
+            
+                String commitId = source.getAttributeValue("commit");
+                if(commitId != null){
+                    ret.commitId = Long.parseLong(commitId);
+                }
+                
+                for(Element e : source.getChildren("table")){
+                    ret.tableNames.add(e.getText());
+                }
+            }
+            catch(NumberFormatException ex){
+                throw new ConversionException("Conversion failure", ex);
+            }
+            
+            return ret;
+        }
+    };
 }

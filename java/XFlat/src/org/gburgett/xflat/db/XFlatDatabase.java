@@ -34,6 +34,7 @@ import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
 import org.gburgett.xflat.transaction.TransactionManager;
+import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -203,13 +204,16 @@ public class XFlatDatabase implements Database {
                 this.executorService = new ScheduledThreadPoolExecutor(this.config.getThreadCount());
 
             if(this.transactionManager == null){
-                this.transactionManager = new ThreadContextTransactionManager();
+                this.transactionManager = new ThreadContextTransactionManager(new DocumentFileWrapper(new File(directory, "xflat_transaction")));
             }
             
             this.InitializeScheduledTasks();
 
             Runtime.getRuntime().addShutdownHook(this.shutdownHook);
         
+            
+            //recover transactional state if necessary
+            this.transactionManager.recover(this);
             
         }catch(Exception ex){
             this.state.set(DatabaseState.Uninitialized);
@@ -224,9 +228,13 @@ public class XFlatDatabase implements Database {
      */
     public void shutdown(){
         try{
-            this.shutdown(0);
+            this.doShutdown(0);
         }catch(TimeoutException ex){
             throw new RuntimeException("A timeout occured that should never have happened", ex);
+        }
+        finally{
+            //close all resources
+            this.getEngineTransactionManager().close();
         }
     }
     
@@ -239,6 +247,16 @@ public class XFlatDatabase implements Database {
      * the timeout expired.
      */
     public void shutdown(int timeout) throws TimeoutException{
+        try{
+            this.doShutdown(timeout);
+        }
+        finally{
+            //close all resources
+            this.getEngineTransactionManager().close();
+        }
+    }
+    
+    private void doShutdown(int timeout) throws TimeoutException{
         if(!this.state.compareAndSet(DatabaseState.Running, DatabaseState.ShuttingDown)){
             return;
         }
@@ -398,6 +416,18 @@ public class XFlatDatabase implements Database {
     
     @Override
     public <T> Table<T> getTable(Class<T> type, String name){
+        
+        TableMetadata table = getMetadata(type, name);
+        
+        TableBase ret = table.getTable(type);
+        return (Table<T>)ret;
+    }
+    
+    public EngineBase getEngine(String name){
+        return getMetadata(null, name).provideEngine();
+    }
+    
+    private TableMetadata getMetadata(Class<?> type, String name){
         if(this.state.get() == DatabaseState.Uninitialized){
             throw new IllegalStateException("Database has not been initialized");
         }
@@ -408,34 +438,38 @@ public class XFlatDatabase implements Database {
         if(name == null || name.startsWith("xflat_")){
             throw new IllegalArgumentException("Table name cannot be null or start with 'xflat_': " + name);
         }
-        
-        if(!this.getConversionService().canConvert(type, Element.class) ||
-                !this.getConversionService().canConvert(Element.class, type)){
-            
-            try {
-                //try to load the pojo converter
-                loadPojoConverter();
-                
-            } catch (Exception ex) {
-                throw new UnsupportedOperationException("No conversion available between " +
-                        type + " and " + Element.class, ex);
-            }
-            
-            //check again
+        if(type != null){
             if(!this.getConversionService().canConvert(type, Element.class) ||
-                !this.getConversionService().canConvert(Element.class, type)){
-                throw new UnsupportedOperationException("No conversion available between " +
-                        type + " and " + Element.class);
+                    !this.getConversionService().canConvert(Element.class, type)){
+
+                try {
+                    //try to load the pojo converter
+                    loadPojoConverter();
+
+                } catch (Exception ex) {
+                    throw new UnsupportedOperationException("No conversion available between " +
+                            type + " and " + Element.class, ex);
+                }
+
+                //check again
+                if(!this.getConversionService().canConvert(type, Element.class) ||
+                    !this.getConversionService().canConvert(Element.class, type)){
+                    throw new UnsupportedOperationException("No conversion available between " +
+                            type + " and " + Element.class);
+                }
             }
         }
+        
         //see if we have a cached engine already
         TableMetadata table = this.tables.get(name);
         if(table == null){
             TableConfig tblConfig = this.tableConfigs.get(name);
             Class<?> idType = String.class;
-            IdAccessor accessor = IdAccessor.forClass(type);
-            if(accessor.hasId()){
-                idType = accessor.getIdType();
+            if(type != null){
+                IdAccessor accessor = IdAccessor.forClass(type);
+                if(accessor != null && accessor.hasId()){
+                    idType = accessor.getIdType();
+                }
             }
             
             table = this.metadataFactory.makeTableMetadata(name, new File(getDirectory(), name + ".xml"), tblConfig, idType);
@@ -447,8 +481,7 @@ public class XFlatDatabase implements Database {
             }
         }
         
-        TableBase ret = table.getTable(type);
-        return (Table<T>)ret;
+        return table;
     }
     
     private AtomicBoolean pojoConverterLoaded = new AtomicBoolean(false);

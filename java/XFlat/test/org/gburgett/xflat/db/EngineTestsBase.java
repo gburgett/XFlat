@@ -6,6 +6,7 @@ package org.gburgett.xflat.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -24,10 +25,12 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
-import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
-import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
+import org.gburgett.xflat.transaction.FakeThreadContextTransactionManager;
+import org.gburgett.xflat.transaction.Transaction;
+import org.gburgett.xflat.transaction.TransactionOptions;
+import org.gburgett.xflat.util.FakeDocumentFileWrapper;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -48,7 +51,6 @@ import static org.mockito.Mockito.*;
  */
 public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
-    protected static ScheduledExecutorService executorService;
     protected static ConversionService conversionService;
     
     protected static org.jdom2.xpath.XPathFactory xpath = org.jdom2.xpath.XPathFactory.instance();
@@ -57,7 +59,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     @BeforeClass
     public static void setUpClass() {
-        executorService = new ScheduledThreadPoolExecutor(4);
         conversionService = new DefaultConversionService();        
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
@@ -144,7 +145,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         if(synchronous){
             ScheduledFuture<?> timeout = 
-                executorService.schedule(new Runnable(){
+                ctx.executorService.schedule(new Runnable(){
                     @Override
                     public void run() {
                         if(engine.getState() == EngineState.SpunDown){
@@ -176,7 +177,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 throw new TimeoutException("spin down timed out with engine state " + didTimeOut.get());
             }
             else{
-                timeout.cancel(true);
+                if(timeout != null)
+                    timeout.cancel(true);
             }
                 
         }
@@ -193,7 +195,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     private TEngine setupEngine(TestContext ctx){
         TEngine instance = this.createInstance(ctx);
-        instance.setExecutorService(executorService);
+        instance.setExecutorService(ctx.executorService);
         instance.setConversionService(conversionService);
         instance.setTransactionManager(ctx.transactionManager);
         
@@ -248,6 +250,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     //<editor-fold desc="tests">
     
+    //<editor-fold desc="transactionless">
     @Test
     public void testInsert_NoValuesYet_Inserts() throws Exception {
         System.out.println("testInsert_NoValuesYet_Inserts");
@@ -287,8 +290,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         System.out.println("testInsert_HasValues_Inserts");
         
         TestContext ctx = getContext();
-        
-        
         
         Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("data").setText("other text data")
@@ -868,8 +869,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = getContext();
         
-        
-        
         Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
                 new Element("other").setText("other text data"),
                 new Element("third")
@@ -1205,6 +1204,247 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     //</editor-fold>
     
+    //<editor-fold desc="transactional">
+    
+    @Test
+    public void testUpdate_InTransaction_RevertRemovesData() throws Exception {
+        System.out.println("testUpdate_InTransaction_RevertRemovesData");
+        
+        TestContext ctx = getContext();
+        
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
+                new Element("third")
+                    .setAttribute("fooInt", "17")
+                    .setText("third text data")
+            );
+        
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
+        
+        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XpathUpdate update = XpathUpdate.set(xpath.compile("third"), "updated text");
+        
+        //ACT
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        
+            int result = ctx.instance.update(query, update);
+            
+            assertEquals("Should update in TX", 1, result);
+            
+            Element row = ctx.instance.readRow("0");
+            assertEquals("Should update in TX", "updated text", row.getValue());
+            
+            tx.revert();
+            
+            row = ctx.instance.readRow("0");
+            assertEquals("Should have reverted TX", "third text data", row.getValue());            
+        }
+        
+        spinDown(ctx);
+        
+        Document doc = getFileContents(ctx);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        
+        assertEquals("Should have reverted data", "third text data", children.get(0).getChild("third").getText());
+    }
+    
+    @Test
+    public void testReplaceRow_InTransaction_CommitModifiesData() throws Exception {
+        System.out.println("testReplaceRow_InTransaction_CommitModifiesData");
+                TestContext ctx = getContext();
+        
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
+                new Element("third")
+                    .setAttribute("fooInt", "17")
+                    .setText("third text data")
+            );
+        
+        prepFileContents(ctx, inFile);
+        ctx.executorService = mock(ScheduledExecutorService.class);
+        
+        spinUp(ctx);
+        
+        Element fourth = new Element("fourth")
+                    .setAttribute("fooInt", "17")
+                    .setText("fourth text data");
+        
+        //ACT
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        
+            ctx.instance.replaceRow("0", fourth);
+            
+            Element row = ctx.instance.readRow("0");
+            assertEquals("Should update in TX", "fourth text data", row.getValue());
+            
+            tx.commit();
+            
+            row = ctx.instance.readRow("0");
+            assertEquals("Should have not reverted TX", "fourth text data", row.getValue());            
+        }
+        
+        spinDown(ctx);
+        
+        Document doc = getFileContents(ctx);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        
+        assertEquals("Should have committed data", "fourth text data", children.get(0).getChild("fourth").getText());
+    }
+    
+    @Test
+    public void testDeleteRow_InTransaction_RevertReturnsRow() throws Exception {
+        System.out.println("testDeleteRow_InTransaction_RevertReturnsRow");
+        
+        TestContext ctx = getContext();
+        
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
+                new Element("third")
+                    .setAttribute("fooInt", "17")
+                    .setText("third text data")
+            );
+        
+        prepFileContents(ctx, inFile);
+        spinUp(ctx);
+        
+        //ACT
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        
+            ctx.instance.deleteRow("0");
+                        
+            Element row = ctx.instance.readRow("0");
+            assertNull("Should delete in TX", row);
+            
+            tx.revert();
+            
+            row = ctx.instance.readRow("0");
+            assertNotNull("Should have reverted TX", row);
+            assertEquals("Should have reverted TX", "third text data", row.getValue());
+        }
+        
+        spinDown(ctx);
+        
+        Document doc = getFileContents(ctx);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        
+        assertEquals("Should have reverted data", "third text data", children.get(0).getChild("third").getText());
+    }
+    
+    @Test
+    public void testInsert_InTransaction_HasReadIsolation() throws Exception {
+        System.out.println("testInsert_InTransaction_HasReadIsolation");
+        
+        TestContext ctx = getContext();
+                
+        prepFileContents(ctx, null);
+        spinUp(ctx);
+        
+        Element outsideTransaction;
+        Element insideTransaction;
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        
+            Element rowData = new Element("data").setText("some text data");
+
+            //ACT
+            ctx.instance.insertRow("1", rowData);
+            
+            //swap out the transaction
+            ctx.transactionManager.setContextId(1L);
+            outsideTransaction = ctx.instance.readRow("1");
+            
+            //swap the transaction back
+            ctx.transactionManager.setContextId(0L);
+            insideTransaction = ctx.instance.readRow("1");
+            
+            tx.commit();
+        }
+        
+        assertNull("Outside the TX, should have no data", outsideTransaction);
+        
+        assertEquals("Inside the TX, should have the data", "data", insideTransaction.getName());
+        assertEquals("Inside the TX, should have the data", "some text data", insideTransaction.getText());
+        
+        Element fromEngine = ctx.instance.readRow("1");
+        assertEquals("Should have committed TX data", "data", fromEngine.getName());
+        assertEquals("Should have committed TX data", "some text data", fromEngine.getText());
+
+        
+        spinDown(ctx);        
+    }
+    
+    @Test
+    public void testQuery_InTransaction_HasReadIsolation() throws Exception {
+        System.out.println("testQuery_InTransaction_HasReadIsolation");
+        
+        TestContext ctx = getContext();
+                
+        Document inFile = Utils.makeDocument(ctx.instance.getTableName(),
+            new Element("other")
+                .setAttribute("fooInt", "17")
+                .setText("other text data"),
+            new Element("third")
+                .setAttribute("fooInt", "17")
+                .setText("third text data"),
+            new Element("fourth")
+                .setAttribute("fooInt", "18")
+                .setText("fourth text data")
+        );
+        prepFileContents(ctx, inFile);
+        
+        spinUp(ctx);
+        
+        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        
+        
+        List<Element> fromCursor = new ArrayList<>();
+        try(Transaction tx = ctx.transactionManager.openTransaction(TransactionOptions.Default.setReadOnly(true))){
+        
+            Element rowData = new Element("data")
+                    .setAttribute("fooInt", "17")
+                    .setText("some text data");
+            
+            //now that we've opened the transaction, switch contexts and insert
+            ctx.transactionManager.setContextId(1L);
+            ctx.instance.insertRow("4", rowData);
+
+            //ACT
+            //switch back and query
+            ctx.transactionManager.setContextId(0L);
+            try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
+                Iterator<Element> it = cursor.iterator();
+                
+                fromCursor.add(it.next());
+                
+            
+                //switch contexts and insert again
+                ctx.transactionManager.setContextId(1L);
+                ctx.instance.insertRow("5", new Element("fifth")
+                    .setAttribute("fooInt", "17")
+                    .setText("fifth text data"));
+                
+                
+                ctx.transactionManager.setContextId(0L);
+                while(it.hasNext()){
+                    fromCursor.add(it.next());
+                }
+            }
+        }
+        
+        assertEquals("Should have cursored over 2 items", 2, fromCursor.size());
+        assertThat("should have correct 2 items", fromCursor, 
+                Matchers.containsInAnyOrder(
+                    Matchers.allOf(
+                        isNamed("other"), hasText("other text data")
+                    ),
+                    Matchers.allOf(
+                        isNamed("third"), hasText("third text data")
+                    )));
+        
+        spinDown(ctx); 
+    }
+    
+    //</editor-fold>
+    
+    //</editor-fold>
+    
     private Matcher<Element> hasChildThat(final String childName, final Matcher<Element> matcher){
         return new TypeSafeMatcher<Element>(){
             @Override
@@ -1250,6 +1490,38 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         };
     }
     
+    private Matcher<Element> isNamed(final String name){
+        return new TypeSafeMatcher<Element>(){
+            @Override
+            protected boolean matchesSafely(Element item) {
+                return item.getName().equals(name);
+            }
+
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("is named ")
+                        .appendText(name);
+            }
+            
+        };
+    }
+    
+    private Matcher<Element> hasText(final String text){
+        return new TypeSafeMatcher<Element>(){
+            @Override
+            protected boolean matchesSafely(Element item) {
+                return item.getText().equals(text);
+            }
+
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("has text ")
+                        .appendText(text);
+            }
+            
+        };
+    }
+    
     protected class TestContext{
         public TEngine instance;
         
@@ -1259,9 +1531,14 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         public long id;
         
-        public EngineTransactionManager transactionManager = new ThreadContextTransactionManager();
+        public AtomicReference<Document> transactionJournal = new AtomicReference<>(new Document().setRootElement(new Element("transactionJournal")));
+        
+        public FakeThreadContextTransactionManager transactionManager = new FakeThreadContextTransactionManager(new FakeDocumentFileWrapper(transactionJournal));
         
         public final Map<String, Object> additionalContext;
+        
+        
+        public ScheduledExecutorService executorService = new ScheduledThreadPoolExecutor(2);
         
         public TestContext(){
             this.id = Thread.currentThread().getId();
