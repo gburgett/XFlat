@@ -23,12 +23,12 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.Converter;
 import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.db.IdAccessor;
-import org.gburgett.xflat.util.JDOMStreamReader;
-import org.gburgett.xflat.util.JDOMStreamWriter;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.jdom2.filter.Filters;
+import org.jdom2.jaxb.JDOMStreamReader;
+import org.jdom2.jaxb.JDOMStreamWriter;
 import org.jdom2.output.XMLOutputter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
@@ -262,10 +262,14 @@ public class JAXBPojoConverter implements PojoConverter {
         public Element convert(T source) throws ConversionException {
             try{
                 Document doc;
-                try(JDOMStreamWriter out = new JDOMStreamWriter()){
+                JDOMStreamWriter out = new JDOMStreamWriter();
+                try{
                     this.marshaller.marshal(source, out);
                     
                     doc = out.getDocument();
+                }
+                finally{
+                    out.close();
                 }
                 
                 return doc.detachRootElement();
@@ -293,14 +297,21 @@ public class JAXBPojoConverter implements PojoConverter {
             Document doc = new Document();
             doc.setRootElement(source.detach());
             
-            try(JDOMStreamReader in = new JDOMStreamReader(doc)){
+            JDOMStreamReader in = new JDOMStreamReader(doc);
+            try{
                 T ret = (T)unmarshaller.unmarshal(in);
                 return ret;
             }
-            catch(JAXBException | XMLStreamException | ClassCastException ex){
+            catch(JAXBException | ClassCastException ex){
                 throw new ConversionException("Unable to convert element to " + clazz, ex);
             }
-            
+            finally{
+                try{
+                    in.close();
+                }catch(XMLStreamException ex){
+                    //ignore
+                }
+            }
         }
         
     }
