@@ -55,10 +55,11 @@ using Hamcrest Matchers.  Breaking the query into XPath expressions and values a
 effectively, much more easily than if we used XQuery.  Future versions may support XQuery.
 
 
-* Multiple hot-swapped Engines (to be implemented)
+* Multiple swappable Engines (to be implemented)
   * The management of each table is handled by an Engine.  As a table grows or shrinks, the appropriate Engine for managing
 the data is swapped in behind the scenes.  For example, very small tables can use an engine that loads the whole
-XML DOM in-memory, while very large tables can use an engine that manipulates a memory-mapped file.
+XML DOM in-memory, while very large tables can use an engine that manipulates a memory-mapped file.  Only one engine
+is implemented for version 1.
 
 
 
@@ -69,19 +70,20 @@ to the row and binary search indexes to improve performance.
 
 
 
-* Sharding on XPath expressions (to be implemented)
+* Sharding by ID (implemented) or on arbitrary XPath expressions (to be implemented)
   * A table can be sharded across multiple files based on a sharding key selected by an XPath expression.  The expression
 selects a part of the `Element` that is converted to a `Comparable`, then a `RangeProvider` determines which file to store
 the Element in.
 
 
-* ACID Transactions (to be implemented)
-  * XFlat can support Transactions which can be saved and resumed.  All uncommitted transactional data is persisted in
-the same file as the table data, so transactions can be resumed between program execution.
+* Transactions
+  * XFlat supports Transactions that by default span all tables in the database.  Currently XFlat only implements snapshot-isolation transactions,
+serializable transactions are planned for a future version.
 
 ====
 
 Required dependencies:
+* Java 7
 
 * JDOM 2
   * jdom-2.0.4.jar

@@ -12,9 +12,9 @@ import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.Table;
-import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.XFlatException;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.jdom2.Attribute;
 import org.jdom2.Element;
 
@@ -63,7 +63,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
         });
     }
     
-    private Cursor<Element> queryTable(final XpathQuery query){
+    private Cursor<Element> queryTable(final XPathQuery query){
         return this.doWithEngine(new EngineAction<Cursor<Element>>(){
             @Override
             public Cursor<Element> act(Engine engine) {
@@ -73,7 +73,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
 
     @Override
-    public Element findOne(XpathQuery query) {
+    public Element findOne(XPathQuery query) {
         try(Cursor<Element> c = this.queryTable(query)){
             Iterator<Element> i = c.iterator();
             if(i.hasNext()){
@@ -82,17 +82,17 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
             
             return null;
         }catch(Exception ex){
-            throw new XflatException("Unable to close cursor", ex);
+            throw new XFlatException("Unable to close cursor", ex);
         }
     }
 
     @Override
-    public Cursor<Element> find(XpathQuery query) {
+    public Cursor<Element> find(XPathQuery query) {
         return this.queryTable(query);
     }
 
     @Override
-    public List<Element> findAll(XpathQuery query) {
+    public List<Element> findAll(XPathQuery query) {
         try(Cursor<Element> c = this.queryTable(query)){
             List<Element> ret = new ArrayList<>();
             for(Element e : c){
@@ -101,7 +101,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
             
             return ret;
         }catch(Exception ex){
-            throw new XflatException("Unable to close cursor", ex);
+            throw new XFlatException("Unable to close cursor", ex);
         }
     }
 
@@ -125,7 +125,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
 
     @Override
-    public boolean replaceOne(XpathQuery query, Element origValue){
+    public boolean replaceOne(XPathQuery query, Element origValue){
         Element e = this.findOne(query);
         if(e == null){
             return false;
@@ -186,7 +186,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
 
     @Override
-    public boolean update(Object id, final XpathUpdate update) throws KeyNotFoundException {
+    public boolean update(Object id, final XPathUpdate update) throws KeyNotFoundException {
         final String sId = getId(id);
         return this.doWithEngine(new EngineAction<Boolean>(){
             @Override
@@ -197,7 +197,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
 
     @Override
-    public int update(final XpathQuery query, final XpathUpdate update) {
+    public int update(final XPathQuery query, final XPathUpdate update) {
         return this.doWithEngine(new EngineAction<Integer>(){
             @Override
             public Integer act(Engine engine) {
@@ -224,7 +224,7 @@ public class ElementTable extends TableBase<Element> implements Table<Element> {
     }
 
     @Override
-    public int deleteAll(final XpathQuery query) {
+    public int deleteAll(final XPathQuery query) {
         return this.doWithEngine(new EngineAction<Integer>(){
             @Override
             public Integer act(Engine engine) {

@@ -25,13 +25,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.db.Engine;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.db.XFlatDatabase;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.gburgett.xflat.transaction.Isolation;
 import org.gburgett.xflat.transaction.Transaction;
 import org.gburgett.xflat.transaction.WriteConflictException;
@@ -148,7 +148,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     @Override
-    public Cursor<Element> queryTable(XpathQuery query) {
+    public Cursor<Element> queryTable(XPathQuery query) {
         query.setConversionService(this.getConversionService());
         
         TableCursor ret = new TableCursor(this.cache.values(), query, getTransactionManager().getTransaction());
@@ -195,7 +195,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     @Override
-    public boolean update(String id, XpathUpdate update) throws KeyNotFoundException {
+    public boolean update(String id, XPathUpdate update) throws KeyNotFoundException {
         Transaction tx = ensureWriteReady();
         try{
             Row row = this.cache.get(id);
@@ -252,7 +252,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     @Override
-    public int update(XpathQuery query, XpathUpdate update) {
+    public int update(XPathQuery query, XPathUpdate update) {
         Transaction tx = ensureWriteReady();
         try{
             
@@ -400,7 +400,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     @Override
-    public int deleteAll(XpathQuery query) {
+    public int deleteAll(XPathQuery query) {
         Transaction tx = ensureWriteReady();
         try{
 
@@ -523,7 +523,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         
         //outside the synchronized block due to a deadlock issue
         //unbind the engine from all transactions except any of the remaining transactions or any that are open.
-        this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions, false);
+        this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions);
     }
 
     private AtomicLong currentlyCommitting = new AtomicLong(-1);
@@ -666,7 +666,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     this.cache.put(id, newRow);
                 }
             } catch (JDOMException | IOException ex) {
-                throw new XflatException("Error building document cache", ex);
+                throw new XFlatException("Error building document cache", ex);
             }
         }
         
@@ -728,7 +728,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                             //oh ok we're all good to go
                             return tx;
                         }
-                        throw new XflatException("Interrupted while waiting for engine to be ready");
+                        throw new XFlatException("Interrupted while waiting for engine to be ready");
                     }
                 }
             }
@@ -875,7 +875,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         try{
                             dumpCacheNow();
                         }
-                        catch(XflatException ex){
+                        catch(XFlatException ex){
                             log.warn("Unable to dump cached data", ex);
                         }
                     }
@@ -889,7 +889,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 try {
                     dumpTask.get();
                 } catch (InterruptedException | ExecutionException ex) {
-                    throw new XflatException("An error occurred after attempting to write to disk " +
+                    throw new XFlatException("An error occurred after attempting to write to disk " +
                             dumpFailures.get() + " times", ex);
                 }
             }
@@ -940,7 +940,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
             catch(IOException ex) {
                 dumpFailures.incrementAndGet();
-                throw new XflatException("Unable to dump cache to file", ex);
+                throw new XFlatException("Unable to dump cache to file", ex);
             }
             finally {
                 scheduledDump.set(null);
@@ -961,12 +961,12 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private class TableCursor implements Cursor<Element>{
 
         private final Iterable<Row> toIterate;
-        private final XpathQuery filter;
+        private final XPathQuery filter;
         
         private final Transaction tx;
         private final long txId;
         
-        public TableCursor(Iterable<Row> toIterate, XpathQuery filter, Transaction tx){
+        public TableCursor(Iterable<Row> toIterate, XPathQuery filter, Transaction tx){
             this.filter = filter;
             this.toIterate = toIterate;
             this.tx = tx;

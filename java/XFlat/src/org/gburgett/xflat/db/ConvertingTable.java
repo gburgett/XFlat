@@ -17,11 +17,11 @@ import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.Table;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.jdom2.Element;
 import org.jdom2.xpath.XPathExpression;
 
@@ -71,7 +71,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             try {
                  id = this.accessor.getIdValue(data);
             } catch (IllegalAccessException | InvocationTargetException ex) {
-                throw new XflatException("Cannot access ID on data", ex);
+                throw new XFlatException("Cannot access ID on data", ex);
             }
             if(id == null)
                 return null;
@@ -100,7 +100,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         try {
             ret = this.conversionService.convert(data, Element.class);
         } catch (ConversionException ex) {
-            throw new XflatException("Cannot convert data with ID " + id, ex);
+            throw new XFlatException("Cannot convert data with ID " + id, ex);
         }
         
         if (id != null){
@@ -117,7 +117,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         try {
             ret = this.conversionService.convert(rowData, this.getTableType());
         } catch (ConversionException ex) {
-            throw new XflatException("Cannot convert data with ID " + sId, ex);
+            throw new XFlatException("Cannot convert data with ID " + sId, ex);
         }
         
         if(sId == null){
@@ -130,7 +130,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             try {
                 this.accessor.setIdValue(ret, id);
             } catch (IllegalAccessException | InvocationTargetException ex) {
-                throw new XflatException("Cannot set ID", ex);
+                throw new XFlatException("Cannot set ID", ex);
             }
         }
         else if(this.idMap != null){
@@ -149,7 +149,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             try{
                 this.accessor.setIdValue(rowData, id);
             } catch (IllegalAccessException | InvocationTargetException ex) {
-                throw new XflatException("Cannot set newly-generated ID", ex);
+                throw new XFlatException("Cannot set newly-generated ID", ex);
             }
             return this.getIdGenerator().idToString(id);
         }
@@ -205,7 +205,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public T findOne(final XpathQuery query) {
+    public T findOne(final XPathQuery query) {
         Element e = findOneElement(query);
         
         if(e == null){
@@ -215,7 +215,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         return convert(e);
     }
 
-    private Element findOneElement(XpathQuery query){
+    private Element findOneElement(XPathQuery query){
         try(Cursor<Element> elements = this.queryTable(query)){
             Iterator<Element> it = elements.iterator();
             if(!it.hasNext()){
@@ -225,11 +225,11 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             return it.next();
         }
         catch(Exception ex){
-            throw new XflatException("Unable to close cursor", ex);
+            throw new XFlatException("Unable to close cursor", ex);
         }
     }
     
-    private Cursor<Element> queryTable(final XpathQuery query){
+    private Cursor<Element> queryTable(final XPathQuery query){
         query.setAlternateIdExpression(alternateIdExpression);
         
         return this.doWithEngine(new EngineAction<Cursor<Element>>(){
@@ -241,7 +241,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     @Override
-    public Cursor<T> find(final XpathQuery query) {
+    public Cursor<T> find(final XPathQuery query) {
         query.setAlternateIdExpression(alternateIdExpression);
         
         return this.doWithEngine(new EngineAction<Cursor<T>>(){
@@ -253,7 +253,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public List<T> findAll(XpathQuery query) {
+    public List<T> findAll(XPathQuery query) {
         List<T> ret = new ArrayList<>();
         
         try(Cursor<Element> data = this.queryTable(query)){
@@ -262,7 +262,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             }
         }
         catch(Exception ex){
-            throw new XflatException("Unable to close cursor", ex);
+            throw new XFlatException("Unable to close cursor", ex);
         }
         
         return ret;
@@ -287,7 +287,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public boolean replaceOne(XpathQuery query, T newValue) {
+    public boolean replaceOne(XPathQuery query, T newValue) {
         
         Element existing = this.findOneElement(query);
         if(existing == null){
@@ -303,13 +303,13 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         try {    
             this.accessor.setIdValue(newValue, this.getIdGenerator().stringToId(replacedId, this.accessor.getIdType()));
         } catch (IllegalAccessException | InvocationTargetException ex) {
-            throw new XflatException("Unable to update object ID", ex);
+            throw new XFlatException("Unable to update object ID", ex);
         }
         
         return true;
     }
     
-    private String recursiveReplaceOne(XpathQuery query, final Element data, Element existing){
+    private String recursiveReplaceOne(XPathQuery query, final Element data, Element existing){
         if(existing == null){
             return null;
         }
@@ -365,7 +365,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public boolean update(Object id, final XpathUpdate update) throws KeyNotFoundException {
+    public boolean update(Object id, final XPathUpdate update) throws KeyNotFoundException {
         if(id == null){
             throw new IllegalArgumentException("Id cannot be null");
         }
@@ -380,7 +380,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public int update(final XpathQuery query, final XpathUpdate update) {
+    public int update(final XPathQuery query, final XPathUpdate update) {
         query.setAlternateIdExpression(alternateIdExpression);
         
         return this.doWithEngine(new EngineAction<Integer>(){
@@ -408,7 +408,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
 
     @Override
-    public int deleteAll(final XpathQuery query) {
+    public int deleteAll(final XPathQuery query) {
         query.setAlternateIdExpression(alternateIdExpression);
         
         return this.doWithEngine(new EngineAction<Integer>(){
@@ -432,7 +432,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         }
 
         @Override
-        public void close() throws XflatException {
+        public void close() throws XFlatException {
             this.rowCursor.close();
         }
     }

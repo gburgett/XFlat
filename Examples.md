@@ -127,3 +127,62 @@ An example of a table persisted to an XML file:
 	</db:row>
 </db:table>
 ```
+
+#### Transactions
+
+Open a transaction and commit multiple updates atomically
+```java
+Table<Foo> fooTable = db.getTable(Foo.class);
+
+try(Transaction tx = db.getTransactionManager().openTransaction()){
+
+	Foo newFoo = new Foo();
+	newFoo.setFooInt(17);
+	
+	fooTable.insert("1", newFoo);
+
+	XpathQuery query = XpathQuery.eq(XPathFactory.instance().compile("foo/fooInt"), 34);
+	XpathUpdate update = XpathUpdate.set(XPathFactory.instance().compile("foo/fooString"), "updated text");
+
+	fooTable.update(query, update);
+	
+	tx.commit();	//can throw TransactionException
+}
+```
+
+Open a read-only transaction that is automatically reverted when closed; the transaction reads a snapshot of the committed data at the time the transaction was opened.
+```java
+Table<Foo> fooTable = db.getTable(Foo.class);
+
+try(Transaction tx = db.getTransactionManager().openTransaction(new TransactionOptions().withReadOnly(true))){
+
+	Foo foo1 = fooTable.find("1");
+	
+	XpathQuery query = XpathQuery.gt(XPathFactory.instance().compile("foo/fooInt"), 21);
+	List<Foo> moreFoos = fooTable.findAll(query);
+}
+```
+
+Open and commit a transaction spanning multiple tables
+```java
+Table<Foo> fooTable = db.getTable(Foo.class, "Table_1");
+Table<Bar> barTable = db.getTable(Bar.class, "Table_2");
+
+try(Transaction tx = db.getTransactionManager().openTransaction()){
+	
+	Foo newFoo = new Foo();
+	newFoo.setFooInt(17);
+	
+	fooTable.insert("1", newFoo);
+
+	XpathQuery query = XpathQuery.lte(XPathFactory.instance().compile("bar/barDouble"), 34.1);
+	Baz newBaz = new Baz();
+	newBaz.setData("some data");
+	XpathUpdate update = XpathUpdate.set(XPathFactory.instance().compile("bar/barBaz"), newBaz);
+
+	barTable.update(query, update);
+	
+	//commits to both Table_1 and Table_2
+	tx.commit();	//can throw TransactionException
+}
+```

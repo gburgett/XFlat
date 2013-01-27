@@ -24,7 +24,7 @@ import org.gburgett.xflat.db.ShardedEngineTestsBase;
 import org.gburgett.xflat.db.TableMetadataFactory;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.Interval;
-import org.gburgett.xflat.query.XpathQuery;
+import org.gburgett.xflat.query.XPathQuery;
 import org.gburgett.xflat.query.NumericIntervalProvider;
 import org.gburgett.xflat.query.IntervalProvider;
 import org.gburgett.xflat.transaction.TransactionManager;
@@ -151,7 +151,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         IntervalProvider provider = (IntervalProvider)ctx.additionalContext.get("rangeProvider");
         XFlatDatabase db = (XFlatDatabase)ctx.additionalContext.get("db");
         
-        ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
+        ShardsetConfig cfg = ShardsetConfig.create(XPathQuery.Id, Integer.class, provider);
         
         IdShardedEngine ret = new IdShardedEngine(file, name, cfg);
         setMetadataFactory(ret, new TableMetadataFactory(db, file));

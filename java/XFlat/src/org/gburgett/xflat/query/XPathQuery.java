@@ -4,26 +4,24 @@
  */
 package org.gburgett.xflat.query;
 
-import org.gburgett.xflat.util.XPathExpressionEqualityMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.hamcrest.Description;
-import org.hamcrest.Matcher;
-import org.hamcrest.TypeSafeMatcher;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.db.XFlatDatabase;
+import org.gburgett.xflat.util.XPathExpressionEqualityMatcher;
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.hamcrest.SelfDescribing;
 import org.hamcrest.StringDescription;
+import org.hamcrest.TypeSafeMatcher;
 import org.jdom2.Attribute;
 import org.jdom2.Element;
-import org.jdom2.Namespace;
 import org.jdom2.filter.AttributeFilter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
@@ -32,7 +30,7 @@ import org.jdom2.xpath.XPathFactory;
  *
  * @author Gordon
  */
-public class XpathQuery {
+public class XPathQuery {
 
     
     //<editor-fold desc="properties" >
@@ -61,7 +59,7 @@ public class XpathQuery {
         return queryType;
     }
     
-    private List<XpathQuery> queryChain;
+    private List<XPathQuery> queryChain;
 
     //</editor-fold>
     
@@ -77,7 +75,7 @@ public class XpathQuery {
         this.conversionService = service;
         
         if(this.queryChain != null){
-            for(XpathQuery q : this.queryChain){
+            for(XPathQuery q : this.queryChain){
                 q.setConversionService(service);
             }
         }
@@ -101,7 +99,7 @@ public class XpathQuery {
     
     
     //<editor-fold desc="constructors" >
-    private XpathQuery(XPathExpression<?> selector, QueryType type, Object value, Class<?> valueType,
+    private XPathQuery(XPathExpression<?> selector, QueryType type, Object value, Class<?> valueType,
             Matcher<?> valueMatcher)
     {
         this.selector = selector;
@@ -111,14 +109,14 @@ public class XpathQuery {
         this.valueType = valueType;
     }
 
-    private XpathQuery(QueryType type, Matcher<Element> rowMatcher, XpathQuery... queries){
+    private XPathQuery(QueryType type, Matcher<Element> rowMatcher, XPathQuery... queries){
         this.queryType = type;
         this.rowMatcher = rowMatcher;
         this.queryChain = new ArrayList<>();
         this.queryChain.addAll(Arrays.asList(queries));
     }
     
-    private XpathQuery(){
+    private XPathQuery(){
     }
     
     //</editor-fold>
@@ -218,7 +216,7 @@ public class XpathQuery {
                 
             case AND:
                 IntervalSet ret = null;
-                for(XpathQuery q : this.queryChain){
+                for(XPathQuery q : this.queryChain){
                     if(ret == null){
                         ret = q.dissect(index, comparer, indexClass);
                     }
@@ -231,7 +229,7 @@ public class XpathQuery {
                 
             case OR:
                 ret = null;
-                for(XpathQuery q : this.queryChain){
+                for(XPathQuery q : this.queryChain){
                     if(ret == null){
                         ret = q.dissect(index, comparer, indexClass);
                     }
@@ -270,14 +268,14 @@ public class XpathQuery {
      * @param object The object that the result of the xpath selection should be equal to.
      * @return An XpathQuery object
      */
-    public static <U> XpathQuery eq(XPathExpression<?> selector, U object){
+    public static <U> XPathQuery eq(XPathExpression<?> selector, U object){
         Matcher<U> eq = Matchers.equalTo(object);
         
         Class<?> valueType = null;
         if(object != null)
             valueType = object.getClass();
         
-        return new XpathQuery(selector, QueryType.EQ, object, valueType, eq);
+        return new XPathQuery(selector, QueryType.EQ, object, valueType, eq);
     }
     /**
      * Creates an XPath query that matches when the single element at the selector
@@ -287,14 +285,14 @@ public class XpathQuery {
      * @param object The object that the result of the xpath selection should not be equal to.
      * @return An XpathQuery object
      */
-    public static <U> XpathQuery ne(XPathExpression<?> selector, U object){
+    public static <U> XPathQuery ne(XPathExpression<?> selector, U object){
         Matcher<U> ne = Matchers.not(Matchers.equalTo(object));
         
         Class<?> valueType = null;
         if(object != null)
             valueType = object.getClass();
         
-        return new XpathQuery(selector, QueryType.NE, object, valueType, ne);
+        return new XPathQuery(selector, QueryType.NE, object, valueType, ne);
     }
 
     /**
@@ -306,7 +304,7 @@ public class XpathQuery {
      * @param converter A function to convert a string to the appropriate type for comparison.
      * @return An XpathQuery object
      */
-    public static <U  extends Comparable<U>> XpathQuery lt(XPathExpression<?> selector, U object){
+    public static <U  extends Comparable<U>> XPathQuery lt(XPathExpression<?> selector, U object){
         if(object == null)
             throw new IllegalArgumentException("object cannot be null");
 
@@ -315,7 +313,7 @@ public class XpathQuery {
             valueType = object.getClass();
                 
         Matcher<U> lt = Matchers.lessThan(object);
-        return new XpathQuery(selector, QueryType.LT, object, valueType, lt);
+        return new XPathQuery(selector, QueryType.LT, object, valueType, lt);
     }
 
     /**
@@ -326,7 +324,7 @@ public class XpathQuery {
      * @param object The object that the result of the xpath selection should be less than or equal to.
      * @return An XpathQuery object
      */
-    public static <U  extends Comparable<U>> XpathQuery lte(XPathExpression<?> selector, U object){
+    public static <U  extends Comparable<U>> XPathQuery lte(XPathExpression<?> selector, U object){
         if(object == null)
             throw new IllegalArgumentException("object cannot be null");
 
@@ -335,7 +333,7 @@ public class XpathQuery {
             valueType = object.getClass();
         
         Matcher<U> lte = Matchers.lessThanOrEqualTo(object);
-        return new XpathQuery(selector, QueryType.LTE, object, valueType, lte);
+        return new XPathQuery(selector, QueryType.LTE, object, valueType, lte);
     }
 
     /**
@@ -346,7 +344,7 @@ public class XpathQuery {
      * @param object The object that the result of the xpath selection should be greater than.
      * @return An XpathQuery object
      */
-    public static <U  extends Comparable<U>> XpathQuery gt(XPathExpression<?> selector, U object){
+    public static <U  extends Comparable<U>> XPathQuery gt(XPathExpression<?> selector, U object){
         if(object == null)
             throw new IllegalArgumentException("object cannot be null");
 
@@ -355,7 +353,7 @@ public class XpathQuery {
             valueType = object.getClass();
         
         Matcher<U> gt = Matchers.greaterThan(object);
-        return new XpathQuery(selector, QueryType.GT, object, valueType, gt);
+        return new XPathQuery(selector, QueryType.GT, object, valueType, gt);
     }
 
     /**
@@ -366,7 +364,7 @@ public class XpathQuery {
      * @param object The object that the result of the xpath selection should be greater than or equal to.
      * @return An XpathQuery object
      */
-    public static <U  extends Comparable<U>> XpathQuery gte(XPathExpression<?> selector, U object){
+    public static <U  extends Comparable<U>> XPathQuery gte(XPathExpression<?> selector, U object){
         if(object == null)
             throw new IllegalArgumentException("object cannot be null");
 
@@ -375,7 +373,7 @@ public class XpathQuery {
             valueType = object.getClass();
         
         Matcher<U> gte = Matchers.greaterThanOrEqualTo(object);
-        return new XpathQuery(selector, QueryType.GTE, object, valueType, gte);
+        return new XPathQuery(selector, QueryType.GTE, object, valueType, gte);
     }
 
     /**
@@ -383,19 +381,19 @@ public class XpathQuery {
      * @param queries The queries that all must match.
      * @return  an XpathQuery object
      */
-    public static XpathQuery and(XpathQuery... queries){
+    public static XPathQuery and(XPathQuery... queries){
         if(queries.length < 2){
             throw new IllegalArgumentException("AND requires at least 2 queries");
         }
         
         List<Matcher<? super Element>> ms = new ArrayList<>();
 
-        for(XpathQuery q : queries){
+        for(XPathQuery q : queries){
             ms.add(q.getRowMatcher());
         }
 
         Matcher<Element> ret = Matchers.allOf(ms);
-        return new XpathQuery(QueryType.AND, ret, queries);
+        return new XPathQuery(QueryType.AND, ret, queries);
     }
 
     /**
@@ -403,19 +401,19 @@ public class XpathQuery {
      * @param queries the queries, one of which must match.
      * @return an XpathQuery object.
      */
-    public static XpathQuery or(XpathQuery... queries){
+    public static XPathQuery or(XPathQuery... queries){
         if(queries.length < 2){
             throw new IllegalArgumentException("OR requires at least 2 queries");
         }
         
         List<Matcher<? super Element>> ms = new ArrayList<>();
 
-        for(XpathQuery q : queries){
+        for(XPathQuery q : queries){
             ms.add(q.getRowMatcher());
         }
 
         Matcher<Element> ret = Matchers.anyOf(ms);
-        return new XpathQuery(QueryType.OR, ret, queries);
+        return new XPathQuery(QueryType.OR, ret, queries);
     }
 
     /**
@@ -427,8 +425,8 @@ public class XpathQuery {
      * @param clazz The type of the value expected at the end of the selector.
      * @return an XpathQuery object.
      */
-    public static <U> XpathQuery matches(XPathExpression<?> selector, Matcher<U> matcher, Class<U> clazz){
-        return new XpathQuery(selector, QueryType.MATCHES, matcher, clazz, matcher);
+    public static <U> XPathQuery matches(XPathExpression<?> selector, Matcher<U> matcher, Class<U> clazz){
+        return new XPathQuery(selector, QueryType.MATCHES, matcher, clazz, matcher);
     }
 
     /**
@@ -437,10 +435,10 @@ public class XpathQuery {
      * @param selector The selector to test whether it exists.
      * @return An XpathQuery object.
      */
-    public static XpathQuery exists(XPathExpression<?> selector){
+    public static XPathQuery exists(XPathExpression<?> selector){
         Matcher<Object> m = Matchers.notNullValue();
         
-        return new XpathQuery(selector, QueryType.EXISTS, true, Object.class, m);
+        return new XPathQuery(selector, QueryType.EXISTS, true, Object.class, m);
     }
 
     //</editor-fold>
@@ -553,7 +551,7 @@ public class XpathQuery {
             str.append(this.queryType.toString());
             str.append(": [");
             boolean first = true;
-            for(XpathQuery q : queryChain){
+            for(XPathQuery q : queryChain){
                 if(first)
                     first = false;
                 else

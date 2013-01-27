@@ -13,12 +13,15 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.gburgett.xflat.Id;
-import org.gburgett.xflat.XflatException;
-import org.jdom2.Attribute;
+import org.gburgett.xflat.XFlatException;
+import org.jdom2.Namespace;
+import org.jdom2.filter.Filters;
+import org.jdom2.xpath.XPathExpression;
+import org.jdom2.xpath.XPathFactory;
 
 /**
  * A helper class that accesses the IDs of an object.
@@ -33,6 +36,8 @@ public class IdAccessor<T> {
     public Class<T> getPojoType(){
         return pojoType;
     }
+    
+    private XPathExpression<Object> alternateIdExpression = null;
     
     private IdAccessor(Class<T> pojoType, PropertyDescriptor idProperty, Field idField){
         this.pojoType = pojoType;
@@ -69,16 +74,64 @@ public class IdAccessor<T> {
             }
         }
         catch(IntrospectionException ex){
-            throw new XflatException("Cannot determine ID property of class " + pojoType.getName(), ex);
+            throw new XFlatException("Cannot determine ID property of class " + pojoType.getName(), ex);
         }
         
         ret = new IdAccessor<>(pojoType, idProp, idField);
+        if(ret.hasId()){
+            //see if there's an alternate ID expression.
+            ret.alternateIdExpression = getAlternateId(ret.getIdPropertyAnnotation(Id.class));
+        }
         
         verify(ret, pojoType);
         
         cachedAccessors.putIfAbsent(pojoType, ret);
         
         return ret;
+    }
+    
+    private static XPathExpression<Object> getAlternateId(Id idPropertyAnnotation){
+        if(idPropertyAnnotation == null)
+            return null;
+        
+        String expression = idPropertyAnnotation.value();
+        if(expression == null || "".equals(expression)){
+            return null;
+        }
+        
+        List<Namespace> namespaces = null;
+        if(idPropertyAnnotation.namespaces() != null && idPropertyAnnotation.namespaces().length > 0){
+            for(String ns : idPropertyAnnotation.namespaces()){
+                if(!ns.startsWith("xmlns:")){
+                    continue;
+                }
+                
+                int eqIndex = ns.indexOf("=");
+                if(eqIndex < 0 || eqIndex >= ns.length() - 1){
+                    continue;
+                }
+                
+                String prefix = ns.substring(6, eqIndex);
+                String url = ns.substring(eqIndex + 1);
+                
+                if(url.startsWith("\"") || url.startsWith("'"))
+                    url = url.substring(1);
+                
+                if(url.endsWith("\"") || url.endsWith("'"))
+                    url = url.substring(0, url.length() - 1);
+                
+                if("".equals(prefix) || "".equals(url))
+                    continue;
+                
+                if(namespaces == null)
+                    namespaces = new ArrayList<>();
+                
+                namespaces.add(Namespace.getNamespace(prefix, url));
+            }
+        }
+        
+        //compile it
+        return XPathFactory.instance().compile(expression, Filters.fpassthrough(), null, namespaces == null ? Collections.EMPTY_LIST : namespaces);
     }
     
     private static PropertyDescriptor getIdProperty(Class<?> pojoType) throws IntrospectionException{
@@ -151,7 +204,7 @@ public class IdAccessor<T> {
                  hashCodeMethod = pojoType.getMethod("hashCode");
             } catch (NoSuchMethodException | SecurityException ex) {
                 //should never happen
-                throw new XflatException("Unable to verify pojo " + pojoType, ex);
+                throw new XFlatException("Unable to verify pojo " + pojoType, ex);
             }
             
             if(!Object.class.equals(eqMethod.getDeclaringClass()) ||
@@ -159,7 +212,7 @@ public class IdAccessor<T> {
             {
                 //this is because our weak reference map that keeps track of IDs
                 //for classes that don't have an Id property uses reference equality
-                throw new XflatException("Persistent objects that override " +
+                throw new XFlatException("Persistent objects that override " +
                         "equals or hashCode must also declare an id field or property");
             }
                     
@@ -265,5 +318,9 @@ public class IdAccessor<T> {
         }
         
         throw new UnsupportedOperationException("Cannot get annotation when object has no ID");
+    }
+    
+    public XPathExpression<Object> getAlternateIdExpression(){
+        return alternateIdExpression;
     }
 }

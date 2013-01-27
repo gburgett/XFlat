@@ -4,36 +4,84 @@
  */
 package org.gburgett.xflat;
 
-import org.gburgett.xflat.TableConfig;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.db.IdGenerator;
-import org.gburgett.xflat.db.IdGenerator;
-import org.gburgett.xflat.db.IntegerIdGenerator;
 import org.gburgett.xflat.db.IntegerIdGenerator;
 import org.gburgett.xflat.db.TimestampIdGenerator;
-import org.gburgett.xflat.db.TimestampIdGenerator;
 import org.gburgett.xflat.db.UuidIdGenerator;
-import org.gburgett.xflat.db.UuidIdGenerator;
+import org.gburgett.xflat.db.XFlatDatabase;
 
 /**
- *
+ * The Configuration for a new XFlat Database.  
+ * <br/>
+ * This Configuration must be
+ * passed to the {@link XFlatDatabase#setConfig(org.gburgett.xflat.DatabaseConfig) }
+ * method before initialization, or the default values will be used.
+ * <p/>
+ * This class is immutable, all set methods return new objects.
  * @author gordon
  */
 public class DatabaseConfig {
     
     private List<Class<? extends IdGenerator>> idGeneratorStrategy;
+    /**
+     * Gets the ID generator strategy used by this Database. 
+     * <p/>
+     * ID generators are selected on a per-table basis by the {@link Database} 
+     * based on an ID generation strategy.  The strategy selects the first IdGenerator
+     * in the list that supports the ID property's type.
+     * @return An unmodifiable list of the ID generators in the strategy.
+     */
+    public List<Class<? extends IdGenerator>> getIdGeneratorStrategy(){
+        if(idGeneratorStrategy == null){
+            return Collections.EMPTY_LIST;
+        }
+        return this.idGeneratorStrategy;
+    }
     
     private int threadCount;
     
+    /**
+     * Gets the number of threads that this Database will spool up in its executor service.
+     * <p/>
+     * This is unused if an executor service is provided to the Database upon construction.
+     * @return the size of the database's thread pool
+     * @see #setThreadCount(int) 
+     */
+    public int getThreadCount(){
+        return this.threadCount;
+    }
+    
     private String pojoConverterClass;
+    /**
+     * Gets the binary name of the class used by the database to convert 
+     * POJOs for the database.
+     * <p/>
+     * The database will load this class using its {@link ClassLoader} in order
+     * to convert pojos.
+     * @return 
+     */
+    public String getPojoConverterClass(){
+        return this.pojoConverterClass;
+    }
     
     private TableConfig defaultTableConfig;
     
-    private DatabaseConfig(){
+    /**
+     * Creates a new DatabaseConfig with the default values.
+     */
+    public DatabaseConfig(){
+        this.threadCount = 4;
+        this.pojoConverterClass = "org.gburgett.xflat.convert.converters.JAXBPojoConverter";
+        this.defaultTableConfig = new TableConfig();
+        this.idGeneratorStrategy = Arrays.asList(
+                UuidIdGenerator.class,
+                TimestampIdGenerator.class,
+                IntegerIdGenerator.class);
     }
     
     private DatabaseConfig(DatabaseConfig other){
@@ -45,25 +93,17 @@ public class DatabaseConfig {
         this.idGeneratorStrategy = other.idGeneratorStrategy;
     }
     
+
     /**
-     * Gets the ID generator strategy used by this Database.  
-     * @return An unmodifiable list of the ID generators in the strategy.
-     */
-    public List<Class<? extends IdGenerator>> getIdGeneratorStrategy(){
-        if(idGeneratorStrategy == null){
-            return Collections.EMPTY_LIST;
-        }
-        return this.idGeneratorStrategy;
-    }
-    /**
-     * Sets the ID generator strategy used by this Database.  
+     * Sets the ID generator strategy used by this Database.
+     * <p/>
      * ID generators are selected on a per-table basis by the {@link Database} 
      * based on an ID generation strategy.  The strategy selects the first IdGenerator
      * in the list that supports the ID property's type.
      * @param strategy The strategy to use for this database.
      * @return A new instance of the DatabaseConfig using this strategy.
      */
-    public DatabaseConfig setIdGeneratorStrategy(List<Class<? extends IdGenerator>> strategy){
+    public DatabaseConfig withIdGeneratorStrategy(List<Class<? extends IdGenerator>> strategy){
         if(strategy.size() <= 0){
             throw new IllegalArgumentException("Id Generator strategy must contain at least " +
                     "one ID generator");
@@ -74,34 +114,22 @@ public class DatabaseConfig {
         return ret;
     }
     
+
     /**
-     * Gets the number of threads that this Database can use.
-     * @return the size of the database's thread pool
-     * @see #setThreadCount(int) 
-     */
-    public int getThreadCount(){
-        return this.threadCount;
-    }
-    /**
-     * Sets the number of threads that this Database can use.
+     * Sets the number of threads that this Database will spool up in its executor service.
+     * <p/>
      * The database uses an ExecutorService to manage scheduled and recurring tasks.
-     * This sets the size of its thread pool.
+     * This sets the size of its thread pool.<br/>
+     * This is unused if an executor service is provided to the Database upon construction.
      * @param threadCount The number of threads in the database's thread pool.
      * @return A new instance with the ThreadCount property set.
      */
-    public DatabaseConfig setThreadCount(int threadCount){
+    public DatabaseConfig withThreadCount(int threadCount){
         DatabaseConfig ret = new DatabaseConfig(this);
         ret.threadCount = threadCount;
         return ret;
     }
-    /**
-     * Gets the binary name of the class used by the database to convert 
-     * POJOs for the database.
-     * @return 
-     */
-    public String getPojoConverterClass(){
-        return this.pojoConverterClass;
-    }
+
     /**
      * Sets the binary name of the class used by the database to convert 
      * POJOs for the database.  The class MUST be an implementation of
@@ -137,16 +165,4 @@ public class DatabaseConfig {
         ret.defaultTableConfig = tableConfig;
         return ret;
     }
-    
-    /**
-     * The default configuration used by the Database.
-     */
-    public static DatabaseConfig Default = new DatabaseConfig()
-            .setThreadCount(4)
-            .setPojoConverterClass("org.gburgett.xflat.convert.converters.JAXBPojoConverter")
-            .setDefaultTableConfig(TableConfig.Default)
-            .setIdGeneratorStrategy(Arrays.asList(
-                UuidIdGenerator.class,
-                TimestampIdGenerator.class,
-                IntegerIdGenerator.class));
 }

@@ -22,7 +22,13 @@ import org.jdom2.Element;
  */
 public class TableConfig {
  
-    private TableConfig(){
+    /**
+     * Creates a TableConfig with the default values.
+     */
+    public TableConfig(){
+        this.idGenerator = null;
+        this.inactivityShutdownMs = 3000;
+        this.shardsetConfig = null;
     }
     
     private TableConfig(TableConfig other){
@@ -49,7 +55,7 @@ public class TableConfig {
      * @param idGenerator The class of ID generator to use.
      * @return A new instance with the idGenerator property set.
      */
-    public TableConfig setIdGenerator(Class<? extends IdGenerator> idGenerator){
+    public TableConfig withIdGenerator(Class<? extends IdGenerator> idGenerator){
         TableConfig ret = new TableConfig(this);
         ret.idGenerator = idGenerator;
         return ret;
@@ -66,7 +72,7 @@ public class TableConfig {
         return this.inactivityShutdownMs;
     }
     /** @see #getInactivityShutdownMs()  */
-    public TableConfig setInactivityShutdownMs(long inactivityShutdownMs) {
+    public TableConfig withInactivityShutdownMs(long inactivityShutdownMs) {
         TableConfig ret = new TableConfig(this);
         ret.inactivityShutdownMs = inactivityShutdownMs;
         return ret;
@@ -91,13 +97,6 @@ public class TableConfig {
     
     //TODO: future configuration options
     
-    /**
-     * The default configuration used by the database when no configuration
-     * is specified.
-     */
-    public static TableConfig Default = new TableConfig()
-            .setIdGenerator(null)
-            .setInactivityShutdownMs(3000);
 
     @Override
     public int hashCode() {

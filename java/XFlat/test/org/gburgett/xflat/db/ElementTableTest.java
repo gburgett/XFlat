@@ -13,8 +13,8 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.hamcrest.Matchers;
 import org.jdom2.Element;
 import org.jdom2.xpath.XPathFactory;
@@ -191,7 +191,7 @@ public class ElementTableTest {
         setId(inDb, fooId);
         inDb.addContent(new Element("fooInt").setText("32"));
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("foo/fooInt"), 32);
+        XPathQuery query = XPathQuery.eq(xpath.compile("foo/fooInt"), 32);
         
         Cursor<Element> mockCursor = getMockCursor(inDb);
         when(engine.queryTable(query))
@@ -221,7 +221,7 @@ public class ElementTableTest {
         Element inDb2 = new Element("foo").addContent(new Element("fooInt").setText("33"));
         setId(inDb2, "id 2");
         
-        XpathQuery query = XpathQuery.gte(xpath.compile("foo/fooInt"), 32);
+        XPathQuery query = XPathQuery.gte(xpath.compile("foo/fooInt"), 32);
         
         Cursor<Element> mockCursor = getMockCursor(inDb1, inDb2);
         when(engine.queryTable(query))
@@ -260,7 +260,7 @@ public class ElementTableTest {
         Element inDb2 = new Element("foo").addContent(new Element("fooInt").setText("33"));
         setId(inDb2, "id 2");
         
-        XpathQuery query = XpathQuery.gte(xpath.compile("foo/fooInt"), 32);
+        XPathQuery query = XPathQuery.gte(xpath.compile("foo/fooInt"), 32);
         
         Cursor<Element> mockCursor = getMockCursor(inDb1, inDb2);
         when(engine.queryTable(query))
@@ -333,7 +333,7 @@ public class ElementTableTest {
         Element existing = new Element("foo").addContent(new Element("fooInt").setText("17"));
         setId(existing, "test id 1");
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("foo/fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("foo/fooInt"), 17);
         
         Cursor<Element> mockCursor = getMockCursor(existing);
         when(engine.queryTable(query))
@@ -368,7 +368,7 @@ public class ElementTableTest {
         Element existing2 = new Element("foo").addContent(new Element("fooInt").setText("18"));
         setId(existing2, "test id 2");
         
-        XpathQuery query = XpathQuery.gte(xpath.compile("foo/fooInt"), 17);
+        XPathQuery query = XPathQuery.gte(xpath.compile("foo/fooInt"), 17);
         
         Cursor<Element> cursor1 = getMockCursor(existing);
         Cursor<Element> cursor2 = getMockCursor(existing2);
@@ -463,7 +463,7 @@ public class ElementTableTest {
         
         String id = "test id";
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("fooInt"), 32);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("fooInt"), 32);
         
         when(engine.update(id, update))
                 .thenReturn(Boolean.TRUE);
@@ -481,8 +481,8 @@ public class ElementTableTest {
     public void testUpdate_Query_Passthrough() throws Exception {
         System.out.println("testUpdate_Query_Passthrough");
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("fooInt"), 17);
-        XpathUpdate update = XpathUpdate.set(xpath.compile("fooInt"), 35);
+        XPathQuery query = XPathQuery.eq(xpath.compile("fooInt"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("fooInt"), 35);
         
         when(engine.update(query, update))
                 .thenReturn(32);
@@ -513,7 +513,7 @@ public class ElementTableTest {
     public void testDeleteAll_Passthrough() throws Exception {
         System.out.println("testDeleteAll_Passthrough");
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("foo/fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("foo/fooInt"), 17);
         
         //ACT
         this.getInstance().deleteAll(query);

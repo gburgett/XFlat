@@ -5,16 +5,12 @@
 package org.gburgett.xflat.util;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import org.hamcrest.Description;
-import org.hamcrest.TypeSafeMatcher;
-import org.jdom2.Namespace;
-import org.jdom2.xpath.XPathExpression;
-import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
+import org.jdom2.xpath.XPathExpression;
 
 /**
  * Implements a Hamcrest {@link org.hamcrest.Matcher} for {@link XPathExpression} objects

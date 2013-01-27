@@ -93,7 +93,7 @@ public class XFlatDatabaseTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.Default.setInactivityShutdownMs(10));
+        db.configureTable("Foo", new TableConfig().withInactivityShutdownMs(10));
         
         db.Initialize();
         try{
@@ -135,7 +135,7 @@ public class XFlatDatabaseTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.Default.setInactivityShutdownMs(10));
+        db.configureTable("Foo", new TableConfig().withInactivityShutdownMs(10));
         
         db.Initialize();
         try{

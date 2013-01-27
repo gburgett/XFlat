@@ -4,17 +4,14 @@
  */
 package org.gburgett.xflat.query;
 
-import javax.management.Query;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.db.XFlatDatabase;
-import org.gburgett.xflat.query.XpathQuery.QueryType;
+import org.gburgett.xflat.query.XPathQuery.QueryType;
 import org.gburgett.xflat.util.ComparableComparator;
 import org.jdom2.Element;
-import org.jdom2.Namespace;
-import org.jdom2.filter.Filters;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 import static org.junit.Assert.*;
@@ -26,7 +23,7 @@ import test.Foo;
  *
  * @author gordon
  */
-public class XpathQueryTest {
+public class XPathQueryTest {
 
     private ConversionService conversionService;
     
@@ -53,7 +50,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data");
-        XpathQuery query = XpathQuery.eq(path, "value");
+        XPathQuery query = XPathQuery.eq(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -80,7 +77,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data");
-        XpathQuery query = XpathQuery.eq(path, "value");
+        XPathQuery query = XPathQuery.eq(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -104,7 +101,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data");
-        XpathQuery query = XpathQuery.eq(path, "value");
+        XPathQuery query = XPathQuery.eq(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -129,7 +126,7 @@ public class XpathQueryTest {
         row.getChild("deep").addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.eq(path, "value");
+        XPathQuery query = XPathQuery.eq(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -153,7 +150,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.eq(path, "value");
+        XPathQuery query = XPathQuery.eq(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -178,7 +175,7 @@ public class XpathQueryTest {
         row.getChild("deep").addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.eq(path, null);
+        XPathQuery query = XPathQuery.eq(path, null);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -202,7 +199,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.eq(path, null);
+        XPathQuery query = XPathQuery.eq(path, null);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -227,7 +224,7 @@ public class XpathQueryTest {
         row.getChild("deep").addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.eq(path, 17);
+        XPathQuery query = XPathQuery.eq(path, 17);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -252,7 +249,7 @@ public class XpathQueryTest {
         row.getChild("deep").addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.eq(path, 17);
+        XPathQuery query = XPathQuery.eq(path, 17);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -286,7 +283,7 @@ public class XpathQueryTest {
         
         //setup query
         XPathExpression<Object> path = xpath.compile("foo");
-        XpathQuery query = XpathQuery.eq(path, queryFoo);
+        XPathQuery query = XPathQuery.eq(path, queryFoo);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -320,7 +317,7 @@ public class XpathQueryTest {
         
         //setup query
         XPathExpression<Object> path = xpath.compile("foo");
-        XpathQuery query = XpathQuery.eq(path, queryFoo);
+        XPathQuery query = XPathQuery.eq(path, queryFoo);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -343,7 +340,7 @@ public class XpathQueryTest {
         
         row.addContent(new Element("data").setText("textData"));
         
-        XpathQuery query = XpathQuery.eq(XpathQuery.Id, 17);
+        XPathQuery query = XPathQuery.eq(XPathQuery.Id, 17);
         query.setConversionService(conversionService);
         
         
@@ -369,7 +366,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.ne(path, "value");
+        XPathQuery query = XPathQuery.ne(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -397,7 +394,7 @@ public class XpathQueryTest {
         row.getChild("deep").addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.ne(path, "value");
+        XPathQuery query = XPathQuery.ne(path, "value");
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -422,7 +419,7 @@ public class XpathQueryTest {
         row.getChild("deep").addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.ne(path, null);
+        XPathQuery query = XPathQuery.ne(path, null);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -446,7 +443,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("deep/data");
-        XpathQuery query = XpathQuery.ne(path, null);
+        XPathQuery query = XPathQuery.ne(path, null);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -474,7 +471,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.lt(path, 21);
+        XPathQuery query = XPathQuery.lt(path, 21);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -501,7 +498,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data");
-        XpathQuery query = XpathQuery.lt(path, 12);
+        XPathQuery query = XPathQuery.lt(path, 12);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -525,7 +522,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.lt(path, 21);
+        XPathQuery query = XPathQuery.lt(path, 21);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -553,7 +550,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.gt(path, (float)21.7);
+        XPathQuery query = XPathQuery.gt(path, (float)21.7);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -580,7 +577,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data");
-        XpathQuery query = XpathQuery.gt(path, 30.09);
+        XPathQuery query = XPathQuery.gt(path, 30.09);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -604,7 +601,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.gt(path, 21.84);
+        XPathQuery query = XPathQuery.gt(path, 21.84);
         query.setConversionService(conversionService);
         
         System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
@@ -633,9 +630,9 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.and(
-                    XpathQuery.lt(xpath.compile("data/@val"), 13.0),
-                    XpathQuery.eq(xpath.compile("data/sub"), "Some Text")
+        XPathQuery query = XPathQuery.and(
+                    XPathQuery.lt(xpath.compile("data/@val"), 13.0),
+                    XPathQuery.eq(xpath.compile("data/sub"), "Some Text")
                 );
         
         query.setConversionService(conversionService);
@@ -663,9 +660,9 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.and(
-                    XpathQuery.lt(xpath.compile("data/@val"), 13.0),
-                    XpathQuery.eq(xpath.compile("data/sub"), "Some Text")
+        XPathQuery query = XPathQuery.and(
+                    XPathQuery.lt(xpath.compile("data/@val"), 13.0),
+                    XPathQuery.eq(xpath.compile("data/sub"), "Some Text")
                 );
         
         query.setConversionService(conversionService);
@@ -695,9 +692,9 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.or(
-                    XpathQuery.lt(xpath.compile("data/@val"), 13.0),
-                    XpathQuery.eq(xpath.compile("data/sub"), "Some Text")
+        XPathQuery query = XPathQuery.or(
+                    XPathQuery.lt(xpath.compile("data/@val"), 13.0),
+                    XPathQuery.eq(xpath.compile("data/sub"), "Some Text")
                 );
         
         query.setConversionService(conversionService);
@@ -726,9 +723,9 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.or(
-                    XpathQuery.lt(xpath.compile("data/@val"), 13.0),
-                    XpathQuery.eq(xpath.compile("data/sub"), "Some Text")
+        XPathQuery query = XPathQuery.or(
+                    XPathQuery.lt(xpath.compile("data/@val"), 13.0),
+                    XPathQuery.eq(xpath.compile("data/sub"), "Some Text")
                 );
         
         query.setConversionService(conversionService);
@@ -758,7 +755,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.matches(path, org.hamcrest.Matchers.equalTo(35.0), Double.class);
+        XPathQuery query = XPathQuery.matches(path, org.hamcrest.Matchers.equalTo(35.0), Double.class);
         
         query.setConversionService(conversionService);
         
@@ -785,7 +782,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data/@val");
-        XpathQuery query = XpathQuery.matches(path, org.hamcrest.Matchers.equalTo(35.0), Double.class);
+        XPathQuery query = XPathQuery.matches(path, org.hamcrest.Matchers.equalTo(35.0), Double.class);
         
         query.setConversionService(conversionService);
         
@@ -813,7 +810,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data[@val=42]");
-        XpathQuery query = XpathQuery.exists(path);
+        XPathQuery query = XPathQuery.exists(path);
         
         query.setConversionService(conversionService);
         
@@ -840,7 +837,7 @@ public class XpathQueryTest {
         row.addContent(data);
         
         XPathExpression<Object> path = xpath.compile("data[sub = \"Wrong Text\"]");
-        XpathQuery query = XpathQuery.exists(path);
+        XPathQuery query = XPathQuery.exists(path);
         
         query.setConversionService(conversionService);
         
@@ -859,7 +856,7 @@ public class XpathQueryTest {
         System.out.println("testDissect_NoMatchingIndex_ReturnsAll");
         
         XPathExpression<Object> path = xpath.compile("abc/def");
-        XpathQuery q = XpathQuery.eq(path, 17);
+        XPathQuery q = XPathQuery.eq(path, 17);
         
         XPathExpression<Object> index = xpath.compile("ghi/jkl");
         
@@ -873,7 +870,7 @@ public class XpathQueryTest {
         System.out.println("testDissect_IndexMatches_ReturnsEq");
         
         XPathExpression<Object> path = xpath.compile("abc/def");
-        XpathQuery q = XpathQuery.eq(path, 17);
+        XPathQuery q = XPathQuery.eq(path, 17);
         
         XPathExpression<Object> index = xpath.compile("abc/def");
         
@@ -887,9 +884,9 @@ public class XpathQueryTest {
         System.out.println("testDissect_And_IndexMatches_ReturnsIntersection");
         
         XPathExpression<Object> path = xpath.compile("abc/def");
-        XpathQuery q = XpathQuery.and(
-                XpathQuery.lt(path, 17),
-                XpathQuery.gte(path, 5)
+        XPathQuery q = XPathQuery.and(
+                XPathQuery.lt(path, 17),
+                XPathQuery.gte(path, 5)
             );
         
         XPathExpression<Object> index = xpath.compile("abc/def");
@@ -904,9 +901,9 @@ public class XpathQueryTest {
         System.out.println("testDissect_Or_IndexMatches_ReturnsUnion");
         
         XPathExpression<Object> path = xpath.compile("abc/def");
-        XpathQuery q = XpathQuery.or(
-                XpathQuery.lt(path, 4),
-                XpathQuery.gte(path, 5)
+        XPathQuery q = XPathQuery.or(
+                XPathQuery.lt(path, 4),
+                XPathQuery.gte(path, 5)
             );
         
         XPathExpression<Object> index = xpath.compile("abc/def");
@@ -922,9 +919,9 @@ public class XpathQueryTest {
         
         XPathExpression<Object> path = xpath.compile("abc/def");
         XPathExpression<Object> path2 = xpath.compile("abc/ghi");
-        XpathQuery q = XpathQuery.and(
-                XpathQuery.ne(path, 17),
-                XpathQuery.gte(path2, 5)
+        XPathQuery q = XPathQuery.and(
+                XPathQuery.ne(path, 17),
+                XPathQuery.gte(path2, 5)
             );
         
         XPathExpression<Object> index = xpath.compile("abc/def");
@@ -940,9 +937,9 @@ public class XpathQueryTest {
         
         XPathExpression<Object> path = xpath.compile("abc/def");
         XPathExpression<Object> path2 = xpath.compile("abc/ghi");
-        XpathQuery q = XpathQuery.or(
-                XpathQuery.ne(path, 17),
-                XpathQuery.gte(path2, 5)
+        XPathQuery q = XPathQuery.or(
+                XPathQuery.ne(path, 17),
+                XPathQuery.gte(path2, 5)
             );
         
         XPathExpression<Object> index = xpath.compile("abc/def");

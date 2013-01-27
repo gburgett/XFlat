@@ -8,7 +8,7 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.jdom2.Element;
@@ -57,7 +57,7 @@ public class TimestampIdGenerator extends IdGenerator {
                 return StringConverters.DateToStringConverter.convert(ret);
             } catch (ConversionException ex) {
                 //Should never happen
-                throw new XflatException("Unable to convert Integer to String", ex);
+                throw new XFlatException("Unable to convert Integer to String", ex);
             }
         }
         

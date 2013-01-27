@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.Converter;
 import org.gburgett.xflat.db.EngineBase;
@@ -135,45 +135,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     }
 
     @Override
-    public synchronized void unbindEngineFromTransaction(EngineBase engine, Long transactionId) {
-        ThreadedTransaction tx = null;
-        for(ThreadedTransaction t : this.currentTransactions.values()){
-            if(t.getTransactionId() == transactionId){
-                tx = t;
-                break;
-            }
-        }
-        
-        if(tx == null){
-            tx = this.committedTransactions.get(transactionId);
-        }
-        
-        if(tx == null){
-            //the transaction was reverted, don't bother unbinding.
-            return;
-        }
-        
-        tx.boundEngines.remove(engine);
-        
-        if(tx.boundEngines.isEmpty()){
-            //remove it from the committed transactions if it is empty.
-            this.committedTransactions.remove(tx.getTransactionId());
-        }
-    }
-
-    @Override
-    public synchronized void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds, boolean includeOpen) {
-        if(includeOpen){
-            for(ThreadedTransaction tx : this.currentTransactions.values()){
-                if(transactionIds.contains(tx.getTransactionId())){
-                    continue;
-                }
-
-                //try to remove its binding
-                tx.boundEngines.remove(engine);
-            }
-        }
-        
+    public synchronized void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds) {
+                
         Iterator<ThreadedTransaction> it = this.committedTransactions.values().iterator();
         while(it.hasNext()){
             ThreadedTransaction tx = it.next();
@@ -280,6 +243,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
 
     @Override
     public void close() {
+        //all transactions auto-revert now.
+        this.currentTransactions.clear();
     }
 
     @Override
@@ -291,7 +256,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 loadJournal();
             }            
         } catch (IOException | JDOMException ex) {
-            throw new XflatException("Unable to recover, could not access journal file " + journalWrapper, ex);
+            throw new XFlatException("Unable to recover, could not access journal file " + journalWrapper, ex);
         }
         
         try{
@@ -321,7 +286,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 this.journalWrapper.writeFile(transactionJournal);
             }
         }catch(TransactionException | IOException ex){
-            throw new XflatException("Unable to recover", ex);
+            throw new XFlatException("Unable to recover", ex);
         }
     }
         

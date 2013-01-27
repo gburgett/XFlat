@@ -5,13 +5,14 @@
 package org.gburgett.xflat;
 
 import java.util.List;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.jdom2.Element;
 
 /**
- * Represents a table in the database.  Converts from the POJO type to JDOM
- * {@link Element} objects before saving to an engine.
+ * Represents a table in the database.  A Table provides CRUD access to the underlying
+ * XML data store, and converts to and from the generic type.  This is the main
+ * interface to access data inside XFlat.
  * @author gordon
  */
 public interface Table<T> {
@@ -37,14 +38,14 @@ public interface Table<T> {
      * @param query The query to match.
      * @return the value of the matched row, or null if no row was matched.
      */
-    public T findOne(XpathQuery query);
+    public T findOne(XPathQuery query);
     
     /**
      * Gets a cursor over all the values matching the Xpath query.
      * @param query The query to match.
      * @return A cursor over each matching row.
      */
-    public Cursor<T> find(XpathQuery query);
+    public Cursor<T> find(XPathQuery query);
     
     /**
      * Gets a list of all the values matching the Xpath query.
@@ -53,7 +54,7 @@ public interface Table<T> {
      * @param query The query to match.
      * @return A list of all the matching values.
      */
-    public List<T> findAll(XpathQuery query);
+    public List<T> findAll(XPathQuery query);
     
     //UPDATE
     /**
@@ -70,7 +71,7 @@ public interface Table<T> {
      * @returns true if the query matched any rows, false otherwise.  If false,
      * the new value was not inserted.
      */
-    public boolean replaceOne(XpathQuery query, T newValue);
+    public boolean replaceOne(XPathQuery query, T newValue);
     
     /**
      * Updates or inserts the row by ID.
@@ -87,7 +88,7 @@ public interface Table<T> {
      * but the update did not select an existing document element.
      * @throws KeyNotFoundException if the row does not exist.
      */
-    public boolean update(Object id, XpathUpdate update)
+    public boolean update(Object id, XPathUpdate update)
             throws KeyNotFoundException;
     
     /**
@@ -96,7 +97,7 @@ public interface Table<T> {
      * @param update The update to apply to each matching row.
      * @returns the number of rows that were updated.
      */
-    public int update(XpathQuery query, XpathUpdate update);
+    public int update(XPathQuery query, XPathUpdate update);
     
     
     //DELETE
@@ -112,5 +113,5 @@ public interface Table<T> {
      * @param query The query selecting elements to delete.
      * @returns the number of rows that were deleted.
      */
-    public int deleteAll(XpathQuery query);
+    public int deleteAll(XPathQuery query);
 }

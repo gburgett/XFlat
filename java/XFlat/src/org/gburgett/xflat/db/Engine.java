@@ -7,8 +7,8 @@ package org.gburgett.xflat.db;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.jdom2.Element;
 
 /**
@@ -52,7 +52,7 @@ public interface Engine {
      * @param query The XPath query selecting rows in the database.
      * @return A cursor iterating over each data element in each row.
      */
-    public Cursor<Element> queryTable(XpathQuery query);
+    public Cursor<Element> queryTable(XPathQuery query);
     
     //UPDATE
     
@@ -71,7 +71,7 @@ public interface Engine {
      * @param update The update to apply.
      * @return true if the update actually applied.
      */
-    public boolean update(String id, XpathUpdate update)
+    public boolean update(String id, XPathUpdate update)
             throws KeyNotFoundException;
     
     /**
@@ -80,7 +80,7 @@ public interface Engine {
      * @param update The update to apply.
      * @return the number of rows that were updated
      */
-    public int update(XpathQuery query, XpathUpdate update);
+    public int update(XPathQuery query, XPathUpdate update);
     
     /**
      * Updates or inserts the given row.  If the row exists,
@@ -107,5 +107,5 @@ public interface Engine {
      * @param query The query that matches database rows.
      * @return the number of rows that were deleted.
      */
-    public int deleteAll(XpathQuery query);
+    public int deleteAll(XPathQuery query);
 }

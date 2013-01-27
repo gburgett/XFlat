@@ -11,8 +11,8 @@ import java.util.List;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.Table;
-import org.gburgett.xflat.XflatException;
-import org.gburgett.xflat.query.XpathQuery;
+import org.gburgett.xflat.XFlatException;
+import org.gburgett.xflat.query.XPathQuery;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
@@ -142,8 +142,8 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.Default
-                .setIdGenerator(IntegerIdGenerator.class));
+        db.configureTable("Foo", new TableConfig()
+                .withIdGenerator(IntegerIdGenerator.class));
         
         db.Initialize();
         try{
@@ -157,7 +157,7 @@ public class DatabaseIntegrationTest {
             }
 
             XPathExpression<Object> expression = XPathFactory.instance().compile("foo/fooInt");
-            try(Cursor<Foo> fooCursor = fooTable.find(XpathQuery.gte(expression, 100))){
+            try(Cursor<Foo> fooCursor = fooTable.find(XPathQuery.gte(expression, 100))){
 
                 int i = 100;
                 for(Foo f : fooCursor){
@@ -191,12 +191,12 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.Default
-                .setIdGenerator(IntegerIdGenerator.class));
+        db.configureTable("Foo", new TableConfig()
+                .withIdGenerator(IntegerIdGenerator.class));
         
         db.Initialize();
         
-        XpathQuery query;
+        XPathQuery query;
         try{
         
             Table<Foo> fooTable = db.getTable(Foo.class);
@@ -208,12 +208,12 @@ public class DatabaseIntegrationTest {
             }
 
             XPathExpression<Object> expression = XPathFactory.instance().compile("foo/fooInt");
-            query = XpathQuery.or(
-                        XpathQuery.lt(expression, 100),
-                        XpathQuery.eq(expression, 175),
-                        XpathQuery.and(
-                            XpathQuery.gt(expression, 400),
-                            XpathQuery.matches(expression, isEven(), Integer.class)
+            query = XPathQuery.or(
+                        XPathQuery.lt(expression, 100),
+                        XPathQuery.eq(expression, 175),
+                        XPathQuery.and(
+                            XPathQuery.gt(expression, 400),
+                            XPathQuery.matches(expression, isEven(), Integer.class)
                         )
                     );
             
@@ -289,8 +289,8 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.configureTable("Foo", TableConfig.Default
-                .setIdGenerator(TimestampIdGenerator.class));
+        db.configureTable("Foo", new TableConfig()
+                .withIdGenerator(TimestampIdGenerator.class));
         
         db.Initialize();
         
@@ -311,14 +311,14 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
         //use a different ID generator
-        db.configureTable("Foo", TableConfig.Default
-                .setIdGenerator(IntegerIdGenerator.class));
+        db.configureTable("Foo", new TableConfig()
+                .withIdGenerator(IntegerIdGenerator.class));
         
         boolean didThrow = false;
         try {
             //ACT
             db.Initialize();
-        } catch (XflatException expected) {
+        } catch (XFlatException expected) {
             didThrow = true;
         }
         assertTrue("Should have thrown XflatException", didThrow);

@@ -5,7 +5,6 @@
 package org.gburgett.xflat.db;
 
 import org.gburgett.xflat.Database;
-import org.gburgett.xflat.convert.ConversionException;
 import org.jdom2.Element;
 
 /**

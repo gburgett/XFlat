@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.EngineStateException;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.db.EngineBase.RowData;
 import org.gburgett.xflat.transaction.Transaction;
@@ -297,7 +297,7 @@ public abstract class EngineBase implements Engine {
                     //release the lock before throwing
                     this.tableLock.compareAndSet(thread, -1);
                     this.tableLockCount--;
-                    throw new XflatException(String.format("Cannot obtain table lock - %d long running writes in progress", this.writesInProgress.get()));
+                    throw new XFlatException(String.format("Cannot obtain table lock - %d long running writes in progress", this.writesInProgress.get()));
                 }
                 
                 //if we've been spin-waiting longer than 500ns then sleep the thread

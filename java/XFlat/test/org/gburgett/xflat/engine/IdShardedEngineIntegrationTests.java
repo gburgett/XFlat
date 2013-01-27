@@ -14,7 +14,7 @@ import org.gburgett.xflat.TableConfig;
 import org.gburgett.xflat.db.IntegerIdGenerator;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.NumericIntervalProvider;
-import org.gburgett.xflat.query.XpathQuery;
+import org.gburgett.xflat.query.XPathQuery;
 import org.jdom2.Element;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -42,9 +42,9 @@ public class IdShardedEngineIntegrationTests {
         File dbDir = new File(workspace, testName);
         XFlatDatabase ret = new XFlatDatabase(dbDir);
         
-        ret.configureTable(tbl, TableConfig.Default
-                                    .setIdGenerator(IntegerIdGenerator.class)
-                                    .sharded(ShardsetConfig.create(XpathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
+        ret.configureTable(tbl, new TableConfig()
+                                    .withIdGenerator(IntegerIdGenerator.class)
+                                    .sharded(ShardsetConfig.create(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
         
         ret.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         ret.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -107,7 +107,7 @@ public class IdShardedEngineIntegrationTests {
         foo.fooInt = 3;
         table.insert(foo);
         
-        List<Foo> fooList = table.findAll(XpathQuery.gt(XpathQuery.Id, 1));
+        List<Foo> fooList = table.findAll(XPathQuery.gt(XPathQuery.Id, 1));
         
         //can't trust ordering of a query
         Collections.sort(fooList, new Comparator<Foo>(){

@@ -4,8 +4,8 @@
  */
 package org.gburgett.xflat.db;
 
-import org.gburgett.xflat.TableConfig;
 import java.io.File;
+import org.gburgett.xflat.TableConfig;
 
 /**
  * An EngineFactory chooses which Engine to instantiate based on the given {@link File}.

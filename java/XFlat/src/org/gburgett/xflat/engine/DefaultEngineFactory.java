@@ -4,15 +4,14 @@
  */
 package org.gburgett.xflat.engine;
 
-import org.gburgett.xflat.TableConfig;
 import java.io.File;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.TableConfig;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.db.EngineFactory;
-import org.gburgett.xflat.query.XpathQuery;
+import org.gburgett.xflat.query.XPathQuery;
 import org.gburgett.xflat.util.XPathExpressionEqualityMatcher;
 import org.hamcrest.Matcher;
-import org.jdom2.xpath.XPathExpression;
 
 /**
  * The default engine factory, which chooses from among the engines available to 
@@ -21,7 +20,7 @@ import org.jdom2.xpath.XPathExpression;
  */
 public class DefaultEngineFactory implements EngineFactory {
 
-    private Matcher idPropertyMatcher = new XPathExpressionEqualityMatcher(XpathQuery.Id);
+    private Matcher idPropertyMatcher = new XPathExpressionEqualityMatcher(XPathQuery.Id);
     
     @Override
     public EngineBase newEngine(File file, String tableName, TableConfig config) {
@@ -29,7 +28,7 @@ public class DefaultEngineFactory implements EngineFactory {
             if(idPropertyMatcher.matches(config.getShardsetConfig().getShardPropertySelector())){
                 return new IdShardedEngine(file, tableName, config.getShardsetConfig());
             }
-            throw new XflatException("Tables sharded on other values than Id are not supported");
+            throw new XFlatException("Tables sharded on other values than Id are not supported");
         }
         
         return new CachedDocumentEngine(file, tableName);

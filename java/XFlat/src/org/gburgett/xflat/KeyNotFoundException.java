@@ -5,10 +5,10 @@
 package org.gburgett.xflat;
 
 /**
- *
+ * An XflatException thrown when a given ID is expected to be present but is not.
  * @author gordon
  */
-public class KeyNotFoundException extends XflatException {
+public class KeyNotFoundException extends XFlatException {
 
     /**
      * Creates a new instance of

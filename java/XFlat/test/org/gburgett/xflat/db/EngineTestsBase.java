@@ -28,8 +28,8 @@ import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.gburgett.xflat.transaction.FakeThreadContextTransactionManager;
 import org.gburgett.xflat.transaction.Transaction;
 import org.gburgett.xflat.transaction.TransactionException;
@@ -473,7 +473,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         //ACT
-        XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("data/fooInt"), 17);
         try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down
@@ -510,7 +510,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinUp(ctx);
         
         //ACT
-        XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("data/fooInt"), 17);
         try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down
@@ -550,7 +550,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinUp(ctx);
         
         //ACT
-        XpathQuery query = XpathQuery.eq(xpath.compile("data/fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("data/fooInt"), 17);
         try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down
@@ -593,7 +593,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinUp(ctx);
         
         //ACT
-        XpathQuery query = XpathQuery.gte(xpath.compile("data/fooInt"), 17);
+        XPathQuery query = XPathQuery.gte(xpath.compile("data/fooInt"), 17);
         try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
         
             //cursors ought to still read during spin down,
@@ -700,7 +700,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
+        XPathUpdate update = XPathUpdate.set(xpath.compile("other"), "updated text");
         
         //ACT
         boolean didThrow = false;
@@ -741,7 +741,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("fourth"), "updated text");
+        XPathUpdate update = XPathUpdate.set(xpath.compile("fourth"), "updated text");
         
         //ACT
         boolean result = ctx.instance.update("0", update);
@@ -778,7 +778,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
+        XPathUpdate update = XPathUpdate.set(xpath.compile("other"), "updated text");
         
         //ACT
         boolean result = ctx.instance.update("0", update);
@@ -821,8 +821,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
-        XpathUpdate update = XpathUpdate.set(xpath.compile("other"), "updated text");
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("other"), "updated text");
         
         //ACT
         int result = ctx.instance.update(query, update);
@@ -861,8 +861,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
-        XpathUpdate update = XpathUpdate.set(xpath.compile("fourth"), "updated text");
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("fourth"), "updated text");
         
         //ACT
         int result = ctx.instance.update(query, update);
@@ -899,8 +899,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
-        XpathUpdate update = XpathUpdate.set(xpath.compile("third"), "updated text");
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("third"), "updated text");
         
         //ACT
         int result = ctx.instance.update(query, update);
@@ -954,8 +954,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathQuery query = XpathQuery.gte(xpath.compile("*/@fooInt"), 17);
-        XpathUpdate update = XpathUpdate.set(xpath.compile("*/data"), "updated text");
+        XPathQuery query = XPathQuery.gte(xpath.compile("*/@fooInt"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("*/data"), "updated text");
         
         //ACT
         int result = ctx.instance.update(query, update);
@@ -1144,7 +1144,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinUp(ctx);
         
         //ACT
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
         
         int numDeleted = ctx.instance.deleteAll(query);
 
@@ -1196,7 +1196,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinUp(ctx);
         
         //ACT
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
         
         int numDeleted = ctx.instance.deleteAll(query);
 
@@ -1241,8 +1241,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, inFile);
         spinUp(ctx);
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
-        XpathUpdate update = XpathUpdate.set(xpath.compile("third"), "updated text");
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("third"), "updated text");
         
         //ACT
         try(Transaction tx = ctx.transactionManager.openTransaction()){
@@ -1411,7 +1411,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         spinUp(ctx);
         
-        XpathQuery query = XpathQuery.eq(xpath.compile("*/@fooInt"), 17);
+        XPathQuery query = XPathQuery.eq(xpath.compile("*/@fooInt"), 17);
         
         
         List<Element> fromCursor = new ArrayList<>();
@@ -1643,7 +1643,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
 
             @Override
-            public Cursor<Element> queryTable(XpathQuery query) {
+            public Cursor<Element> queryTable(XPathQuery query) {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
@@ -1653,12 +1653,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
 
             @Override
-            public boolean update(String id, XpathUpdate update) throws KeyNotFoundException {
+            public boolean update(String id, XPathUpdate update) throws KeyNotFoundException {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
             @Override
-            public int update(XpathQuery query, XpathUpdate update) {
+            public int update(XPathQuery query, XPathUpdate update) {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
@@ -1673,7 +1673,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
 
             @Override
-            public int deleteAll(XpathQuery query) {
+            public int deleteAll(XPathQuery query) {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
             //</editor-fold>

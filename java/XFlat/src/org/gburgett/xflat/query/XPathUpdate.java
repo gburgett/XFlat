@@ -24,7 +24,7 @@ import org.jdom2.xpath.XPathExpression;
  * The new value must be convertible to {@link Content} or String.
  * @author gordon
  */
-public class XpathUpdate {
+public class XPathUpdate {
     
     private List<Update> updates = new ArrayList<>();
     public List<Update> getUpdates(){
@@ -42,7 +42,7 @@ public class XpathUpdate {
         this.conversionService = conversionService;
     }
     
-    private XpathUpdate(){
+    private XPathUpdate(){
         
     }
     
@@ -51,8 +51,8 @@ public class XpathUpdate {
      * @param path The path selecting an element (or elements) to set.
      * @return A builder object that can be chained to provide a value for the update.
      */
-    public static <T> XpathUpdate set(XPathExpression<T> path, Object value){
-        XpathUpdate ret = new XpathUpdate();
+    public static <T> XPathUpdate set(XPathExpression<T> path, Object value){
+        XPathUpdate ret = new XPathUpdate();
         
         Update<T> u = new Update<>(path, value, UpdateType.SET);
         ret.updates.add(u);
@@ -60,8 +60,8 @@ public class XpathUpdate {
         return ret;
     }
     
-    public static <T> XpathUpdate unset(XPathExpression<T> path){
-        XpathUpdate ret = new XpathUpdate();
+    public static <T> XPathUpdate unset(XPathExpression<T> path){
+        XPathUpdate ret = new XPathUpdate();
         ret.updates.add(new Update<>(path, null, UpdateType.UNSET));
         return ret;
     }
@@ -72,14 +72,14 @@ public class XpathUpdate {
      * @param path
      * @return 
      */
-    public <T> XpathUpdate andSet(XPathExpression<T> path, Object value){
+    public <T> XPathUpdate andSet(XPathExpression<T> path, Object value){
         Update<T> u = new Update<>(path, value, UpdateType.SET);
         this.updates.add(u);
         
         return this;
     }
     
-    public <T> XpathUpdate andUnset(XPathExpression<T> path){
+    public <T> XPathUpdate andUnset(XPathExpression<T> path){
         this.updates.add(new Update<>(path, null, UpdateType.UNSET));
         return this;
     }

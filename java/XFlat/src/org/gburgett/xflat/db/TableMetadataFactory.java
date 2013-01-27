@@ -10,7 +10,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.DatabaseConfig;
 import org.gburgett.xflat.TableConfig;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.jdom2.Document;
@@ -126,7 +126,7 @@ public class TableMetadataFactory {
 
         TableMetadata ret = new TableMetadata(name, db, engineFile);
         
-        config = config == null ? TableConfig.Default : config;
+        config = config == null ? new TableConfig() : config;
         ret.config = config;
 
         //make ID Generator
@@ -134,7 +134,7 @@ public class TableMetadataFactory {
         if(generatorClass != null){
             ret.idGenerator = makeIdGenerator(generatorClass);
             if(idType != null && !ret.idGenerator.supports(idType)){
-                throw new XflatException("Id Generator " + generatorClass.getName() +
+                throw new XFlatException("Id Generator " + generatorClass.getName() +
                         " does not support type " + idType);
             }
         }
@@ -151,7 +151,7 @@ public class TableMetadataFactory {
                 }
         
             if(ret.idGenerator == null){
-                throw new XflatException("Could not pick id generator for type " + idType);
+                throw new XFlatException("Could not pick id generator for type " + idType);
             }
         }
 
@@ -167,7 +167,7 @@ public class TableMetadataFactory {
             try {
                 config = TableConfig.FromElementConverter.convert(c);
             } catch (ConversionException ex) {
-                throw new XflatException("Cannot deserialize metadata for table " + name, ex);
+                throw new XFlatException("Cannot deserialize metadata for table " + name, ex);
             }
         }
         //else we already verified that config was equal to that stored in metadata
@@ -183,14 +183,14 @@ public class TableMetadataFactory {
                 try {
                     generatorClass = (Class<? extends IdGenerator>) TableMetadata.class.getClassLoader().loadClass(gClassStr);
                 } catch (ClassNotFoundException ex) {
-                    throw new XflatException("Cannot load metadata: generator class could not be loaded", ex);
+                    throw new XFlatException("Cannot load metadata: generator class could not be loaded", ex);
                 }
             }
         }
         ret.idGenerator = makeIdGenerator(generatorClass);
         
         if(idType != null && !ret.idGenerator.supports(idType)){
-            throw new XflatException("Id Generator " + generatorClass + " does not support " + 
+            throw new XFlatException("Id Generator " + generatorClass + " does not support " + 
                     " ID type " + idType);
         }
         ret.idGenerator.loadState(g);
@@ -219,7 +219,7 @@ public class TableMetadataFactory {
             try {
                 cfg = TableConfig.ToElementConverter.convert(metadata.config);
             } catch (ConversionException ex) {
-                throw new XflatException("Cannot serialize table metadata", ex);
+                throw new XFlatException("Cannot serialize table metadata", ex);
             }
             doc.getRootElement().addContent(cfg);
         }
@@ -243,13 +243,13 @@ public class TableMetadataFactory {
     
     private IdGenerator makeIdGenerator(Class<? extends IdGenerator> generatorClass){
         if(generatorClass == null){
-            throw new XflatException("generator class could not be loaded");
+            throw new XFlatException("generator class could not be loaded");
         }
 
         try {
             return generatorClass.newInstance();
         } catch (InstantiationException | IllegalAccessException ex) {
-            throw new XflatException("Cannot load metadata: generator class could not be instantiated", ex);
+            throw new XFlatException("Cannot load metadata: generator class could not be instantiated", ex);
         }
     }
 }

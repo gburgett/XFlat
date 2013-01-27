@@ -4,11 +4,13 @@
  */
 package org.gburgett.xflat;
 
-import org.gburgett.xflat.Table;
+import org.gburgett.xflat.transaction.Transaction;
 import org.gburgett.xflat.transaction.TransactionManager;
 
 /**
- * An interface for a Database managing one or more Tables.
+ * An interface for a Database managing one or more Tables.<br/>
+ * The Database allows getting and using Tables, and also provides access to
+ * the {@link TransactionManager} which can open {@link Transaction Transactions}.
  * @author gordon
  */
 public interface Database {

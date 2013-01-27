@@ -9,7 +9,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.gburgett.xflat.transaction.TransactionManager;
 
 /**
- *
+ * The Base Class of all Transaction Managers.<p/>
+ * This class defines the contract required of Transaction Manager implementations
+ * by XFlat.  XFlat users do not need to concern themselves with these methods, only
+ * the exposed TransactionManager interface.
  * @author Gordon
  */
 public abstract class EngineTransactionManager implements TransactionManager, AutoCloseable {
@@ -40,25 +43,15 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
      */
     public abstract void bindEngineToCurrentTransaction(EngineBase engine);
     
-    /**
-     * Called by an engine in order to unbind itself from a transaction.  This means
-     * that the engine no longer has transactional data for this transaction; either
-     * the data in the transaction has been fully committed or fully cleaned.  In either
-     * case the engine will no longer need to ask the transaction manager about
-     * the status of the transaction.
-     * @param engine The engine to unbind from a transaction.
-     * @param transactionId The ID of the transaction to unbind.
-     */
-    public abstract void unbindEngineFromTransaction(EngineBase engine, Long transactionId);
     
     /**
-     * Unbinds the engine from all its bound transactions except the given collection.
+     * Unbinds the engine from all its bound and closed transactions except the given collection.<br/>
+     * The engine will not be unbound from any open transactions.
      * @see #unbindEngineFromTransaction(org.gburgett.xflat.db.EngineBase, java.lang.Long) 
      * @param engine The engine to unbind.
      * @param transactionIds The transactions to remain bound to.
-     * @param includeOpenTransactions whether to also unbind from open transactions.
      */
-    public abstract void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds, boolean includeOpenTransactions);
+    public abstract void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds);
     
     /**
      * Checks to see if the given transaction ID has been committed.  If so,

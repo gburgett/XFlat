@@ -5,10 +5,10 @@
 package org.gburgett.xflat;
 
 /**
- *
+ * An XflatException thrown when a unique ID is duplicated in a table.
  * @author gordon
  */
-public class DuplicateKeyException extends XflatException {
+public class DuplicateKeyException extends XFlatException {
 
     /**
      * Creates a new instance of

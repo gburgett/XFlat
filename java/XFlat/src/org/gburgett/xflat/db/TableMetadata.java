@@ -9,11 +9,12 @@ import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.PojoConverter;
 import org.gburgett.xflat.db.EngineBase.SpinDownEvent;
 import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
 import org.jdom2.Element;
+import org.jdom2.xpath.XPathExpression;
 
 /**
  * A class containing metadata about a Table, and providing the ability to spin up
@@ -97,7 +98,7 @@ public class TableMetadata implements EngineProvider {
         IdAccessor accessor = IdAccessor.forClass(clazz);
         if(accessor.hasId()){
             if(!this.idGenerator.supports(accessor.getIdType())){
-                throw new XflatException(String.format("Cannot serialize class %s to table %s: ID type %s not supported by the table's Id generator %s.",
+                throw new XFlatException(String.format("Cannot serialize class %s to table %s: ID type %s not supported by the table's Id generator %s.",
                                 clazz, this.name, accessor.getIdType(), this.idGenerator));
             }
         }
@@ -105,10 +106,22 @@ public class TableMetadata implements EngineProvider {
         ConvertingTable<T> ret = new ConvertingTable<>(clazz, this.name);
         
         ret.setConversionService(this.db.getConversionService());
-        PojoConverter converter = this.db.getPojoConverter();
-        if(converter != null){
-            ret.setAlternateIdExpression(converter.idSelector(clazz));
+        
+        //check if there's an alternate ID expression we can use for queries that come through
+        //the converting table.
+        if(accessor.hasId()){
+            XPathExpression<Object> alternateId = accessor.getAlternateIdExpression();
+            if(alternateId != null){
+                ret.setAlternateIdExpression(alternateId);
+            }
+            else{
+                PojoConverter converter = this.db.getPojoConverter();
+                if(converter != null){
+                    ret.setAlternateIdExpression(converter.idSelector(clazz));
+                }
+            }
         }
+        
         return ret;
     }
     

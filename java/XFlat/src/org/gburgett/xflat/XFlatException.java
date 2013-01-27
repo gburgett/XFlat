@@ -5,16 +5,16 @@
 package org.gburgett.xflat;
 
 /**
- *
+ * The base class for all normal exceptions thrown by XFlat.
  * @author gordon
  */
-public class XflatException extends RuntimeException {
+public class XFlatException extends RuntimeException {
     
-    public XflatException(String msg){
+    public XFlatException(String msg){
         super(msg);
     }
     
-    public XflatException(String msg, Throwable cause){
+    public XFlatException(String msg, Throwable cause){
         super(msg, cause);
     }
 }

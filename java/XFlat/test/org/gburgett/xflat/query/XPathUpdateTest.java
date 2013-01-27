@@ -12,18 +12,17 @@ import org.jdom2.Content;
 import org.jdom2.Element;
 import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
-import org.jdom2.xpath.XPathDiagnostic;
 import org.jdom2.xpath.XPathFactory;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.*;
 import test.Foo;
 
 /**
  *
  * @author gordon
  */
-public class XpathUpdateTest {
+public class XPathUpdateTest {
     
     private ConversionService conversionService;
     
@@ -50,7 +49,7 @@ public class XpathUpdateTest {
         data.setText("value");
         row.addContent(data);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("data"), "other value");
+        XPathUpdate update = XPathUpdate.set(xpath.compile("data"), "other value");
         int updateCount = update.apply(row);
         System.out.println(outputter.outputString(row));
         
@@ -70,7 +69,7 @@ public class XpathUpdateTest {
         data.setAttribute("val", "value");
         row.addContent(data);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("data/@val"), "other value");
+        XPathUpdate update = XPathUpdate.set(xpath.compile("data/@val"), "other value");
         int updateCount = update.apply(row);
         System.out.println(outputter.outputString(row));
         
@@ -89,7 +88,7 @@ public class XpathUpdateTest {
         data.setText("value");
         row.addContent(data);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("data"), null);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("data"), null);
         int updateCount = update.apply(row);
         System.out.println(outputter.outputString(row));
         
@@ -109,7 +108,7 @@ public class XpathUpdateTest {
         data.setAttribute("val", "value");
         row.addContent(data);
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("data/@val"), null);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("data/@val"), null);
         int updateCount = update.apply(row);
         System.out.println(outputter.outputString(row));
         
@@ -134,7 +133,7 @@ public class XpathUpdateTest {
         conversionService.addConverter(Foo.class, Content.class, new Foo.ToElementConverter());
         conversionService.addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("data"), setTo);
+        XPathUpdate update = XPathUpdate.set(xpath.compile("data"), setTo);
         update.setConversionService(conversionService);
         
         //ACT
@@ -158,7 +157,7 @@ public class XpathUpdateTest {
         row.addContent(new Element("deep"));
         row.getChild("deep").addContent(data);
         
-        XpathUpdate update = XpathUpdate.unset(xpath.compile("deep/data"));
+        XPathUpdate update = XPathUpdate.unset(xpath.compile("deep/data"));
         int updateCount = update.apply(row);
         System.out.println(outputter.outputString(row));
         
@@ -178,7 +177,7 @@ public class XpathUpdateTest {
         data.setAttribute("val", "value");
         row.addContent(data);
         
-        XpathUpdate update = XpathUpdate.unset(xpath.compile("data/@val"));
+        XPathUpdate update = XPathUpdate.unset(xpath.compile("data/@val"));
         int updateCount = update.apply(row);
         System.out.println(outputter.outputString(row));
         
@@ -200,7 +199,7 @@ public class XpathUpdateTest {
         row.addContent(new Element("other"));
         row.getChild("other").addContent(data.clone());
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile(".//data"), 17);
+        XPathUpdate update = XPathUpdate.set(xpath.compile(".//data"), 17);
         update.setConversionService(conversionService);
         
         //ACT
@@ -227,7 +226,7 @@ public class XpathUpdateTest {
         row.addContent(new Element("other"));
         row.getChild("other").addContent(data.clone());
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("deep/data"), 17)
+        XPathUpdate update = XPathUpdate.set(xpath.compile("deep/data"), 17)
                                     .andSet(xpath.compile("other/data"), 34.2);
         update.setConversionService(conversionService);
         
@@ -255,7 +254,7 @@ public class XpathUpdateTest {
         row.addContent(new Element("other"));
         row.getChild("other").addContent(data.clone());
         
-        XpathUpdate update = XpathUpdate.set(xpath.compile("deep/data"), 17)
+        XPathUpdate update = XPathUpdate.set(xpath.compile("deep/data"), 17)
                                 .andUnset(xpath.compile("other/data"));
         update.setConversionService(conversionService);
         

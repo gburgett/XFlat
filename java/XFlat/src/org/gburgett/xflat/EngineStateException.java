@@ -7,10 +7,11 @@ package org.gburgett.xflat;
 import org.gburgett.xflat.db.EngineState;
 
 /**
- *
+ * An XflatException thrown when the engine is in an unusable state for the 
+ * current operation.
  * @author gordon
  */
-public class EngineStateException extends XflatException {
+public class EngineStateException extends XFlatException {
 
     private final EngineState state;
     public EngineState getEngineState(){

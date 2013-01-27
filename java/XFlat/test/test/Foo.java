@@ -4,9 +4,11 @@
  */
 package test;
 
+import org.gburgett.xflat.Id;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.Converter;
 import org.jdom2.Element;
+import org.jdom2.Namespace;
 
 /**
  *
@@ -15,6 +17,7 @@ import org.jdom2.Element;
 public class Foo {
     
     private String id;
+    @Id(value="foo/@t:id", namespaces={"xmlns:t='http://www.example.com/ns'"})
     public String getId(){
         return id;
     }
@@ -47,10 +50,15 @@ public class Foo {
         return true;
     }
  
+    public static final Namespace FooIdNs = Namespace.getNamespace("t", "http://www.example.com/ns");
+    
     public static class ToElementConverter implements Converter<Foo, Element>{
         @Override
         public Element convert(Foo source) {
             Element ret = new Element("foo");
+            
+            if(source.id != null)
+                ret.setAttribute("id", source.id, FooIdNs);
             
             Element fooInt = new Element("fooInt");
             fooInt.setText(Integer.toString(source.fooInt));
@@ -67,6 +75,8 @@ public class Foo {
                 throw new ConversionException("Expected element named 'Foo'");
             
             Foo ret = new Foo();
+            ret.id = source.getAttributeValue("id", FooIdNs);
+            
             Element fooInt = source.getChild("fooInt");
             if(fooInt != null){
                 try{

@@ -18,7 +18,7 @@ import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.DuplicateKeyException;
 import org.gburgett.xflat.KeyNotFoundException;
 import org.gburgett.xflat.ShardsetConfig;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.db.Engine;
 import org.gburgett.xflat.db.EngineAction;
 import org.gburgett.xflat.db.ShardedEngineBase;
@@ -28,8 +28,8 @@ import org.gburgett.xflat.query.Interval;
 import org.gburgett.xflat.query.IntervalComparator;
 import org.gburgett.xflat.query.IntervalProvider;
 import org.gburgett.xflat.query.IntervalSet;
-import org.gburgett.xflat.query.XpathQuery;
-import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.query.XPathQuery;
+import org.gburgett.xflat.query.XPathUpdate;
 import org.jdom2.Element;
 
 /**
@@ -44,9 +44,9 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     public IdShardedEngine(File file, String tableName, ShardsetConfig<T> config){
         super(file, tableName, config);
         
-        if((config.getShardPropertySelector().getExpression() == null ? XpathQuery.Id.getExpression() != null : !config.getShardPropertySelector().getExpression().equals(XpathQuery.Id.getExpression())) ||
+        if((config.getShardPropertySelector().getExpression() == null ? XPathQuery.Id.getExpression() != null : !config.getShardPropertySelector().getExpression().equals(XPathQuery.Id.getExpression())) ||
                 config.getShardPropertySelector().getNamespace("db") != XFlatDatabase.xFlatNs){
-            throw new XflatException("IdShardedEngine must be sharded by the expression '@db:id' where db is the XFlat Namespace");
+            throw new XFlatException("IdShardedEngine must be sharded by the expression '@db:id' where db is the XFlat Namespace");
         }
     }
     
@@ -62,7 +62,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
      * @param query
      * @return 
      */
-    private List<Interval<T>> getExecutionPlan(XpathQuery query){
+    private List<Interval<T>> getExecutionPlan(XPathQuery query){
         final IntervalProvider<T> provider = config.getIntervalProvider();
         
         IntervalSet<T> dissectedQuery = query.dissectId(provider.getComparator(), config.getShardPropertyClass());
@@ -106,7 +106,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public Cursor<Element> queryTable(final XpathQuery query) {
+    public Cursor<Element> queryTable(final XPathQuery query) {
         query.setConversionService(this.getConversionService());
         
         List<Interval<T>> shardIntervals = getExecutionPlan(query);
@@ -150,7 +150,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public boolean update(final String id, final XpathUpdate update) throws KeyNotFoundException {
+    public boolean update(final String id, final XPathUpdate update) throws KeyNotFoundException {
         ensureWriteReady();
         try{
             return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
@@ -165,7 +165,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public int update(final XpathQuery query, final XpathUpdate update) {
+    public int update(final XPathQuery query, final XPathUpdate update) {
         ensureWriteReady();
         try{
             query.setConversionService(this.getConversionService());
@@ -221,7 +221,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public int deleteAll(final XpathQuery query) {
+    public int deleteAll(final XPathQuery query) {
         ensureWriteReady();
         try{
             query.setConversionService(this.getConversionService());
@@ -250,13 +250,13 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
      */
     private class CrossShardQueryCursor implements Cursor<Element>{
 
-        private final XpathQuery query;
+        private final XPathQuery query;
         private final List<Interval<T>> intervals;
         
         private Set<Cursor<Element>> openCursors = new HashSet<>();
         private boolean closed = false;
         
-        public CrossShardQueryCursor(XpathQuery query, List<Interval<T>> shardIntervals){
+        public CrossShardQueryCursor(XPathQuery query, List<Interval<T>> shardIntervals){
             this.query = query;
             this.intervals = shardIntervals;
         }
@@ -306,7 +306,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
                             //current open cursor is done, need to close it
                             closeCursor(currentCursor);
                         } catch (Exception ex) {
-                            throw new XflatException("Exception closing cursor for shard " + config.getIntervalProvider().getName(intervals.get(intervalIndex)), ex);
+                            throw new XFlatException("Exception closing cursor for shard " + config.getIntervalProvider().getName(intervals.get(intervalIndex)), ex);
                         }
                         currentCursor = null;
                         currentCursorIterator = null;
@@ -344,7 +344,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         }
 
         @Override
-        public void close() throws XflatException {
+        public void close() throws XFlatException {
             if(this.closed){
                 return;
             }
@@ -362,7 +362,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
             IdShardedEngine.this.crossShardQueries.remove(this);
             
             if(last != null){
-                throw new XflatException("Exception while closing multi-shard cursor", last);
+                throw new XFlatException("Exception while closing multi-shard cursor", last);
             }
         }
     }

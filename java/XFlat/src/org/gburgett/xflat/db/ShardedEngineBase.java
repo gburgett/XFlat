@@ -18,7 +18,7 @@ import org.gburgett.xflat.Cursor;
 import org.gburgett.xflat.EngineStateException;
 import org.gburgett.xflat.ShardsetConfig;
 import org.gburgett.xflat.TableConfig;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.query.Interval;
 import org.jdom2.Element;
@@ -82,7 +82,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             try {
                 converted = this.getConversionService().convert(value, this.config.getShardPropertyClass());
             } catch (ConversionException ex) {
-                throw new XflatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
+                throw new XFlatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
                         " selected non-convertible value " + value, ex);
             }
         }
@@ -94,12 +94,12 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         try{
             ret = this.config.getIntervalProvider().getInterval(converted);
         }catch(java.lang.NullPointerException ex){
-            throw new XflatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
+            throw new XFlatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
                     " selected null value which cannot be mapped to a range");
         }
         
         if(ret == null){
-            throw new XflatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
+            throw new XFlatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
                     " selected value " + converted + " which cannot be mapped to a range");
         }
         
@@ -115,7 +115,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 
                 EngineState state = getState();
                 if(state == EngineState.SpunDown){
-                    throw new XflatException("Engine has already spun down");
+                    throw new XFlatException("Engine has already spun down");
                 }
                 
                 //build the new metadata element so we can use it to provide engines
@@ -124,7 +124,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                 this.knownShards.put(interval, file);
                 
                 metadata = this.getMetadataFactory().makeTableMetadata(this.getTableName(), file);
-                metadata.config = TableConfig.Default; //not even really used for our purposes
+                metadata.config = new TableConfig(); //not even really used for our purposes
                 
                 TableMetadata weWereLate = openShards.putIfAbsent(interval, metadata);
                 if(weWereLate != null){
@@ -151,7 +151,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         
         EngineState state = getState();
         if(state == EngineState.Uninitialized || state == EngineState.SpunDown){
-            throw new XflatException("Attempt to read or write to an engine in an uninitialized state");
+            throw new XFlatException("Attempt to read or write to an engine in an uninitialized state");
         }
         
         try{

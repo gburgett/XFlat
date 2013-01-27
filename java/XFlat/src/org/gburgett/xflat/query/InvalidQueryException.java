@@ -15,9 +15,9 @@ package org.gburgett.xflat.query;
  */
 public class InvalidQueryException extends RuntimeException {
     
-    private final XpathQuery query;
+    private final XPathQuery query;
     
-    public XpathQuery getQuery(){
+    public XPathQuery getQuery(){
         return query;
     }
     
@@ -26,7 +26,7 @@ public class InvalidQueryException extends RuntimeException {
         return indexType;
     }
     
-    public InvalidQueryException(XpathQuery q, Class<?> indexType){
+    public InvalidQueryException(XPathQuery q, Class<?> indexType){
         super(String.format("Query %s expected value to be type %s, but index requires value to be %s", q.toString(), q.getValueType().toString(), indexType.toString()));
         
         this.query = q;

@@ -25,7 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.Database;
 import org.gburgett.xflat.Table;
-import org.gburgett.xflat.XflatException;
+import org.gburgett.xflat.XFlatException;
 import org.gburgett.xflat.convert.ConversionException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
@@ -133,10 +133,10 @@ public class XFlatDatabase implements Database {
     //the engine cache
     private ConcurrentHashMap<String, TableMetadata> tables = new ConcurrentHashMap<>();
     
-    private DatabaseConfig config = DatabaseConfig.Default;
+    private DatabaseConfig config = new DatabaseConfig();
     public void setConfig(DatabaseConfig config){
         if(this.state.get() != DatabaseState.Uninitialized){
-            throw new XflatException("Cannot configure database after initialization");
+            throw new XFlatException("Cannot configure database after initialization");
         }
         this.config = config;
     }
@@ -152,7 +152,7 @@ public class XFlatDatabase implements Database {
      */
     public void configureTable(String tableName, TableConfig config){
         if(this.state.get() != DatabaseState.Uninitialized){
-            throw new XflatException("Cannot configure table after initialization");
+            throw new XFlatException("Cannot configure table after initialization");
         }
         
         this.tableConfigs.put(tableName, config);
@@ -217,7 +217,7 @@ public class XFlatDatabase implements Database {
             
         }catch(Exception ex){
             this.state.set(DatabaseState.Uninitialized);
-            throw new XflatException("Initialization error", ex);
+            throw new XFlatException("Initialization error", ex);
         }
     }
     
@@ -359,7 +359,7 @@ public class XFlatDatabase implements Database {
                 
                 TableConfig inMetadata = TableConfig.FromElementConverter.convert(cfg);
                 if(!entry.getValue().equals(inMetadata)){
-                    throw new XflatException("Configuration for table " + entry.getKey() +
+                    throw new XFlatException("Configuration for table " + entry.getKey() +
                             " does not match stored configuration");
                 }
             } catch (ConversionException ex) {

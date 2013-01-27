@@ -59,14 +59,22 @@ public class JAXBPojoConverter implements PojoConverter {
 
     private Map<Class<?>, XPathExpression<Object>> idSelectorCache = new ConcurrentHashMap<>();
     
+    /**
+     * Guesses an alternate ID selector for the class based on how JAXB would
+     * map the ID property.  If the class has no ID property, a null expression
+     * is returned.
+     * @param clazz The class for which an alternate ID selector is required.
+     * @return The alternate ID selector, or null if the class hass no ID property.
+     */
     @Override
     public XPathExpression<Object> idSelector(Class<?> clazz) {
-        XPathExpression<Object> ret = idSelectorCache.get(clazz);
-        if(ret == null){
-            ret = makeIdSelector(clazz);
+        
+        if(!idSelectorCache.containsKey(clazz)){
+            XPathExpression<Object> ret = makeIdSelector(clazz);
             idSelectorCache.put(clazz, ret);
+            return ret;
         }
-        return ret;
+        return idSelectorCache.get(clazz);
     }
     
     private XPathExpression<Object> makeIdSelector(Class<?> clazz){
