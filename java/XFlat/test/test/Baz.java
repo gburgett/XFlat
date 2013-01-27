@@ -10,7 +10,7 @@ import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
-import org.gburgett.xflat.Id;
+import org.xflatdb.xflat.Id;
 
 /**
  * A test class annotated such that it can be marshalled by JAXB.

@@ -6,7 +6,7 @@ package test;
 
 import java.io.File;
 import java.util.List;
-import org.gburgett.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.db.XFlatDatabase;
 import org.jdom2.Document;
 import org.jdom2.Element;
 

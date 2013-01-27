@@ -4,9 +4,9 @@
  */
 package test;
 
-import org.gburgett.xflat.Id;
-import org.gburgett.xflat.convert.ConversionException;
-import org.gburgett.xflat.convert.Converter;
+import org.xflatdb.xflat.Id;
+import org.xflatdb.xflat.convert.ConversionException;
+import org.xflatdb.xflat.convert.Converter;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
 

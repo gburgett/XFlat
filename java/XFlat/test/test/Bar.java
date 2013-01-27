@@ -5,8 +5,8 @@
 package test;
 
 import java.util.Objects;
-import org.gburgett.xflat.convert.ConversionException;
-import org.gburgett.xflat.convert.Converter;
+import org.xflatdb.xflat.convert.ConversionException;
+import org.xflatdb.xflat.convert.Converter;
 import org.jdom2.Element;
 
 /**
