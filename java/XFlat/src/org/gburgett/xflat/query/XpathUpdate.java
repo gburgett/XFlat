@@ -267,7 +267,8 @@ public class XpathUpdate {
             return this.conversionService.convert(value, String.class);
         } catch (ConversionException ex) {
             Log log = LogFactory.getLog(getClass());
-            log.warn("Unable to convert update value to string", ex);
+            if(log.isTraceEnabled())
+                log.trace("Unable to convert update value to string", ex);
             return null;
         }
     }

@@ -6,12 +6,13 @@ package org.gburgett.xflat.engine;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.gburgett.xflat.db.EngineBase;
 import org.gburgett.xflat.db.EngineTestsBase;
 import org.gburgett.xflat.util.DocumentFileWrapper;
+import org.gburgett.xflat.util.FakeDocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.JDOMException;
-import org.junit.Before;
 
 /**
  *
@@ -20,31 +21,34 @@ import org.junit.Before;
 public class CachedDocumentEngineTest extends EngineTestsBase {
 
     String name = "CachedDocumentEngineTest";
+    
     @Override
-    protected EngineBase createInstance(TestContext ctx) {
+    protected void prepContext(TestContext ctx){
         File file = new File(ctx.workspace, name + ".xml");
         ctx.additionalContext.put("file", file);
-        return new CachedDocumentEngine(new DocumentFileWrapper(file), name);
+        
+        AtomicReference<Document> doc = new AtomicReference<>();
+        ctx.additionalContext.put("doc", doc);
+        
+    }
+    
+    @Override
+    protected EngineBase createInstance(TestContext ctx) {
+        AtomicReference<Document> doc = (AtomicReference<Document>)ctx.additionalContext.get("doc");
+        return new CachedDocumentEngine(new FakeDocumentFileWrapper(doc), name);
     }
 
     @Override
     protected void prepFileContents(TestContext ctx, Document contents) throws IOException {
-        File file = (File)ctx.additionalContext.get("file");
-        if(contents == null){
-            //ensure file doesn't exist
-            if(file.exists())
-                file.delete();
-            
-            return;
-        }
+        AtomicReference<Document> doc = (AtomicReference<Document>)ctx.additionalContext.get("doc");
         
-        new DocumentFileWrapper(file).writeFile(contents);
+        new FakeDocumentFileWrapper(doc).writeFile(contents);
     }
 
     @Override
     protected Document getFileContents(TestContext ctx) throws IOException, JDOMException {
-        File file = (File)ctx.additionalContext.get("file");
-        return new DocumentFileWrapper(file).readFile();
+        AtomicReference<Document> doc = (AtomicReference<Document>)ctx.additionalContext.get("doc");
+        return new FakeDocumentFileWrapper(doc).readFile();
     }
     
     

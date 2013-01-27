@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ScheduledExecutorService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.ShardsetConfig;
@@ -27,9 +27,8 @@ import org.gburgett.xflat.query.Interval;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.NumericIntervalProvider;
 import org.gburgett.xflat.query.IntervalProvider;
-import org.gburgett.xflat.transaction.ThreadContextTransactionManager;
+import org.gburgett.xflat.transaction.TransactionManager;
 import org.gburgett.xflat.util.DocumentFileWrapper;
-import org.gburgett.xflat.util.FakeDocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
@@ -51,14 +50,25 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
     String name = "IdShardedEngineTest";
     
     XMLOutputter outputter = new XMLOutputter();
-            
+           
     @Override
-    protected IdShardedEngine createInstance(TestContext ctx) {
-        
-        final Map<String, Document> docs = new ConcurrentHashMap<>();
+    protected void prepContext(final TestContext ctx){
+                final Map<String, Document> docs = new ConcurrentHashMap<>();
         ctx.additionalContext.put("docs", docs);
         
-        XFlatDatabase db = new XFlatDatabase(workspace, ctx.executorService);
+        XFlatDatabase db = new XFlatDatabase(workspace, ctx.executorService){
+            //override to always return the executor service set on the context
+            @Override
+            protected ScheduledExecutorService getExecutorService(){
+                return ctx.executorService;
+            }
+            
+            @Override
+            public TransactionManager getTransactionManager(){
+                return ctx.transactionManager;
+            }
+        };
+        
         db.extendConversionService(new PojoConverter(){
             @Override
             public ConversionService extend(ConversionService service) {
@@ -109,10 +119,10 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             }
         });
         db.setTransactionManager(ctx.transactionManager);
-                
+        ctx.additionalContext.put("db", db);        
+        
         IntervalProvider provider = NumericIntervalProvider.forInteger(1, 100);
         ctx.additionalContext.put("rangeProvider", provider);
-        ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
         
         File file = spy(new File(ctx.workspace, name));
         when(file.exists()).thenReturn(true);
@@ -130,7 +140,18 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 return ret;
             }
         });
+        ctx.additionalContext.put("file", file);
+    }
+    
+    @Override
+    protected IdShardedEngine createInstance(TestContext ctx) {
         
+
+        File file = (File)ctx.additionalContext.get("file");
+        IntervalProvider provider = (IntervalProvider)ctx.additionalContext.get("rangeProvider");
+        XFlatDatabase db = (XFlatDatabase)ctx.additionalContext.get("db");
+        
+        ShardsetConfig cfg = ShardsetConfig.create(XpathQuery.Id, Integer.class, provider);
         
         IdShardedEngine ret = new IdShardedEngine(file, name, cfg);
         setMetadataFactory(ret, new TableMetadataFactory(db, file));

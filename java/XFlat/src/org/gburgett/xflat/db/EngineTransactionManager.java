@@ -54,10 +54,11 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
     /**
      * Unbinds the engine from all its bound transactions except the given collection.
      * @see #unbindEngineFromTransaction(org.gburgett.xflat.db.EngineBase, java.lang.Long) 
-     * @param engine
-     * @param transactionIds 
+     * @param engine The engine to unbind.
+     * @param transactionIds The transactions to remain bound to.
+     * @param includeOpenTransactions whether to also unbind from open transactions.
      */
-    public abstract void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds);
+    public abstract void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds, boolean includeOpenTransactions);
     
     /**
      * Checks to see if the given transaction ID has been committed.  If so,
@@ -140,4 +141,5 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
      * rethrown since this is only used during shutdown.
      */
     public abstract void close();
+
 }

@@ -32,7 +32,9 @@ import org.gburgett.xflat.db.EngineState;
 import org.gburgett.xflat.db.XFlatDatabase;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
+import org.gburgett.xflat.transaction.Isolation;
 import org.gburgett.xflat.transaction.Transaction;
+import org.gburgett.xflat.transaction.WriteConflictException;
 import org.gburgett.xflat.util.DocumentFileWrapper;
 import org.hamcrest.Matcher;
 import org.jdom2.Document;
@@ -79,9 +81,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     //<editor-fold desc="interface methods">
     @Override
     public void insertRow(String id, Element data) throws DuplicateKeyException {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
-            Transaction tx = this.getTransactionManager().getTransaction();
+            
             long txId = getTxId(tx);
 
             RowData rData = new RowData(txId, data, id);
@@ -90,8 +92,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 rData.commitId = txId;
             }
 
-            Row row = new Row(id, rData);
-            row = this.cache.putIfAbsent(id, row);
+            Row newRow = new Row(id, rData);
+            Row row;
+            row = this.cache.putIfAbsent(id, newRow);
             if(row != null){
                 synchronized(row){
                     //see if all the data was from after this transaction
@@ -107,6 +110,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         throw new DuplicateKeyException(id);
                     }
                 }
+            }
+            else if(tx != null || this.getTransactionManager().anyOpenTransactions()){
+                //may still be uncommitted
+                this.uncommittedRows.put(id, newRow);
             }
 
             setLastActivity(System.currentTimeMillis());
@@ -154,9 +161,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public void replaceRow(String id, Element data) throws KeyNotFoundException {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
-            Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
             Row row = this.cache.get(id);
@@ -190,14 +196,13 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public boolean update(String id, XpathUpdate update) throws KeyNotFoundException {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
             Row row = this.cache.get(id);
             if(row == null){
                 throw new KeyNotFoundException(id);
             }
 
-            Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
             update.setConversionService(this.getConversionService());
@@ -229,8 +234,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     }
                 }
             } catch (JDOMException ex) {
-                if(log.isDebugEnabled())
-                    log.debug("Exception while applying update " + update.toString(), ex);
+                if(log.isTraceEnabled())
+                    log.trace("Exception while applying update " + update.toString(), ex);
 
                 ret = false;
             }
@@ -248,7 +253,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public int update(XpathQuery query, XpathUpdate update) {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
             
             query.setConversionService(this.getConversionService());
@@ -256,7 +261,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
             Matcher<Element> rowMatcher = query.getRowMatcher();
 
-            Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
 
@@ -292,8 +296,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         rowsUpdated = updates > 0 ? rowsUpdated + 1 : rowsUpdated;
                     } 
                     catch (JDOMException ex) {
-                        if(log.isDebugEnabled())
-                            log.debug("Exception while applying update " + update.toString(), ex);
+                        if(log.isTraceEnabled())
+                            log.trace("Exception while applying update " + update.toString(), ex);
                     }
                 }
             }
@@ -312,9 +316,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public boolean upsertRow(String id, Element data) {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
-            Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
             RowData newData = new RowData(txId, data, id);
@@ -359,7 +362,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public void deleteRow(String id) throws KeyNotFoundException {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
 
             Row row = this.cache.get(id);
@@ -368,7 +371,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 throw new KeyNotFoundException(id);
             }
 
-            Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
             RowData newData = new RowData(txId, null, id);
@@ -380,6 +382,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             synchronized(row){
                 RowData rData = row.chooseMostRecentCommitted(tx, txId);
                 if(rData == null || rData.data == null){
+                    //already deleted
                     throw new KeyNotFoundException(id);
                 }
 
@@ -398,12 +401,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public int deleteAll(XpathQuery query) {
-        ensureWriteReady();
+        Transaction tx = ensureWriteReady();
         try{
 
             query.setConversionService(this.getConversionService());
 
-            Transaction tx = this.getTransactionManager().getTransaction();
             long txId = getTxId(tx);
 
             Matcher<Element> rowMatcher = query.getRowMatcher();
@@ -450,7 +452,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     
     
-    private void update(){
+    private void updateTask(){
+        
+        Set<Long> remainingTransactions = new HashSet<>();
+        Set<Row> rowsToRemove = new HashSet<>();
+        
         synchronized(syncRoot){
             if(this.currentlyCommitting.get() != -1){
                 if(this.getTransactionManager().isTransactionCommitted(this.currentlyCommitting.get()) == -1 &&
@@ -461,24 +467,29 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 }
             }
             
-            Set<Row> rowsToRemove = new HashSet<>();
-            Set<Long> remainingTransactions = new HashSet<>();
 
             Iterator<Row> it = this.uncommittedRows.values().iterator();
             while(it.hasNext()){
                 Row row = it.next();
                 synchronized(row){
-                    it.remove();
-
                     if(row.cleanup()){
                         rowsToRemove.add(row);
+                        //fully committed, we can remove it from uncommitted rows.
+                        it.remove();
                     }
                     else{
+                        boolean isFullyCommitted = true;
                         //remember the remaining transactions
                         for(RowData data : row.rowData.values()){
                             if(data.commitId == -1){
+                                isFullyCommitted = false;
                                 remainingTransactions.add(data.transactionId);
                             }
+                        }
+                        
+                        if(isFullyCommitted){
+                            //fully committed, we can remove it from uncommitted rows.
+                            it.remove();
                         }
                     }
                 }
@@ -508,10 +519,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     this.releaseTableLock();
                 }
             }
-
-            //unbind the engine from all transactions except the remaining transactions
-            this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions);
         }
+        
+        //outside the synchronized block due to a deadlock issue
+        //unbind the engine from all transactions except any of the remaining transactions or any that are open.
+        this.getTransactionManager().unbindEngineExceptFrom(this, remainingTransactions, false);
     }
 
     private AtomicLong currentlyCommitting = new AtomicLong(-1);
@@ -534,22 +546,37 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             while(it.hasNext()){
                 Row row = it.next();
                 
-                this.log.info("committing row " + row.rowId);
+                if(log.isTraceEnabled())
+                    this.log.trace("committing row " + row.rowId);
                 synchronized(row){
+                    if(tx.getOptions().getIsolationLevel() == Isolation.SNAPSHOT){
+                        //check for conflicts
+                        for(RowData data : row.rowData.values()){
+                            if(data.commitId > tx.getTransactionId()){                                
+                                //committed data after our own transaction began
+                                throw new WriteConflictException(String.format("Conflicting data in table %s, row %s", this.getTableName(), row.rowId));
+                            }
+                        }
+                    }
+                    
                     //don't remove the row, only do that in cleanup.  
                     //We don't want to cleanup cause we still might need the old data,
                     //just set the transaction status to committed.
-                    
+                                        
                     RowData got = row.rowData.get(tx.getTransactionId());
                     if(got != null){
                         got.commitId = tx.getCommitId();
                     }
+                    
                 }
             }
             
             //we must immediately dump the cache, we cannot say we are committed
             //until the data is on disk.
+            lastModified.set(System.currentTimeMillis());
             dumpCacheNow();
+            
+            currentlyCommitting.compareAndSet(tx.getTransactionId(), -1);
         }
     }
     
@@ -565,7 +592,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     //remove the row data, since it's now uncommitted.
 
                     RowData got = row.rowData.remove(txId);
-                    if(got.commitId != -1){
+                    if(got != null && got.commitId != -1){
                         //this transaction was persisted to the DB.  We're going to need
                         //to dump the cache at the end.
                         mustDump = true;
@@ -574,6 +601,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
 
             if(mustDump){
+                lastModified.set(System.currentTimeMillis());
                 this.dumpCacheNow();
             }
             //else we can leave dumping the cache for the cleanup task.
@@ -658,7 +686,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         throw new RuntimeException("task termination");
                     }
                     
-                    update();
+                    updateTask();
                 }
             }, 500, 500, TimeUnit.MILLISECONDS);
         
@@ -686,8 +714,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
      * engine has fully finished spinning up
      */
     @Override
-    protected void ensureWriteReady(){
-        super.ensureWriteReady();
+    protected Transaction ensureWriteReady(){
+        Transaction tx = super.ensureWriteReady();
         
         //check if we're not yet running, if so wait until we are running
         if(!operationsReady.get() || state.get() != EngineState.Running){         
@@ -698,13 +726,15 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     } catch (InterruptedException ex) {
                         if(operationsReady.get()){
                             //oh ok we're all good to go
-                            return;
+                            return tx;
                         }
                         throw new XflatException("Interrupted while waiting for engine to be ready");
                     }
                 }
             }
         }
+        
+        return tx;
     }
     
     
@@ -724,7 +754,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
 
             if(log.isTraceEnabled())
-                log.trace("Spinning down");
+                log.trace(String.format("Table %s Spinning down", this.getTableName()));
 
 
             final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
@@ -747,8 +777,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             if(openCursors.isEmpty() && (cacheDumpTask.get() == null || cacheDumpTask.get().isDone())){
                 this.state.set(EngineState.SpunDown);
 
-                if(log.isTraceEnabled())
-                    log.trace("Spin down complete (immediate)");
 
                 if(completionEventHandler != null)
                     completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
@@ -771,9 +799,6 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
                             throw new RuntimeException("cancel task - in wrong state");
                         }
-
-                        if(log.isTraceEnabled())
-                            log.trace(String.format("Spin down complete (task)"));
 
                         if(completionEventHandler != null)
                             completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
@@ -800,7 +825,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         //that throws exceptions on access.
         this.cache = new InactiveCache<>();
         
-        this.state.set(EngineState.SpunDown);
+        EngineState old = this.state.getAndSet(EngineState.SpunDown);
+        if(old != EngineState.SpunDown){
+            log.warn(String.format("Table %s improperly spun down", this.getTableName()));
+        }
         
         return true;
     }

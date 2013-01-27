@@ -20,6 +20,7 @@ import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.db.EngineBase.RowData;
 import org.gburgett.xflat.transaction.Transaction;
+import org.gburgett.xflat.transaction.TransactionException;
 import org.gburgett.xflat.transaction.TransactionManager;
 import org.jdom2.Element;
 
@@ -76,8 +77,9 @@ public abstract class EngineBase implements Engine {
     
     /**
      * Forces this engine to immediately release all resources, even if there are
-     * still outstanding cursors.  Cursors that continue iterating will throw an
-     * exception that indicates the engine has spun down.
+     * still outstanding cursors or uncommitted data.  Cursors that continue iterating will throw an
+     * exception that indicates the engine has spun down.  This will be called after a normal
+     * spin down, or in case of some kind of error to reclaim resources.
      */
     protected abstract boolean forceSpinDown();
     
@@ -184,7 +186,7 @@ public abstract class EngineBase implements Engine {
      * If the engine is spinning down then we throw because engines are read-only
      * when spinning down.
      */
-    protected void ensureWriteReady(){
+    protected Transaction ensureWriteReady(){
         //check if there is a write lock on the table
         long tblLock = tableLock.get();
         if(tblLock != -1 && tblLock != Thread.currentThread().getId()){
@@ -199,6 +201,11 @@ public abstract class EngineBase implements Engine {
                     tblLock = tableLock.get();
                 }
             }
+        }
+        
+        Transaction tx = this.transactionManager.getTransaction();
+        if(tx != null && tx.getOptions().getReadOnly()){
+            throw new TransactionException("Cannot write in a read-only transaction");
         }
         
         //check the engine state
@@ -216,8 +223,11 @@ public abstract class EngineBase implements Engine {
         if(inprog < 1){
             //dunno how we got here, try to correct
             this.writesInProgress.compareAndSet(inprog, 1);
-            log.info(String.format("Writes in progress was less than 1: %d", inprog));
+            if(log.isTraceEnabled())
+                log.trace(String.format("Writes in progress was less than 1: %d", inprog));
         }
+        
+        return tx;
     }
     
     /**
@@ -229,7 +239,8 @@ public abstract class EngineBase implements Engine {
         int inprog = this.writesInProgress.decrementAndGet();
         if(inprog < 0){
             this.writesInProgress.compareAndSet(inprog, 0);
-            log.info(String.format("Writes in progress was less than 1: %d", inprog));
+            if(log.isTraceEnabled())
+                log.trace(String.format("Writes in progress was less than 1: %d", inprog));
         }
     }
     

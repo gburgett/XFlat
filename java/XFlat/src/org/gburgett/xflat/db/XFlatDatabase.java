@@ -479,6 +479,8 @@ public class XFlatDatabase implements Database {
                 //this thread was slower than another thread, use the other thread's table metadata
                 table = weWereSlow;
             }
+            if(log.isTraceEnabled())
+                log.trace(String.format("Metadata loaded for table %s", table.getName()));
         }
         
         return table;
@@ -499,14 +501,21 @@ public class XFlatDatabase implements Database {
         converter = this.getClass().getClassLoader().loadClass(this.config.getPojoConverterClass());
         
         if(converter == null){
+            log.warn(String.format("Unable to locate Pojo Converter %s", this.config.getPojoConverterClass()));
             return;
         }
+        
+        if(log.isTraceEnabled())
+            log.trace(String.format("Activating Pojo Converter %s", converter.getName()));
         
         this.pojoConverter = (PojoConverter)converter.newInstance();
         
         this.extendConversionService(this.pojoConverter);
     }
     
+    /**
+     * Represents the various states of the Database.
+     */
     public enum DatabaseState{
         Uninitialized,
         Running,

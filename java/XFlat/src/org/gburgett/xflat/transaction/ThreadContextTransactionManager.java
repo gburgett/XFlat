@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.gburgett.xflat.XflatException;
 import org.gburgett.xflat.convert.ConversionException;
@@ -40,6 +41,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     
     private DocumentFileWrapper journalWrapper;
     private Document transactionJournal = null;
+    
+    private Log log = LogFactory.getLog(getClass());
     
     public ThreadContextTransactionManager(DocumentFileWrapper wrapper){
         this.journalWrapper = wrapper;
@@ -129,8 +132,6 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         //always happens in the context of a commit or revert (which is the same thread as this)
         //or another thread's cleanup after the transaction is closed.
         tx.boundEngines.add(engine);
-        
-        LogFactory.getLog(getClass()).trace("engines bound to TX " + tx.getTransactionId() + ": " + tx.boundEngines.size());
     }
 
     @Override
@@ -161,14 +162,16 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     }
 
     @Override
-    public synchronized void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds) {
-        for(ThreadedTransaction tx : this.currentTransactions.values()){
-            if(transactionIds.contains(tx.getTransactionId())){
-                continue;
+    public synchronized void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds, boolean includeOpen) {
+        if(includeOpen){
+            for(ThreadedTransaction tx : this.currentTransactions.values()){
+                if(transactionIds.contains(tx.getTransactionId())){
+                    continue;
+                }
+
+                //try to remove its binding
+                tx.boundEngines.remove(engine);
             }
-            
-            //try to remove its binding
-            tx.boundEngines.remove(engine);
         }
         
         Iterator<ThreadedTransaction> it = this.committedTransactions.values().iterator();
@@ -210,11 +213,13 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             entry.tableNames.add(e.getTableName());
         }
         
+        Element entryElement;
         try {
             if(transactionJournal == null){
                 loadJournal();
             }
-            transactionJournal.getRootElement().addContent(toElement.convert(entry));
+            entryElement = toElement.convert(entry);
+            transactionJournal.getRootElement().addContent(entryElement);
             journalWrapper.writeFile(transactionJournal);
         } catch (ConversionException | IOException | JDOMException ex) {
             throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
@@ -223,19 +228,27 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         //commit all, and if any fail revert all.
         try{
             for(EngineBase e : tx.boundEngines){
-                LogFactory.getLog(getClass()).trace("committing to bound engine " + e.getTableName());
-                e.commit(tx);            
+                if(log.isTraceEnabled())
+                    log.trace(String.format("committing transaction %d to table %s", tx.id, e.getTableName()));
+                e.commit(tx);
             }
         }catch(Exception ex){
             try{
                 //uncommit
                 tx.commitId = -1;
-                revert(tx.boundEngines, tx.getTransactionId(), false);
+                tx.revert();
             }catch(TransactionException ex2){
                 throw new TransactionException("Unable to commit, " + ex2.getMessage(), ex);
             }
-            throw new TransactionException("Unable to commit", ex);
+            
+            if(ex instanceof TransactionException)
+                throw ex;
+            
+            throw new TransactionException("Unable to commit: " + ex.getMessage(), ex);
         }
+        
+        //remove it from the transaction journal
+        transactionJournal.getRootElement().removeContent(entryElement);
         
         //we're all committed, so we can finally say so.
         committedTransactions.put(tx.id, tx);
@@ -301,6 +314,9 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 //revert the transaction in all the engines
                 revert(toRevert, entry.txId, true);
                 
+                //successful revert - remove the entry
+                children.remove();
+                
                 //save the journal after each successful revert
                 this.journalWrapper.writeFile(transactionJournal);
             }
@@ -349,7 +365,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             if(this.isRollbackOnly.get()){
                 throw new IllegalTransactionStateException("Cannot commit a rollback-only transaction");
             }
-            if(!this.isCompleted.compareAndSet(false, true)){
+            if(this.isCompleted.get()){
                 throw new IllegalTransactionStateException("Cannot commit a completed transaction");
             }
             
@@ -361,16 +377,16 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
 
         @Override
         public void revert() {
-            if(this.isCompleted.get()){
+            if(!isCompleted.compareAndSet(false, true)){
                 throw new IllegalTransactionStateException("Cannot rollback a completed transaction");
             }
             
             ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
-            this.isCompleted.set(true);
+            
         }
 
         @Override
-        public void setRollbackOnly() {
+        public void setRevertOnly() {
             this.isRollbackOnly.set(true);
         }
 
@@ -397,7 +413,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
 
         @Override
         public boolean isCommitted() {
-            return commitId > -1;
+            return this.isCompleted.get() && commitId > -1;
         }
 
         @Override
@@ -426,6 +442,11 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             }
             l.remove(listener);
         }
+
+        @Override
+        public TransactionOptions getOptions() {
+            return this.options;
+        }
     }
     
     
@@ -433,7 +454,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         public long txId;
         public long commitId;
         
-        public List<String> tableNames = new ArrayList<>();
+        public Set<String> tableNames = new HashSet<>();
     }
     
     private Converter<TransactionJournalEntry, Element> toElement = new Converter<TransactionJournalEntry, Element>(){

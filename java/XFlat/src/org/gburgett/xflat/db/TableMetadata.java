@@ -48,6 +48,7 @@ public class TableMetadata implements EngineProvider {
     
     long lastActivity = System.currentTimeMillis();
     
+    Log log = LogFactory.getLog(getClass());
     
     public boolean canSpinDown(){
         EngineBase engine = this.engine.get();
@@ -172,6 +173,8 @@ public class TableMetadata implements EngineProvider {
                 }
             }else{
                 engine = newEngine;
+                if(log.isTraceEnabled())
+                    log.trace(String.format("Spinning up new engine for table %s", this.name));
             }
         }
         else if(state == EngineState.SpinningUp ||
@@ -215,9 +218,8 @@ public class TableMetadata implements EngineProvider {
                 engine.releaseTableLock();
             }
 
-            Log l = LogFactory.getLog(getClass());
-            if(l.isTraceEnabled())
-                l.trace(String.format("Spinning down table %s", this.name));
+            if(log.isTraceEnabled())
+                log.trace(String.format("Spinning down table %s", this.name));
         
             
             if(engine.spinDown(new SpinDownEventHandler(){

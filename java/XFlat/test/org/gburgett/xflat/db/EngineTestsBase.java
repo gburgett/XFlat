@@ -8,9 +8,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -25,11 +27,14 @@ import org.gburgett.xflat.convert.ConversionService;
 import org.gburgett.xflat.convert.DefaultConversionService;
 import org.gburgett.xflat.convert.converters.JDOMConverters;
 import org.gburgett.xflat.convert.converters.StringConverters;
+import org.gburgett.xflat.db.EngineBase.SpinDownEventHandler;
 import org.gburgett.xflat.query.XpathQuery;
 import org.gburgett.xflat.query.XpathUpdate;
 import org.gburgett.xflat.transaction.FakeThreadContextTransactionManager;
 import org.gburgett.xflat.transaction.Transaction;
+import org.gburgett.xflat.transaction.TransactionException;
 import org.gburgett.xflat.transaction.TransactionOptions;
+import org.gburgett.xflat.transaction.WriteConflictException;
 import org.gburgett.xflat.util.FakeDocumentFileWrapper;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
@@ -82,6 +87,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
      * directory and setting up the engine instance.
      */
     protected TestContext getContext(){
+        
         TestContext ctx = new TestContext();
         
         ctx.workspace = new File(workspace, Long.toHexString(ctx.id));
@@ -92,10 +98,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             Utils.deleteDir(ctx.workspace);
         }
         
+        prepContext(ctx);
+        
         ctx.instance = setupEngine(ctx);
         
         return ctx;
     }
+    
+    
+    
+    
     
     /**
      * Spins down the Engine, waiting for it to complete and throwing
@@ -210,10 +222,18 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     }
     
     /**
-     * Gets the engine instance to test
+     * Gets the engine instance to test.  This may be called more than once per test,
+     * with the expectation that the instance will be for the same table after
+     * spinning down the first instance.
      * @return 
      */
     protected abstract TEngine createInstance(TestContext ctx);
+    
+    /**
+     * Prepares the test context by creating and storing dependencies
+     * @param ctx 
+     */
+    protected abstract void prepContext(TestContext ctx);
     
     /**
      * Prepares the underlying XML file by writing the given contents to it.
@@ -1395,7 +1415,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         List<Element> fromCursor = new ArrayList<>();
-        try(Transaction tx = ctx.transactionManager.openTransaction(TransactionOptions.Default.setReadOnly(true))){
+        try(Transaction tx = ctx.transactionManager.openTransaction(TransactionOptions.Default.withReadOnly(true))){
         
             Element rowData = new Element("data")
                     .setAttribute("fooInt", "17")
@@ -1441,6 +1461,249 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx); 
     }
     
+    @Test
+    public void testConflictingWrite_SnapshotIsolation_ThrowsWriteConflictException() throws Exception {
+        System.out.println("testConflictingWrite_SnapshotIsolation_ThrowsWriteConflictException");
+        
+        TestContext ctx = getContext();
+                
+        prepFileContents(ctx, null);
+        spinUp(ctx);
+        
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        
+            Element rowData = new Element("data").setText("some text data");
+
+            ctx.instance.insertRow("1", rowData);
+            
+            //swap out the transaction
+            ctx.transactionManager.setContextId(1L);
+            
+            ctx.instance.insertRow("1", new Element("other").setText("other text data"));
+            
+            //swap the transaction back
+            ctx.transactionManager.setContextId(0L);
+            
+            try{
+                tx.commit();
+                fail("should have thrown WriteConflictException");
+            }catch(WriteConflictException ex){
+                //expected
+            }            
+        }
+    }
+    
+    @Test
+    public void testConflictingWrite_SnapshotIsolation_TwoTransactions_ThrowsWriteConflictException() throws Exception {
+        System.out.println("testConflictingWrite_SnapshotIsolation_ThrowsWriteConflictException");
+        
+        TestContext ctx = getContext();
+                
+        prepFileContents(ctx, null);
+        spinUp(ctx);
+        
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        
+            Element rowData = new Element("data").setText("some text data");
+
+            ctx.instance.insertRow("1", rowData);
+            
+            //swap out the transaction
+            ctx.transactionManager.setContextId(1L);
+            try(Transaction tx2 = ctx.transactionManager.openTransaction()){
+                //insert conflicting data
+                ctx.instance.insertRow("1", new Element("other").setText("other text data"));
+
+                //swap the transaction back
+                ctx.transactionManager.setContextId(0L);
+                //should be OK
+                tx.commit();
+
+                try{
+                    //ACT
+                    tx2.commit();
+                    fail("should have thrown WriteConflictException");
+                }catch(WriteConflictException ex){
+                    //expected
+                }            
+
+            }
+        }
+    }
+    
+    //</editor-fold>
+    
+    //<editor-fold desc="transaction durability">
+    @Test
+    public void testCommit_NoSimultaneousTasks_DataIsCommittedImmediately() throws Exception {
+        System.out.println("testCommit_NoSimultaneousTasks_DataIsCommittedImmediately");
+        
+        TestContext ctx = getContext();
+        prepFileContents(ctx, null);
+        spinUp(ctx);
+        
+        //shutdown any running tasks
+        ctx.executorService.shutdown();
+        ctx.executorService.awaitTermination(5, TimeUnit.SECONDS);
+        
+        //don't start up any new tasks, but don't throw an error if an attempt is made either.
+        ctx.executorService = mock(ScheduledExecutorService.class);
+        ctx.instance.setExecutorService(ctx.executorService);
+        
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+            
+            ctx.instance.insertRow("0", new Element("data").setText("some text data"));
+            ctx.instance.insertRow("1", new Element("second").setText("second text data"));
+            
+            
+            tx.commit();
+        }
+        
+        //force it to immediately release all resources
+        ctx.instance.forceSpinDown();
+        
+        //setup a new engine
+        ctx.executorService = new ScheduledThreadPoolExecutor(2);
+        ctx.instance = setupEngine(ctx);
+        
+        spinUp(ctx);
+        
+        Element row = ctx.instance.readRow("0");
+        Element row2 = ctx.instance.readRow("1");
+        
+        spinDown(ctx);
+        
+        assertNotNull("Should have committed first row", row);
+        assertEquals("Should have committed first row", "data", row.getName());
+        assertEquals("Should have committed first row", "some text data", row.getText());
+        
+        
+        assertNotNull("Should have committed second row", row2);
+        assertEquals("Should have committed second row", "second", row2.getName());
+        assertEquals("Should have committed second row", "second text data", row2.getText());
+    }
+    
+    @Test
+    public void testCommit_EngineHasCommittedData_RevertsCommittedData() throws Exception {
+        System.out.println("testCommit_SecondEngineThrowsError_RecoversOnRestart");
+        
+        final TestContext ctx = getContext();
+        prepFileContents(ctx, null);
+        spinUp(ctx);
+        
+        EngineBase eng2 = new EngineBase("bad_engine"){
+
+            @Override
+            public int hashCode(){
+                //set up to return same hash code so that HashSet returns them in order.
+                return ctx.instance.hashCode();
+            }
+            
+            @Override
+            public void commit(Transaction tx){
+                //set up the second engine to throw an exception on commit
+            
+                throw new RuntimeException("Test");
+            }
+            
+            //<editor-fold desc="don't care">
+            @Override
+            protected boolean spinUp() {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            protected boolean beginOperations() {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            protected boolean spinDown(SpinDownEventHandler completionEventHandler) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            protected boolean forceSpinDown() {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            protected boolean hasUncomittedData() {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public void insertRow(String id, Element data) throws DuplicateKeyException {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public Element readRow(String id) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public Cursor<Element> queryTable(XpathQuery query) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public void replaceRow(String id, Element data) throws KeyNotFoundException {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public boolean update(String id, XpathUpdate update) throws KeyNotFoundException {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public int update(XpathQuery query, XpathUpdate update) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public boolean upsertRow(String id, Element data) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public void deleteRow(String id) throws KeyNotFoundException {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+            @Override
+            public int deleteAll(XpathQuery query) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+            //</editor-fold>
+        };
+        
+        Set<EngineBase> s = new HashSet<>();
+        s.add(eng2);
+        s.add(ctx.instance);
+        Iterator<EngineBase> it = s.iterator();
+        assertEquals("HashSet doesn't work as i thought", ctx.instance, it.next());
+        assertEquals("HashSet doesn't work as i thought", eng2, it.next());
+        
+        try(Transaction tx = ctx.transactionManager.openTransaction()){
+            
+            ctx.transactionManager.bindEngineToCurrentTransaction(eng2);
+            
+            ctx.instance.insertRow("0", new Element("data").setText("some text data"));
+            ctx.instance.insertRow("1", new Element("second").setText("second text data"));
+            
+            try{
+                tx.commit();
+                fail("Expected TransactionException");
+            }catch(TransactionException ex){
+                //expected
+            }
+        }
+        
+        assertNull("Should have reverted data after partial commit", ctx.instance.readRow("0"));
+        assertNull("Should have reverted data after partial commit", ctx.instance.readRow("1"));
+    }
     //</editor-fold>
     
     //</editor-fold>
