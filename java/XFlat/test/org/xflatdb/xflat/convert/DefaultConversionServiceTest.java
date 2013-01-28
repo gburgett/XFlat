@@ -4,15 +4,12 @@
  */
 package org.xflatdb.xflat.convert;
 
-import org.xflatdb.xflat.convert.DefaultConversionService;
-import org.xflatdb.xflat.convert.Converter;
-import org.xflatdb.xflat.convert.ConversionException;
 import java.util.Date;
-import org.xflatdb.xflat.convert.converters.StringConverters;
-import org.junit.Test;
-import static org.mockito.Mockito.*;
-import static org.mockito.Matchers.*;
 import static org.junit.Assert.*;
+import org.junit.Test;
+import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.*;
+import org.xflatdb.xflat.convert.converters.StringConverters;
 import test.Bar;
 import test.Foo;
 import test.SubFoo;

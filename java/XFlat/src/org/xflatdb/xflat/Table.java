@@ -60,7 +60,7 @@ public interface Table<T> {
     
     /**
      * Gets a list of all the values matching the Xpath query.
-     * This is the same as {@link #find(org.gburgett.xflat.query.XpathQuery) }
+     * This is the same as {@link #find(org.xflatdb.xflat.query.XpathQuery) }
      * but without the hassle of a cursor.
      * @param query The query to match.
      * @return A list of all the matching values.

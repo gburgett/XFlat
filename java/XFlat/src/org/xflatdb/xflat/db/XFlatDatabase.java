@@ -56,7 +56,7 @@ import org.jdom2.Namespace;
  */
 public class XFlatDatabase implements Database {
     
-    public static Namespace xFlatNs = Namespace.getNamespace("db", "http://xflat.gburgett.org/xflat/db");
+    public static Namespace xFlatNs = Namespace.getNamespace("db", "http://www.xflatdb.org/xflat/db");
     
     //<editor-fold desc="dependencies">
     private ScheduledExecutorService executorService;
@@ -86,7 +86,7 @@ public class XFlatDatabase implements Database {
         this.engineFactory = factory;
     }
     /**
-     * @see #setEngineFactory(org.gburgett.xflat.db.EngineFactory) 
+     * @see #setEngineFactory(org.xflatdb.xflat.db.EngineFactory) 
      */
     public EngineFactory getEngineFactory(){
         return this.engineFactory;
@@ -410,7 +410,7 @@ public class XFlatDatabase implements Database {
     
     /**
      * Extends the database's conversion service with the given PojoConverter.
-     * It does this by invoking {@link PojoConverter#extend(org.gburgett.xflat.convert.ConversionService) }
+     * It does this by invoking {@link PojoConverter#extend(org.xflatdb.xflat.convert.ConversionService) }
      * using the database's current conversion service, in a synchronized context.
      * @param extender The extender that should extend the database's conversion service.
      */

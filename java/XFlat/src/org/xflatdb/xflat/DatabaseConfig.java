@@ -30,7 +30,7 @@ import org.xflatdb.xflat.db.XFlatDatabase;
  * The Configuration for a new XFlat Database.  
  * <br/>
  * This Configuration must be
- * passed to the {@link XFlatDatabase#setConfig(org.gburgett.xflat.DatabaseConfig) }
+ * passed to the {@link XFlatDatabase#setConfig(org.xflatdb.xflat.DatabaseConfig) }
  * method before initialization, or the default values will be used.
  * <p/>
  * This class is immutable, all set methods return new objects.
@@ -166,7 +166,7 @@ public class DatabaseConfig {
      * Sets the {@link TableConfig} used for new tables that have not been
      * manually configured.
      * If {@link Database#getTable(java.lang.String, java.lang.Class) } is called
-     * for a table that has not been manually configured using {@link Database#configureTable(java.lang.String, org.gburgett.xflat.db.TableConfig) },
+     * for a table that has not been manually configured using {@link Database#configureTable(java.lang.String, org.xflatdb.xflat.db.TableConfig) },
      * this configuration is used.
      * @param tableConfig The default table config to use.
      * @return A new instance with the defaultTableConfig property set.

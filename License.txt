@@ -1,4 +1,5 @@
-   All items in this repository Copyright 2012 Gordon Burgett and individual contributors
+   All items in this repository not explicitly copyrighted are
+   Copyright 2013 Gordon Burgett and individual contributors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

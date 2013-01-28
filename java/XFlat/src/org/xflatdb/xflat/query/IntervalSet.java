@@ -104,7 +104,7 @@ public class IntervalSet<T> {
      * Creates an IntervalSet representing all values between the two given values exclusive.
      * That is, the set (lower, upper)
      * <p/>
-     * This is equivalent to {@link #gt(java.lang.Object) gt(lower)} {@link #intersection(org.gburgett.xflat.query.IntervalSet, java.util.Comparator) ∩}
+     * This is equivalent to {@link #gt(java.lang.Object) gt(lower)} {@link #intersection(org.xflatdb.xflat.query.IntervalSet, java.util.Comparator) ∩}
      * {@link #lt(java.lang.Object) lt(upper)}.
      * @param <U>
      * @param lower The exclusive lower bound of the interval set.

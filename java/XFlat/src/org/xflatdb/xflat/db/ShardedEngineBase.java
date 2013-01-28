@@ -57,7 +57,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
      * Gets a metadata factory which can be used to generate {@link TableMetadata} objects.
      * This allows the engine to spawn additional engines as necessary.
      * The metadata factory is set up to read and write metadata from the same
-     * {@link File} given to the {@link EngineFactory#newEngine(java.io.File, java.lang.String, org.gburgett.xflat.TableConfig) } method,
+     * {@link File} given to the {@link EngineFactory#newEngine(java.io.File, java.lang.String, org.xflatdb.xflat.TableConfig) } method,
      * so if the engine uses this it must also use that file as a directory.
      * @return 
      */

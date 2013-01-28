@@ -24,7 +24,7 @@ public interface TransactionManager {
     /**
      * Gets the current transaction, or null if none exists.  The current
      * transaction is defined as the transaction retrieved by the last call to
-     * {@link #openTransaction(org.gburgett.xflat.transaction.TransactionOptions) }
+     * {@link #openTransaction(org.xflatdb.xflat.transaction.TransactionOptions) }
      * in this context (usually a thread context).
      * @return The current transaction, or null.
      */
