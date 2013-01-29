@@ -27,7 +27,8 @@
         </ul>
 		
 		<p>
-		<a href="examples.html">Examples</a>
+		<a href="examples.html">Examples</a><br/>
+		<a href="javadoc/1.0.0/index.html">Javadoc</a>
 		</p>
 		
         <p class="header">This project is maintained by <a class="header name" href="https://github.com/gburgett">Gordon Burgett</a></p>
@@ -77,6 +78,19 @@ effective up to the hundreds of MB, using memory-mapped files.</p>
 
 <ul>
 <li>
+<p>Lightweight</p>
+<ul>
+<li>The XFlat Jar is less than 250kb compressed.  With required dependencies only, it is still below 750k.
+With all optional dependencies, XFlat weighs in at about 4 MB.  This includes the JAXB dependency for
+automatic POJO mapping, which is over 3 MB.</li>
+<li>At runtime, XFlat uses a scheduled thread pool executor to manage recurring tasks.  By default this
+spawns 4 threads.  If you have a light-usage scenario, you can get away with configuring XFlat to use
+only 2 threads.  You can even pass it a <a href="http://docs.oracle.com/javase/7/docs/api/java/util/concurrent/ScheduledThreadPoolExecutor.html"><code>ScheduledThreadPoolExecutor</code></a> in the constructor, for even
+finer control of the database's concurrent tasks.</li>
+</ul>
+</li>
+
+<li>
 <p>Pure XML data files</p>
 
 <ul>
@@ -91,7 +105,7 @@ changed.</li>
 <p>POJO mapping to XML</p>
 
 <ul>
-<li>XFlat maps POJOs to JDOM <code>Element</code> objects using JAXB.  The underlying implementation can be swapped if necessary.
+<li>XFlat maps POJOs to JDOM <a href="http://www.jdom.org/docs/apidocs/org/jdom2/Element.html"><code>Element</code></a> objects using JAXB.  The underlying implementation can be swapped if necessary.
 The JAXB context is only loaded if it is used, so you can avoid it completely by specifying custom converters,
 or using only the JDOM CRUD interface.</li>
 </ul>
@@ -101,7 +115,7 @@ or using only the JDOM CRUD interface.</li>
 
 <ul>
 <li>Tables can be queried by any arbitrary XPath expression using the table row as the context.  The expression
-selects a part of the <code>Element</code> that is convertible to the value which is being matched, then the matching is performed
+selects a part of the <a href="http://www.jdom.org/docs/apidocs/org/jdom2/Element.html"><code>Element</code></a> that is convertible to the value which is being matched, then the matching is performed
 using Hamcrest Matchers.  Breaking the query into XPath expressions and values allows the engine to leverage indexes
 effectively, much more easily than if we used XQuery.  Future versions may support XQuery.</li>
 </ul>
@@ -110,7 +124,7 @@ effectively, much more easily than if we used XQuery.  Future versions may suppo
 <p>Sharding by ID</p>
 
 <ul>
-<li>A table can be sharded across multiple files by its ID.  The ID must be a <code>Comparable</code>.  A sharded table is spread across as many files
+<li>A table can be sharded across multiple files by its ID.  The ID must be a <a href="http://docs.oracle.com/javase/7/docs/api/java/lang/Comparable.html"><code>Comparable</code></a>.  A sharded table is spread across as many files
 as is necessary, and each row is stored in the appropriate file based on its ID.  A <code>RangeProvider</code> determines which values go into which
 shards.</li>
 </ul>
@@ -141,7 +155,7 @@ is implemented for version 1.</li>
 
 <ul>
 <li>Engines can take advantage of indexes that are based on any arbitrary XPath expression.  The expression selects a
-part of the <code>Element</code> that is converted to a <code>Comparable</code> (such as an Integer), then the engine can map that <code>Comparable</code>
+part of the <a href="http://www.jdom.org/docs/apidocs/org/jdom2/Element.html"><code>Element</code></a> that is converted to a <a href="http://docs.oracle.com/javase/7/docs/api/java/lang/Comparable.html"><code>Comparable</code></a> (such as an Integer), then the engine can map that <a href="http://docs.oracle.com/javase/7/docs/api/java/lang/Comparable.html"><code>Comparable</code></a>
 to the row and binary search indexes to improve performance.</li>
 </ul>
 </li>
@@ -150,7 +164,7 @@ to the row and binary search indexes to improve performance.</li>
 
 <ul>
 <li>A table can be sharded across multiple files based on a sharding key selected by an XPath expression.  The expression
-selects a part of the <code>Element</code> that is converted to a <code>Comparable</code>, then a <code>RangeProvider</code> determines which file to store
+selects a part of the <a href="http://www.jdom.org/docs/apidocs/org/jdom2/Element.html"><code>Element</code></a> that is converted to a <a href="http://docs.oracle.com/javase/7/docs/api/java/lang/Comparable.html"><code>Comparable</code></a>, then a <code>RangeProvider</code> determines which file to store
 the Element in.</li>
 </ul>
 </li>
