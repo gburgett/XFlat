@@ -41,7 +41,12 @@ import org.jdom2.Element;
 import org.jdom2.JDOMException;
 
 /**
- *
+ * A {@link TransactionManager} that uses the current thread as the context for transactions.
+ * Each transaction opened by this manager will be bound to the current thread, and
+ * the {@link #getTransaction() } method will return the transaction open on the current
+ * thread, if any.
+ * <p/>
+ * This is the default TransactionManager used by XFlat.
  * @author Gordon
  */
 public class ThreadContextTransactionManager extends EngineTransactionManager {
@@ -55,10 +60,20 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     
     private Log log = LogFactory.getLog(getClass());
     
+    /**
+     * Creates a new ThreadContextTransactionManager, which will manage a mapping
+     * of threads to transactions.
+     * @param wrapper A wrapper which wraps the file to which this Transaction Manager
+     * can save its Transaction Journal, for recovery in case of catastrophic error.
+     */
     public ThreadContextTransactionManager(DocumentFileWrapper wrapper){
         this.journalWrapper = wrapper;
     }
     
+    /**
+     * Gets the Id of the current context, which is the current thread's ID.
+     * @return The current thread's ID.
+     */
     protected Long getContextId(){
         return Thread.currentThread().getId();
     }
@@ -349,6 +364,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             ThreadContextTransactionManager.this.commit(this);
             //soon as commit returns, we are committed.
             this.isCompleted.set(true);
+            
+            fireEvent(TransactionEventObject.COMMITTED);
         }
 
         @Override
@@ -359,6 +376,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             
             ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
             
+            fireEvent(TransactionEventObject.REVERTED);
         }
 
         @Override
@@ -401,13 +419,14 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         public void putTransactionListener(TransactionListener listener) {
             Set<TransactionListener> l = this.listeners.get();
             if(l == null){
-                l = new ConcurrentSkipListSet<>();
+                l = new HashSet<>();
                 if(!this.listeners.compareAndSet(null, l)){
                     l = this.listeners.get();
                 }
             }
-            
-            l.add(listener);
+            synchronized(l){
+                l.add(listener);
+            }
         }
 
         @Override
@@ -416,12 +435,27 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             if(l == null){
                 return;
             }
-            l.remove(listener);
+            synchronized(l){
+                l.remove(listener);
+            }
         }
 
         @Override
         public TransactionOptions getOptions() {
             return this.options;
+        }
+        
+        private void fireEvent(int event){
+            Set<TransactionListener> listeners = this.listeners.get();
+            if(listeners == null)
+                return;
+            
+            TransactionEventObject evtObj = new TransactionEventObject(ThreadContextTransactionManager.this, this, event);
+            synchronized(listeners){
+                for(Object l : listeners.toArray()){
+                    ((TransactionListener)l).TransactionEvent(evtObj);
+                }
+            }
         }
     }
     

@@ -16,13 +16,13 @@
 package org.xflatdb.xflat.engine;
 
 import java.io.File;
+import org.hamcrest.Matcher;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineFactory;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
-import org.hamcrest.Matcher;
 
 /**
  * The default engine factory, which chooses from among the engines available to 
@@ -33,6 +33,14 @@ public class DefaultEngineFactory implements EngineFactory {
 
     private Matcher idPropertyMatcher = new XPathExpressionEqualityMatcher(XPathQuery.Id);
     
+    /**
+     * Creates either an {@link IdShardedEngine} or a {@link CachedDocumentEngine}
+     * based on whether the table is sharded.
+     * @param file
+     * @param tableName
+     * @param config
+     * @return 
+     */
     @Override
     public EngineBase newEngine(File file, String tableName, TableConfig config) {
         if(config.getShardsetConfig() != null){

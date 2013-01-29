@@ -13,13 +13,10 @@
 *	See the License for the specific language governing permissions and
 *	limitations under the License.
 */
-package test;
 
 /**
- *
- * @author gordon
+ * This package contains basic converters implemented for common conversion
+ * types.  The converters in this package focus on converting to and from 
+ * {@link org.jdom2.Element}.
  */
-public class SubFoo extends Foo {
-    
-    public boolean subFooBool;
-}
+package org.xflatdb.xflat.convert.converters;

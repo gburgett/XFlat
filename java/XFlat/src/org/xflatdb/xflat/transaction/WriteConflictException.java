@@ -16,8 +16,9 @@
 package org.xflatdb.xflat.transaction;
 
 /**
- * This exception is thrown when a write conflict occurs upon committing a transaction,
- * in an isolation level that can cause write conflicts.
+ * This exception is thrown when a write conflict occurs upon committing a transaction.
+ * This only occurs when a transaction has an isolation level that can cause write conflicts,
+ * such as {@link Isolation#SNAPSHOT}.
  * @author Gordon
  */
 public class WriteConflictException extends TransactionException {

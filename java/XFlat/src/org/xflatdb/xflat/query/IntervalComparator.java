@@ -19,7 +19,8 @@ import java.util.Comparator;
 
 /**
  * A Comparator that enforces ordering on {@link Interval} objects when
- * given a comparator for the Interval items.
+ * given a comparator for the individual begin and end values.  The 
+ * comparator enforces ordering by comparing the beginnings of intervals.
  * @author Gordon
  */
 public class IntervalComparator<T> implements Comparator<Interval<T>> {

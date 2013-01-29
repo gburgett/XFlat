@@ -27,12 +27,19 @@ package org.xflatdb.xflat.query;
 public class InvalidQueryException extends RuntimeException {
     
     private final XPathQuery query;
-    
+    /**
+     * Gets the query that was invalid.
+     * @return The query that caused the exception.
+     */
     public XPathQuery getQuery(){
         return query;
     }
     
     private final Class<?> indexType;
+    /**
+     * Gets the type of the index.
+     * @return the class representing the index's type.
+     */
     public Class<?> getIndexType(){
         return indexType;
     }

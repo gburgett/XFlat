@@ -13,13 +13,10 @@
 *	See the License for the specific language governing permissions and
 *	limitations under the License.
 */
-package test;
 
 /**
- *
- * @author gordon
+ * This package contains classes related to XPath-based queries.  Builders for
+ * creating queries and updates can be found here, as well as a number of query-related
+ * helper classes.
  */
-public class SubFoo extends Foo {
-    
-    public boolean subFooBool;
-}
+package org.xflatdb.xflat.query;

@@ -23,7 +23,7 @@ public enum Isolation {
     /**
      * Snapshot isolation level.
      * <p/>
-     * http://en.wikipedia.org/wiki/Snapshot_isolation
+     * see <a href="http://en.wikipedia.org/wiki/Snapshot_isolation">http://en.wikipedia.org/wiki/Snapshot_isolation</a>
      */
     SNAPSHOT,
 }

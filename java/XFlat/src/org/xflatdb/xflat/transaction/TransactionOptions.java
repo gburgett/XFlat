@@ -16,7 +16,10 @@
 package org.xflatdb.xflat.transaction;
 
 /**
- *
+ * An object representing the options that can be applied to a transaction.
+ * <p/>
+ * The TransactionOptions object is immutable; all set methods return a new
+ * instance that has the given option set.
  * @author Gordon
  */
 public class TransactionOptions {
@@ -44,6 +47,12 @@ public class TransactionOptions {
      * Sets whether this transaction is Read Only.  A ReadOnly transaction
      * cannot be committed.  Write operations during a ReadOnly transaction
      * throw an exception.
+     * <p/>
+     * This method returns a new TransactionOptions object with the specified
+     * option set.
+     * 
+     * @param readOnly true to set the transaction to read only mode.
+     * @return a new TransactionOptions object with ReadOnly == the given value.
      */
     public TransactionOptions withReadOnly(boolean readOnly){
         TransactionOptions ret = new TransactionOptions(this);
@@ -51,13 +60,28 @@ public class TransactionOptions {
         return ret;
     }
     
+    /**
+     * Sets the isolation level of this transaction.  The isolation level determines
+     * how the database applies locking to the rows.
+     * <p/>
+     * This method returns a new TransactionOptions object with the specified
+     * option set.
+     * 
+     * @param level The isolation level of the transaction.
+     * @return a new TransactionOptions object with IsolationLevel == the given value.
+     */
     public TransactionOptions withIsolationLevel(Isolation level){
         TransactionOptions ret = new TransactionOptions(this);
         ret.isolation = level;
         return ret;
     }
     
-    private TransactionOptions(){        
+    /**
+     * Creates a new TransactionOptions object with the default options.
+     */
+    public TransactionOptions(){   
+        this.readOnly = false;
+        this.isolation = Isolation.SNAPSHOT;
     }
     
     private TransactionOptions(TransactionOptions other){
@@ -71,8 +95,6 @@ public class TransactionOptions {
      * ReadOnly: false, <br/>
      * IsolationLevel: SNAPSHOT <br/>
      */
-    public static final TransactionOptions Default = new TransactionOptions()
-                .withReadOnly(false)
-                .withIsolationLevel(Isolation.SNAPSHOT);
+    public static final TransactionOptions Default = new TransactionOptions();
     
 }

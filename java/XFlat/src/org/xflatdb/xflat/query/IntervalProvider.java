@@ -16,38 +16,44 @@
 package org.xflatdb.xflat.query;
 
 import java.util.Comparator;
-import org.xflatdb.xflat.convert.Converter;
-import org.jdom2.Element;
 
 /**
- *
+ * Interval Providers are used to determine intervals for sharding.  An interval
+ * provider determines an unlimited set of fixed-width intervals, each of which is mapped
+ * to a "bucket" into which data that fits into that interval is stored.
+ * <p/>
+ * IntervalProvider implementations ought to be able to handle any value that
+ * is expected to be selected by a sharding selector.
  * @author Gordon
  */
 public interface IntervalProvider<T> {
     
     /**
-     * Gets the range that contains the given value.
-     * @param value The value for which a range is needed.
-     * @return The range for that value.
+     * Gets the interval that contains the given value.  This interval
+     * will be used to determine the bucket into which the data associated
+     * to the value is stored.
+     * 
+     * @param value The value for which a interval is needed.
+     * @return The interval for that value.
      */
     public Interval<T> getInterval(T value);
     
     /**
-     * Gets another range, which is a number of ranges away from the 
-     * given range.
+     * Gets another interval, which is a number of standard intervals away from the 
+     * given interval.
      * <p/>
-     * For instance, on an integer range provider, if the current range is
+     * For instance, on an integer interval provider, if the current interval is
      * [0, 10) and the factor is 1, the nextRange is [10, 20).<br/>
      * If the factor is -2, the nextRange is [-20, -10).
-     * @param currentInterval The base range
+     * @param currentInterval The base interval
      * @param factor The number of ranges to skip.
-     * @return A new range that is factor ranges away from currentRange.
+     * @return A new interval that is factor ranges away from currentRange.
      */
     public Interval<T> nextInterval(Interval<T> currentInterval, long factor);
     
     /**
-     * Returns a comparator that can compare the values provided by this range.
-     * @return 
+     * Returns a comparator that can compare the values provided by this interval.
+     * @return An instance of Comparator that compares this interval's values.
      */
     public Comparator<T> getComparator();
     

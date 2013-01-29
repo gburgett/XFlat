@@ -18,31 +18,54 @@ package org.xflatdb.xflat.db;
 import org.xflatdb.xflat.EngineStateException;
 
 /**
- *
+ * The base class for implementations of {@link org.xflatdb.xflat.Table}.
+ * This provides dependencies to table implementations that are injected by the database.
  * @author gordon
  */
 public abstract class TableBase<T> {
         
     private Class<T> tableType;
+    /**
+     * Gets the class of the items in the table.
+     * @return The class object
+     */
     protected Class<T> getTableType(){
         return this.tableType;
     }
     
     private String tableName;
+    /**
+     * Gets the table's name.
+     * @return The table name.
+     */
     protected String getTableName(){
         return this.tableName;
     }
     
     private IdGenerator idGenerator;
+    /**
+     * Injects the ID generator used by this table to generate IDs for objects
+     * that do not already have them.
+     * @param idGenerator The ID generator to use.
+     */
     public void setIdGenerator(IdGenerator idGenerator) {
         this.idGenerator = idGenerator;
     }
+    /**
+     * Gets the ID generator used by this table to generate IDs for objects
+     * that do not already have them.
+     * @return The ID generator used by the table.
+     */
     protected IdGenerator getIdGenerator(){
         return this.idGenerator;
     }
     
     private EngineProvider engineProvider;
-    
+    /**
+     * Creates a new Table for the given table type and name.
+     * @param tableType The type of the objects in this table.
+     * @param tableName The name of the table.
+     */
     protected TableBase(Class<T> tableType, String tableName){
         this.tableType = tableType;
         this.tableName = tableName;
@@ -64,7 +87,7 @@ public abstract class TableBase<T> {
     /**
      * Performs an action with an engine obtained from the EngineProvider.
      * Also wraps the action in some special engine error handling.
-     * 
+     * <p/>
      * Beware that the action may be executed multiple times depending on the retry
      * logic of this method.
      * @param <T> The return type of the action.

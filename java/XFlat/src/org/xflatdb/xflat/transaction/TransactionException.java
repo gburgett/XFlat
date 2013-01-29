@@ -16,7 +16,7 @@
 package org.xflatdb.xflat.transaction;
 
 /**
- *
+ * The base class for all exceptions that are related to transactions.
  * @author Gordon
  */
 public class TransactionException extends RuntimeException {

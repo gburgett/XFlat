@@ -46,7 +46,8 @@ public class XPathUpdate {
     private ConversionService conversionService;
     /**
      * Sets the conversion service used by this Update operation when it is
-     * applied.
+     * applied.  The conversion service is used to convert values to JDOM elements
+     * and attributes.
      * @param conversionService 
      */
     public void setConversionService(ConversionService conversionService) {
@@ -59,8 +60,10 @@ public class XPathUpdate {
     
     /**
      * Creates an update that sets the values selected by the XPath expression.
+     * The value will only be modified if it exists.  If the XPath expression
+     * selects a nonexistent value then no update will be applied.
      * @param path The path selecting an element (or elements) to set.
-     * @return A builder object that can be chained to provide a value for the update.
+     * @return an XPath update that sets the given value.
      */
     public static <T> XPathUpdate set(XPathExpression<T> path, Object value){
         XPathUpdate ret = new XPathUpdate();
@@ -71,6 +74,14 @@ public class XPathUpdate {
         return ret;
     }
     
+    /**
+     * Creates an update that removes the element or attribute selected by the XPath expression.
+     * The value will only be deleted if it exists.  If the XPath expression
+     * selects a nonexistent value then no update will be applied.
+     * @param <T>
+     * @param path The path selecting an element (or elements) to set.
+     * @return an XPath update that deletes the given value.
+     */
     public static <T> XPathUpdate unset(XPathExpression<T> path){
         XPathUpdate ret = new XPathUpdate();
         ret.updates.add(new Update<>(path, null, UpdateType.UNSET));
@@ -78,10 +89,11 @@ public class XPathUpdate {
     }
     
     /**
-     * Adds an additional update operation to this XPath update for the values
-     * selected by the given XPath expression.
-     * @param path
-     * @return 
+     * Adds an additional update operation that sets the values selected by the XPath expression.
+     * The value will only be modified if it exists.  If the XPath expression
+     * selects a nonexistent value then no update will be applied.
+     * @param path The path selecting an element (or elements) to set.
+     * @return an XPath update that sets the given value.
      */
     public <T> XPathUpdate andSet(XPathExpression<T> path, Object value){
         Update<T> u = new Update<>(path, value, UpdateType.SET);
@@ -90,12 +102,19 @@ public class XPathUpdate {
         return this;
     }
     
+    /**
+     * Adds an additional update operation that removes the element or attribute selected by the XPath expression.
+     * The value will only be modified if it exists.  If the XPath expression
+     * selects a nonexistent value then no update will be applied.
+     * @param path The path selecting an element (or elements) to set.
+     * @return an XPath update that sets the given value.
+     */
     public <T> XPathUpdate andUnset(XPathExpression<T> path){
         this.updates.add(new Update<>(path, null, UpdateType.UNSET));
         return this;
     }
     
-    public static class Update <T>{
+    private static class Update <T>{
         private XPathExpression<T> path;
         public XPathExpression<T> getPath(){
             return path;
@@ -124,10 +143,8 @@ public class XPathUpdate {
      * the data in a selected row.
      * @param rowData The DOM Element representing the data in a selected row.
      * @return true if any updates were applied.
-     * @throws JDOMException 
      */
     public int apply(Element rowData)
-            throws JDOMException
     {
         int updateCount = 0;
         
@@ -144,7 +161,7 @@ public class XPathUpdate {
                 asContent = (Content) update.value;
             }
             
-            for(Object node : update.path.evaluate(rowData)){
+            for(Object node : update.path.evaluate(rowData)){                
                 if(node == null)
                     continue;
                 
@@ -304,8 +321,13 @@ public class XPathUpdate {
         }
     }
 
+    /**
+     * Enumerates the different types of updates.
+     */
     public enum UpdateType{
+        /** An update that sets a value. */
         SET,
+        /** An update that deletes a value. */
         UNSET
     }
 }

@@ -38,20 +38,42 @@ public class DocumentFileWrapper {
     private XMLOutputter outputter;
     private SAXBuilder builder;
     
+    /**
+     * Creates a new DocumentFileWrapper that wraps the given file, using the default
+     * SAXBuilder and XMLOutputter.
+     * @param file 
+     */
     public DocumentFileWrapper(File file){
         this(file, new SAXBuilder(), new XMLOutputter());
     }
     
+    /**
+     * Creates a new DocumentFileWrapper wrapping the given file, using the given
+     * SAXBuilder and XMLOutputter to read and write the file.
+     * @param file The file wrapped by this wrapper.
+     * @param builder The builder used to build documents from the {@link FileInputStream}.
+     * @param outputter The outputter that formats documents for output to the {@link FileOutputStream}.
+     */
     public DocumentFileWrapper(File file, SAXBuilder builder, XMLOutputter outputter){
         this.file = file;
         this.outputter = outputter;
         this.builder = builder;
     }
     
+    /**
+     * A passthrough for {@link File#exists() }.
+     * @return true if the wrapped file exists.
+     */
     public boolean exists(){
         return file.exists();
     }
     
+    /**
+     * Reads a JDOM Document out of the wrapped file.
+     * @return The Document parsed from the file.
+     * @throws IOException if an IO error occurred while reading the file.
+     * @throws JDOMException if the data in the file was not valid XML
+     */
     public Document readFile() throws IOException, JDOMException{
         if(!this.file.exists())
             return null;
@@ -62,6 +84,14 @@ public class DocumentFileWrapper {
         }
     }
     
+    /**
+     * Reads a JDOM document out of the named file, which is in the directory
+     * wrapped by this wrapper.
+     * @param fileName The name of the file in the directory wrapped by this wrapper.
+     * @return The Document parsed from the file.
+     * @throws IOException if an IO error occurred while reading the file.
+     * @throws JDOMException if the data in the file was not valid XML
+     */
     public Document readFile(String fileName) throws IOException, JDOMException{
         File file = new File(this.file, fileName);
         
@@ -74,6 +104,11 @@ public class DocumentFileWrapper {
         }
     }
     
+    /**
+     * Writes a JDOM document to the wrapped file.
+     * @param doc The document to output to the wrapped file.
+     * @throws IOException if an IO error occurred while writing the file.
+     */
     public void writeFile(Document doc) throws IOException{
         this.ensureDirectoryExists(file);
         
@@ -82,6 +117,13 @@ public class DocumentFileWrapper {
         }
     }
     
+    /**
+     * Writes a JDOM document to the named file, which is in the directory
+     * wrapped by this wrapper.
+     * @param fileName The name of the file in the directory wrapped by this wrapper.
+     * @param doc The document to output to the wrapped file.
+     * @throws IOException if an IO error occurred while writing the file.
+     */
     public void writeFile(String fileName, Document doc) throws IOException{
         File file = new File(this.file, fileName);
         

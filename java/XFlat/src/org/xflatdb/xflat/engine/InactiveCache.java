@@ -21,10 +21,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- *
+ * A concurrent map used as a cache in the {@link CachedDocumentEngine} when
+ * it is no longer active.
  * @author gordon
  */
-public class InactiveCache<T, U> implements ConcurrentMap<T, U> {
+class InactiveCache<T, U> implements ConcurrentMap<T, U> {
     
     @Override
     public int size() {

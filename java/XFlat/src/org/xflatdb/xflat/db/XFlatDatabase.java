@@ -15,9 +15,6 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.engine.DefaultEngineFactory;
-import org.xflatdb.xflat.DatabaseConfig;
-import org.xflatdb.xflat.TableConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -34,8 +31,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.Namespace;
 import org.xflatdb.xflat.Database;
+import org.xflatdb.xflat.DatabaseConfig;
 import org.xflatdb.xflat.Table;
+import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.ConversionService;
@@ -43,12 +45,10 @@ import org.xflatdb.xflat.convert.DefaultConversionService;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.convert.converters.JDOMConverters;
 import org.xflatdb.xflat.convert.converters.StringConverters;
+import org.xflatdb.xflat.engine.DefaultEngineFactory;
 import org.xflatdb.xflat.transaction.ThreadContextTransactionManager;
 import org.xflatdb.xflat.transaction.TransactionManager;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.Namespace;
 
 /**
  * The base class for classes that manage tables and conversion services.
@@ -199,6 +199,14 @@ public class XFlatDatabase implements Database {
         this.state = new AtomicReference<>(DatabaseState.Uninitialized);
     }
     
+    /**
+     * Initializes the database.  Once initialized the database can provide tables
+     * and operate on underlying data.
+     * <p/>
+     * The database will register a shutdown hook with the runtime to clean up any
+     * resources and abandon all running tasks.  This shutdown hook will be removed
+     * when {@link #shutdown() } is called.
+     */
     public void Initialize(){
         if(!this.state.compareAndSet(DatabaseState.Uninitialized, DatabaseState.Running)){
             return;
@@ -420,6 +428,7 @@ public class XFlatDatabase implements Database {
         }
     }
         
+
     @Override
     public <T> Table<T> getTable(Class<T> type){
         return this.getTable(type, type.getSimpleName());
@@ -434,6 +443,15 @@ public class XFlatDatabase implements Database {
         return (Table<T>)ret;
     }
     
+    /**
+     * Gets the internal EngineBase that has been spun up to manage the given table.
+     * This internal engine is the low-level manager of the database on disk.
+     * <p/>
+     * Please use {@link #getTable(java.lang.Class) } instead.  It is preferable
+     * to interact with the data via the {@link Table} interface.
+     * @param name The name of the table for which an engine is desired.
+     * @return A running EngineBase which manages the table.
+     */
     public EngineBase getEngine(String name){
         return getMetadata(null, name).provideEngine();
     }
@@ -528,8 +546,20 @@ public class XFlatDatabase implements Database {
      * Represents the various states of the Database.
      */
     public enum DatabaseState{
+        /**
+         * The state of a database before the {@link #Initialize() } method is
+         * called.
+         */
         Uninitialized,
+        /**
+         * The state of a database that is running and capable of responding
+         * to requests.
+         */
         Running,
+        /**
+         * The state of a database that is either in the process of or has already
+         * shut down.  Requests on this database will throw.
+         */
         ShuttingDown
     }
     

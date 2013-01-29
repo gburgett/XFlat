@@ -16,30 +16,30 @@
 package org.xflatdb.xflat.db;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import org.xflatdb.xflat.Cursor;
+import org.jdom2.Element;
 import org.xflatdb.xflat.EngineStateException;
 import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.query.Interval;
-import org.jdom2.Element;
 
 /**
- *
+ * The base class for all engines that are sharded.  Sharded engines store the table
+ * data across multiple files.
  * @author Gordon
  */
 public abstract class ShardedEngineBase<T> extends EngineBase {
+    /** The shards that are currently open and ready to use. */
     protected ConcurrentMap<Interval<T>, TableMetadata> openShards = new ConcurrentHashMap<>();
+    /** The shards that are known to exist on disk. */
     protected ConcurrentMap<Interval<T>, File> knownShards = new ConcurrentHashMap<>();
     
     
@@ -48,8 +48,10 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     
     private final Object spinDownSyncRoot = new Object();
     
+    /** The directory managed by this sharded engine. */
     protected File directory;
         
+    /** The configuration of this sharded table. */
     protected ShardsetConfig<T> config;
     
     private TableMetadataFactory metadataFactory;
@@ -69,8 +71,13 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         this.metadataFactory = metadataFactory;
     }
     
-    
-    public ShardedEngineBase(File file, String tableName, ShardsetConfig<T> config){
+    /**
+     * Creates a new ShardedEngine for the given directory, table name, and configuration
+     * @param file The directory in which the shards are saved.
+     * @param tableName The name of the sharded table.
+     * @param config The sharding configuration.
+     */
+    protected ShardedEngineBase(File file, String tableName, ShardsetConfig<T> config){
         super(tableName);
         
         this.directory = file;
@@ -82,11 +89,23 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         }
     }
     
+    /**
+     * Gets the interval in which the row should reside, based on the shard property
+     * selector in the configuration.
+     * @param row The row representing converted data.
+     * @return The interval in which the row should reside.
+     */
     protected Interval<T> getRangeForRow(Element row){
         Object selected = config.getShardPropertySelector().evaluateFirst(row);
         return getInterval(selected);
     }
     
+    /**
+     * Gets the interval in which the given selected shard property should reside,
+     * based on the IntervalProvider given in the configuration.
+     * @param value The shard property selected by the shard property selector in the configuration.
+     * @return The interval in which the shard property should reside.
+     */
     protected Interval<T> getInterval(Object value){
         T converted;
         if(value == null || !this.config.getShardPropertyClass().isAssignableFrom(value.getClass())){
@@ -158,6 +177,16 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         return metadata.provideEngine();
     }
     
+    /**
+     * Performs an action with the appropriate engine for the given shard interval.
+     * The shard interval must be one that is provided by the IntervalProvider
+     * for this sharded engine, which maps to a shard file on disk.
+     * 
+     * @param <U> The generic type of the value to return.
+     * @param range The shard interval mapping to a shard file on disk.
+     * @param action The action to perform once the engine is provided.
+     * @return The value returned by the action.
+     */
     protected <U> U doWithEngine(Interval<T> range, EngineAction<U> action){
         
         EngineState state = getState();
@@ -174,7 +203,11 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         }
     }
     
-    protected void update(){
+    /**
+     * Executed by the recurring update task every 500 ms in order to clean up
+     * the shardset and spin down any inactive shards.
+     */
+    protected void updateTask(){
         Iterator<TableMetadata> it = openShards.values().iterator();
         while(it.hasNext()){
             TableMetadata table = it.next();
@@ -194,6 +227,10 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         
     }
     
+    /**
+     * Returns true if any of the individual shards have uncommitted data.
+     * @return 
+     */
     @Override
     protected boolean hasUncomittedData() {
         EngineState state = this.state.get();
@@ -215,6 +252,14 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         return false;
     }
         
+    /**
+     * Reverts the given transaction.  If not recovering, this does nothing,
+     * since the individual shards will have been bound to the transaction themselves.<br/>
+     * If recovering, every shard in the shardset will be opened and the transaction 
+     * will be reverted in that shard.
+     * @param txId The ID of the (potentially partially-committed) transaction to revert.
+     * @param isRecovering true if this was called during a recovery operation on startup.
+     */
     @Override
     public void revert(long txId, boolean isRecovering){
         if(!isRecovering){
@@ -227,7 +272,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             this.getEngine(interval).revert(txId, isRecovering);
         }
     }
-    
+   
     @Override
     protected boolean spinUp() {
         if(!this.state.compareAndSet(EngineState.Uninitialized, EngineState.SpinningUp)){
@@ -262,7 +307,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
                     throw new RuntimeException("task termination");
                 }
                 
-                update();
+                updateTask();
             }
         }, 500, 500, TimeUnit.MILLISECONDS);
         

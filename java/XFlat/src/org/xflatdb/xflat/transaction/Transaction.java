@@ -15,16 +15,27 @@
 */
 package org.xflatdb.xflat.transaction;
 
-import java.io.Closeable;
-
 /**
- *
+ * Represents a transaction in the XFlat database.  <br/>
+ * While in context and open, the database will operate with the isolation level specified in 
+ * the {@link TransactionOptions} given at the time this transaction was opened.
+ * <p/>
+ * When committed, the data modified by this transaction will be durably saved
+ * to disk, and immediately will be available to transactionless reads as well
+ * as new transactions.
+ * <p/>
+ * When closed, if a transaction has not been committed, it will be automatically
+ * reverted.
  * @author Gordon
  */
 public interface Transaction extends AutoCloseable {
     
     /**
-     * Commits the transaction immediately.
+     * Commits the transaction immediately.  Transactions are committed atomically
+     * and durably, so that the instant this method returns successfully, the caller can be
+     * assured that the modifications performed by this transaction have been
+     * saved to disk.
+     * 
      * @throws TransactionException if an error occurred during the commit.  The
      * transaction manager will automatically revert the transaction upon a commit 
      * error.
@@ -34,13 +45,15 @@ public interface Transaction extends AutoCloseable {
     void commit() throws TransactionException;
     
     /**
-     * Reverts the transaction immediately.
+     * Reverts the transaction immediately.  When a transaction is reverted,
+     * the database acts as though all the modifications performed inside the
+     * transaction scope never happened.
      */
     void revert();
     
     /**
      * Sets the transaction to be "Revert Only".  The transaction will continue
-     * as normal, but will throw an {@link IllegalStateException} when {@link #commit() }
+     * as normal, but will throw an {@link IllegalStateException} if {@link #commit() }
      * is called.
      */
     void setRevertOnly();
@@ -48,8 +61,8 @@ public interface Transaction extends AutoCloseable {
     /**
      * Gets the ID of this transaction.  A Transaction's ID is linked to the time
      * it was created, so a transaction with a higher ID is guaranteed to have
-     * been created later.  Transaction IDs are also valid across 
-     * @return 
+     * been created later.  Transaction IDs are also valid across multiple tables.
+     * @return The transaction's ID.
      */
     long getTransactionId();
     
@@ -64,13 +77,13 @@ public interface Transaction extends AutoCloseable {
     
     /**
      * Returns true if the transaction has been committed.
-     * @return 
+     * @return true iff the transaction successfully committed.
      */
     boolean isCommitted();
     
     /**
      * Returns true if the transaction has been reverted.
-     * @return 
+     * @return true iff the transaction was reverted.
      */
     boolean isReverted();
     
@@ -90,13 +103,13 @@ public interface Transaction extends AutoCloseable {
     
     /**
      * Adds a transaction listener for this transaction, if it does not already exist.
-     * @param listener 
+     * @param listener The listener to add to this transaction.
      */
     void putTransactionListener(TransactionListener listener);
     
     /**
      * Removes a transaction listener for this transaction.
-     * @param listener 
+     * @param listener The listener to remove from this transaction.
      */
     void removeTransactionListener(TransactionListener listener);
 }

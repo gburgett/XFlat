@@ -19,7 +19,7 @@ import java.util.Iterator;
 import org.xflatdb.xflat.Cursor;
 
 /**
- *
+ * A singleton {@link Cursor} which iterates over zero results. 
  * @author Gordon
  */
 public class EmptyCursor {
@@ -52,6 +52,11 @@ public class EmptyCursor {
         
     };
     
+    /**
+     * Gets the singleton instance, cast to whatever type is necessary.
+     * @param <T> The type of items in the empty cursor.
+     * @return A singleton cursor which iterates zero results.
+     */
     public static <T> Cursor<T> instance(){
         return (Cursor<T>)emptyCursor;
     }

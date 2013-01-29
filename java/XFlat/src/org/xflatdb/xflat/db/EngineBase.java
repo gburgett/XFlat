@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jdom2.Element;
 import org.xflatdb.xflat.EngineStateException;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionService;
@@ -33,7 +34,6 @@ import org.xflatdb.xflat.db.EngineBase.RowData;
 import org.xflatdb.xflat.transaction.Transaction;
 import org.xflatdb.xflat.transaction.TransactionException;
 import org.xflatdb.xflat.transaction.TransactionManager;
-import org.jdom2.Element;
 
 /**
  * The base class for Engine objects.  The Database uses the functionality
@@ -125,6 +125,10 @@ public abstract class EngineBase implements Engine {
         }while(!lastActivity.compareAndSet(existing, time));
     }
     
+    /**
+     * An event handler for the events fired when an Engine finishes spinning
+     * down.
+     */
     public static interface SpinDownEventHandler{
         /**
          * Called when the engine is completely finished spinning down,
@@ -134,12 +138,25 @@ public abstract class EngineBase implements Engine {
         public void spinDownComplete(SpinDownEvent event);
     }
     
+    /**
+     * An event object given to the {@link SpinDownEventHandler} when an
+     * engine finishes spinning down.
+     */
     public static class SpinDownEvent extends java.util.EventObject{
+        /**
+         * The Engine that has spun down.
+         * @return 
+         */
         @Override
         public Engine getSource(){
             return (Engine)super.getSource();
         }
         
+        /**
+         * Creates a new SpinDownEvent which says the given engine has finished
+         * spinning down.
+         * @param source The engine which has finished spinning down.
+         */
         public SpinDownEvent(Engine source){
             super(source);
         }

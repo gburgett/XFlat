@@ -19,17 +19,17 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
 import org.xflatdb.xflat.DatabaseConfig;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.JDOMException;
 
 /**
- *
+ * A Factory which creates {@link TableMetadata} instances.
  * @author Gordon
  */
 public class TableMetadataFactory {
@@ -38,19 +38,38 @@ public class TableMetadataFactory {
     private DatabaseConfig dbConfig;
     private DocumentFileWrapper wrapper;
     
+    /**
+     * Creates a new TableMetadataFactory with the given dependencies.
+     * @param db The XFlatDatabase from which dependencies are retrieved when engines are provided.
+     * @param wrapper The metadata directory to which the factory should read and save table metadata.
+     */
     public TableMetadataFactory(XFlatDatabase db, File metadataDirectory){
         this(db, db.getConfig(), new DocumentFileWrapper(metadataDirectory));
     }
     
+    /**
+     * Creates a new TableMetadataFactory with the given dependencies.
+     * @param db The XFlatDatabase from which dependencies are retrieved when engines are provided.
+     * @param config The XFlat Database configuration.
+     * @param wrapper A Wrapper around the metadata directory allowing the factory to read and save table metadata.
+     */
     TableMetadataFactory(XFlatDatabase db, DatabaseConfig config, DocumentFileWrapper wrapper){
         this.db = db;
-        this.dbConfig= db.getConfig();
+        this.dbConfig= config;
         this.wrapper = wrapper;
     }
     
+    /**
+     * Creates a new TableMetadataFactory with no dependencies.
+     */
     TableMetadataFactory(){
     }
     
+    /**
+     * Gets the metadata document for the given table name.
+     * @param name The table name for which to get the metadata document.
+     * @return A Document representing the metadata associated to the table.
+     */
     public Document getMetadataDoc(String name){
         try {
              return this.wrapper.readFile(name + ".config.xml");

@@ -16,9 +16,10 @@ import org.jdom2.xpath.XPathExpression;
  * Implements a Hamcrest {@link org.hamcrest.Matcher} for {@link XPathExpression} objects
  * that is namespace-aware and can translate namespace prefixes.
  * <p/>
- * Therefore in the following example, the two XPath expressions are equal:
+ * According to this matcher, in the following example the two XPath expressions are equal:
+ * <p/>
  * <code>
- * a:abc xmlns:a = "http://www.example.com"
+ * a:abc xmlns:a = "http://www.example.com"<br/>
  * b:abc xmlns:b = "http://www.example.com"
  * </code>
  * 
@@ -31,6 +32,11 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
     
     private static final Pattern nsPattern = Pattern.compile("([a-zA-Z0-9\\.]+):");
     
+    /**
+     * Creates a new XPathExpressionEqualityMatcher whose {@link #matches(java.lang.Object) }
+     * method will return true iff the given XPathExpression is equal to the one provided here.
+     * @param toMatch The expression to match.
+     */
     public XPathExpressionEqualityMatcher(XPathExpression<U> toMatch) {
         this.toMatch = toMatch;        
     }
@@ -60,6 +66,11 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
         return ret;
     }
     
+    /**
+     * Returns true if the matcher matches the given XPath expression.
+     * @param item
+     * @return 
+     */
     @Override
     protected boolean matchesSafely(XPathExpression<U> item) {
         if (item == null) {
@@ -76,6 +87,10 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
         return equals(toMatch, myExpTokens, item, tokenizeExpression(item));
     }
 
+    /**
+     * Describes this matcher to the given description.
+     * @param description 
+     */
     @Override
     public void describeTo(Description description) {
         if (toMatch == null) {
@@ -105,8 +120,8 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
     /**
      * Compares two XPath expressions for equality by tokenizing their expressions
      * and expanding namespace prefixes.
-     * @param left
-     * @param right
+     * @param left One XPath expression to compare for equality
+     * @param right The other XPath expression to compare for equality.
      * @return true iff the two expressions are equal.
      */
     public static boolean equals(XPathExpression<?> left, XPathExpression<?> right){

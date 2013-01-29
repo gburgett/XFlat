@@ -16,7 +16,8 @@
 package org.xflatdb.xflat.transaction;
 
 /**
- * A Listener for Transaction Events.
+ * A Listener for Transaction Events.  Transaction listeners are notified upon
+ * major events in a transaction lifecycle, i.e. Commit and Revert.
  * @author Gordon
  */
 public interface TransactionListener {

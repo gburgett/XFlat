@@ -22,7 +22,7 @@ import java.util.Objects;
  * Represents one interval within an interval set.  The interval
  * is represented by two values, the begin and the end,
  * which can be inclusive or exclusive.
- * @param T
+ * @param T The type of values representing the interval.
  */
 public class Interval<T> {
     final T begin;
@@ -242,6 +242,11 @@ public class Interval<T> {
         return true;
     }
 
+    /**
+     * Represents this object as a string, appended to the given StringBuilder.
+     * @param sb The StringBuilder to which this object's string representation
+     * should be appended.
+     */
     public void toString(StringBuilder sb) {
         if (beginInclusive) {
             sb.append('[');

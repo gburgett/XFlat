@@ -219,36 +219,29 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             update.setConversionService(this.getConversionService());
 
             boolean ret;
-            try {
-                //lock the row
-                synchronized(row){
-                    RowData data = row.chooseMostRecentCommitted(tx, txId);
-                    if(data == null || data.data == null){
-                        throw new KeyNotFoundException(id);
+            //lock the row
+            synchronized(row){
+                RowData data = row.chooseMostRecentCommitted(tx, txId);
+                if(data == null || data.data == null){
+                    throw new KeyNotFoundException(id);
+                }
+                else{
+                    //apply to a copy, store the copy as a transactional state.
+                    RowData newData = new RowData(txId, data.data.clone(), row.rowId);
+                    if(tx == null){
+                        //transactionless means auto-commit
+                        newData.commitId = txId;
                     }
-                    else{
-                        //apply to a copy, store the copy as a transactional state.
-                        RowData newData = new RowData(txId, data.data.clone(), row.rowId);
-                        if(tx == null){
-                            //transactionless means auto-commit
-                            newData.commitId = txId;
-                        }
 
-                        int updates = update.apply(newData.rowElement);
-                        ret = updates > 0;
-                        if(ret){
-                            //no need to put a new version if no data was modified
-                            row.rowData.put(txId, newData);
-                            if(tx != null || this.getTransactionManager().anyOpenTransactions())
-                                this.uncommittedRows.put(id, row);
-                        }
+                    int updates = update.apply(newData.rowElement);
+                    ret = updates > 0;
+                    if(ret){
+                        //no need to put a new version if no data was modified
+                        row.rowData.put(txId, newData);
+                        if(tx != null || this.getTransactionManager().anyOpenTransactions())
+                            this.uncommittedRows.put(id, row);
                     }
                 }
-            } catch (JDOMException ex) {
-                if(log.isTraceEnabled())
-                    log.trace("Exception while applying update " + update.toString(), ex);
-
-                ret = false;
             }
 
             setLastActivity(System.currentTimeMillis());
@@ -287,29 +280,24 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     if(!rowMatcher.matches(rData.rowElement))
                         continue;
 
-                    try {
-                        //apply to a copy, store the copy as a transactional state.
-                        RowData newData = new RowData(txId, rData.data.clone(), row.rowId);
-                        if(tx == null){
-                            //transactionless means auto-commit
-                            newData.commitId = txId;
-                        }
-
-                        int updates = update.apply(newData.rowElement);
-
-                        if(updates > 0){
-                            //no need to put a new version if no data was modified
-                            row.rowData.put(txId, newData);
-                            if(newData.commitId == -1 && (tx != null || this.getTransactionManager().anyOpenTransactions()))
-                                this.uncommittedRows.put(row.rowId, row);
-                        }
-
-                        rowsUpdated = updates > 0 ? rowsUpdated + 1 : rowsUpdated;
-                    } 
-                    catch (JDOMException ex) {
-                        if(log.isTraceEnabled())
-                            log.trace("Exception while applying update " + update.toString(), ex);
+                    //apply to a copy, store the copy as a transactional state.
+                    RowData newData = new RowData(txId, rData.data.clone(), row.rowId);
+                    if(tx == null){
+                        //transactionless means auto-commit
+                        newData.commitId = txId;
                     }
+
+                    int updates = update.apply(newData.rowElement);
+
+                    if(updates > 0){
+                        //no need to put a new version if no data was modified
+                        row.rowData.put(txId, newData);
+                        if(newData.commitId == -1 && (tx != null || this.getTransactionManager().anyOpenTransactions()))
+                            this.uncommittedRows.put(row.rowId, row);
+                    }
+
+                    rowsUpdated = updates > 0 ? rowsUpdated + 1 : rowsUpdated;
+
                 }
             }
 

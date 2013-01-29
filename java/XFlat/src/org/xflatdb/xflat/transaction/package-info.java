@@ -13,13 +13,9 @@
 *	See the License for the specific language governing permissions and
 *	limitations under the License.
 */
-package test;
 
 /**
- *
- * @author gordon
+ * This package contains all the classes related to the public transaction API,
+ * as well as the main TransactionManager implementations.
  */
-public class SubFoo extends Foo {
-    
-    public boolean subFooBool;
-}
+package org.xflatdb.xflat.transaction;

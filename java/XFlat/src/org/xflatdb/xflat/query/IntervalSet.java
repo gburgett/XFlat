@@ -51,7 +51,7 @@ public class IntervalSet<T> {
     /**
      * Creates an interval set representing all values less than the given value,
      * to negative infinity.
-     * That is, the set (-∞, value)
+     * That is, the interval (-∞, value)
      * @param <U>
      * @param value The exclusive end value of the interval to create.
      * @return An interval set containing one interval
@@ -64,7 +64,7 @@ public class IntervalSet<T> {
     /**
      * Creates an interval set representing all values less than or equal to the given value,
      * to negative infinity.
-     * That is, the set (-∞, value]
+     * That is, the interval (-∞, value]
      * @param <U>
      * @param value The inclusive end value of the interval to create.
      * @return An interval set containing one interval
@@ -77,7 +77,7 @@ public class IntervalSet<T> {
     /**
      * Creates an interval set representing all values greater than the given value,
      * to positive infinity.
-     * That is, the set (value, ∞)
+     * That is, the interval (value, ∞)
      * @param <U>
      * @param value The exclusive begin value of the interval to create.
      * @return An interval set containing one interval
@@ -90,7 +90,7 @@ public class IntervalSet<T> {
     /**
      * Creates an interval set representing all values greater than or equal to the given value,
      * to positive infinity.
-     * That is, the set [value, ∞)
+     * That is, the interval [value, ∞)
      * @param <U>
      * @param value The inclusive begin value of the interval to create.
      * @return An interval set containing one interval
@@ -102,7 +102,7 @@ public class IntervalSet<T> {
     
     /**
      * Creates an IntervalSet representing all values between the two given values exclusive.
-     * That is, the set (lower, upper)
+     * That is, the interval (lower, upper)
      * <p/>
      * This is equivalent to {@link #gt(java.lang.Object) gt(lower)} {@link #intersection(org.xflatdb.xflat.query.IntervalSet, java.util.Comparator) ∩}
      * {@link #lt(java.lang.Object) lt(upper)}.
@@ -130,7 +130,7 @@ public class IntervalSet<T> {
     
     /**
      * Creates an interval set containing all values except one.  
-     * That is, the set of intervals { (-∞, value) U (value, ∞) }
+     * That is, the interval { (-∞, value) U (value, ∞) }
      * @param <U>
      * @param value The one value that should be in the interval.
      * @return an IntervalSet containing two Intervals
@@ -144,7 +144,7 @@ public class IntervalSet<T> {
     
     /**
      * Creates an interval set containing the entire number range.
-     * That is, the set (-∞, ∞)
+     * That is, the interval (-∞, ∞)
      * @param <U>
      * @return 
      */
@@ -170,10 +170,13 @@ public class IntervalSet<T> {
     }
     
     /**
-     * Gets the union of this IntervalSet with the other IntervalSet, using the given comparer.
+     * Gets the union of this IntervalSet with the other IntervalSet, using the given comparator.
+     * The returned interval set will contain the minimum number of {@link Interval} objects
+     * necessary to represent the union of this interval set with the other.
+     * <p/>
      * The returned interval set is a new instance.
      * @param other The other interval set with which to union this interval set.
-     * @param comparer The comparer for values of the interval set.
+     * @param comparer The comparator for begin and end values of the interval set.
      * @return A new interval set containing the union.
      */
     public IntervalSet<T> union(IntervalSet<T> other, final Comparator<T> comparer){
@@ -192,6 +195,9 @@ public class IntervalSet<T> {
     
     /**
      * Gets the intersection of this interval set with another interval set.
+     * The returned interval set will contain the minimum number of {@link Interval} objects
+     * necessary to represent the intersection of this interval set with the other.
+     * <p/>
      * The returned interval set is a new instance.
      * @param other The other interval set which has intersecting intervals.
      * @param comparer The comparer for values of the interval set.
@@ -324,7 +330,7 @@ public class IntervalSet<T> {
      * Tests whether this IntervalSet intersects another IntervalSet.
      * @param other The other interval set to test against
      * @param comparer The comparer comparing values.
-     * @return true if any interval in this interval set intersects any value on the other.
+     * @return true if any interval in this interval set intersects any interval in the other.
      */
     public boolean intersects(IntervalSet<T> other, Comparator<T> comparer){
         // O(n^2), but theres not gonna be very many in any interval set.
@@ -340,9 +346,9 @@ public class IntervalSet<T> {
     }
     
     /**
-     * Tests whether this IntervalSet contains any intervals that intersect the other interval set.
-     * @param other The interval to test
-     * @param comparer The comparer comparing values.
+     * Tests whether this IntervalSet contains any intervals that intersect the given interval.
+     * @param other The interval to test.
+     * @param comparer The comparer comparing begin and end values.
      * @return true if any interval in this interval set intersects the given interval.
      */
     public boolean intersects(Interval<T> other, Comparator<T> comparer){
@@ -357,7 +363,9 @@ public class IntervalSet<T> {
     @Override
     public int hashCode() {
         int hash = 5;
-        for(int i = 0; i < this.intervals.size(); i++){
+        int size = this.intervals.size();
+        hash = 59 * hash + size;
+        for(int i = 0; i < size; i++){
             hash = 59 * hash + Objects.hashCode(this.intervals.get(i));
         }        
         return hash;
@@ -388,6 +396,12 @@ public class IntervalSet<T> {
     
     
     private String stringValue = null;    
+    /**
+     * Returns the string representation of this interval set, which is the 
+     * string representation of each interval in this set concatenated with the 
+     * union operator "U".
+     * @return The string representation of this interval set.
+     */
     @Override
     public String toString(){
         if(stringValue == null){

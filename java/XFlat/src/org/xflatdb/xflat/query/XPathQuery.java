@@ -38,7 +38,12 @@ import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 
 /**
- *
+ * Represents a query in the XPath Query Language. 
+ * <p/>
+ * Queries are constructed using XPath expressions associated to values.
+ * The XPath expressions select elements or attributes in the row data which
+ * are convertible to the query's value type, and then the converted value
+ * type is compared to the given value to see if the row matches the query.
  * @author Gordon
  */
 public class XPathQuery {
@@ -79,8 +84,11 @@ public class XPathQuery {
     private ConversionService conversionService;
     /**
      * Sets the conversion service for the entire query chain.  Necessary for
-     * matchers that match against non-JDOM types
-     * @param service 
+     * matchers that match against non-JDOM types.
+     * <p/>
+     * JDOM Engines will set this automatically when they execute the query.
+     * @param service The conversion service to use to convert selected data
+     * to the comparable value type.
      */
     public void setConversionService(ConversionService service){
         this.conversionService = service;
@@ -99,8 +107,8 @@ public class XPathQuery {
      * know the alternate ID expression in case the user queries on that rather than
      * {@link #Id}.
      * <p/>
-     * This is automatically populated by converting tables.
-     * @param expression 
+     * This is automatically populated by {@link org.xflatdb.xflat.db.ConvertingTable}.
+     * @param expression The expression which represents an alternate way to select the ID.
      */
     public void setAlternateIdExpression(XPathExpression<Object> expression){
         this.alternateIdExpression = expression;
@@ -462,15 +470,25 @@ public class XPathQuery {
      * execution plan.
      */
     public enum QueryType {
+        /** Represents an equals query. */
         EQ,
+        /** Represents a not equals query. */
         NE,
+        /** Represents a less than query. */
         LT,
+        /** Represents a less than or equals query. */
         LTE,
+        /** Represents a greater than query. */
         GT,
+        /** Represents a greater than or equals query. */
         GTE,
+        /** Represents the intersection of several sub-queries. */
         AND,
+        /** Represents the union of several sub-queries. */
         OR,
+        /** Represents an exists query. */
         EXISTS,
+        /** Represents a matches query. */
         MATCHES
     }
        
@@ -548,6 +566,10 @@ public class XPathQuery {
     
     //<editor-fold desc="utility">
     
+    /**
+     * Returns the string representation of this query.
+     * @return 
+     */
     @Override
     public String toString(){
         StringBuilder str = new StringBuilder();

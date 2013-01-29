@@ -21,7 +21,9 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- *
+ * The default implementation of {@link ConversionService}.  This conversion
+ * service manages a mapping of conversions to their converters, and can perform
+ * no conversions initially.
  * @author gordon
  */
 public class DefaultConversionService implements ConversionService {
@@ -30,6 +32,9 @@ public class DefaultConversionService implements ConversionService {
     
     private ReadWriteLock converterLock = new ReentrantReadWriteLock();
 
+    /**
+     * Creates a new DefaultConversionService with no registered conversions.
+     */
     public DefaultConversionService(){
     }
     

@@ -19,16 +19,15 @@ import java.util.Comparator;
 import org.xflatdb.xflat.util.ComparableComparator;
 
 /**
- * A class containing a number of factory methods for getting RangeProviders for
- * numbers.
+ * A class containing a number of factory methods for getting {@link IntervalProvider}
+ * objects for numbers.
  * 
- * Each RangeProvider provides instances of {@link NumericRange} behind the scenes.
- * The lower and upper values for the NumericRange are calculated based on the
+ * Each IntervalProvider provides fixed-width intervals calculated based on the
  * width and base parameters to each function.  The base is the offset on the number line
- * from which to start, and the width is the size of each range on the number line.
+ * from which to start, and the width is the size of each interval on the number line.
  * <p/>
  * Example: <br/>
- * for base = 25 and width = 100, ranges would be the following: <br/>
+ * for base = 25 and width = 100, intervals would be the following: <br/>
  * ... [-175, -75) [-75, 25) [25, 125) [125, 225) ...
  * @author Gordon
  */
@@ -39,10 +38,10 @@ public class NumericIntervalProvider {
     }
     
     /**
-     * Creates a RangeProvider for {@link Integer} based ranges.
-     * @param base The base from which ranges should be calculated.  Usually 0.
-     * @param width The width of one range.
-     * @return A RangeProvider providing ranges based on these settings.
+     * Creates a IntervalProvider for {@link Integer} based intervals.
+     * @param base The base from which intervals should be calculated.  Usually 0.
+     * @param width The width of one interval.
+     * @return A IntervalProvider providing intervals based on these settings.
      */
     public static IntervalProvider<Integer> forInteger(final int base, final int width){
         return new IntervalProvider<Integer>(){
@@ -96,10 +95,10 @@ public class NumericIntervalProvider {
     }    
     
     /**
-     * Creates a RangeProvider for {@link Long} based ranges.
-     * @param base The base from which ranges should be calculated.  Usually 0.
-     * @param width The width of one range.
-     * @return A RangeProvider providing ranges based on these settings.
+     * Creates a IntervalProvider for {@link Long} based intervals.
+     * @param base The base from which intervals should be calculated.  Usually 0.
+     * @param width The width of one interval.
+     * @return A IntervalProvider providing intervals based on these settings.
      */
     public static IntervalProvider<Long> forLong(final long base, final long width){
         return new IntervalProvider<Long>(){
@@ -151,10 +150,10 @@ public class NumericIntervalProvider {
     }
     
     /**
-     * Creates a RangeProvider for {@link Double} based ranges.
-     * @param base The base from which ranges should be calculated.  Usually 0.
-     * @param width The width of one range.
-     * @return A RangeProvider providing ranges based on these settings.
+     * Creates a IntervalProvider for {@link Double} based intervals.
+     * @param base The base from which intervals should be calculated.  Usually 0.
+     * @param width The width of one interval.
+     * @return A IntervalProvider providing intervals based on these settings.
      */
     public static IntervalProvider<Double> forDouble(final double base, final double width){
         return new IntervalProvider<Double>(){

@@ -16,7 +16,8 @@
 package org.xflatdb.xflat.transaction;
 
 /**
- *
+ * The TransactionManager opens transactions and manages their lifecycle.  Different
+ * TransactionManagers provide different contexts for their transactions.
  * @author Gordon
  */
 public interface TransactionManager {
@@ -34,7 +35,8 @@ public interface TransactionManager {
      * Opens a new transaction, using the {@link TransactionOptions#Default} options.
      * If a transaction is already open in this context, an IllegalStateException
      * is thrown.
-     * @return 
+     * @return A new Transaction object representing the transaction open in this context.
+     * @throws IllegalStateException if a transaction is already open in this context.
      */
     public Transaction openTransaction();
     
@@ -42,8 +44,9 @@ public interface TransactionManager {
      * Opens a new transaction, using the given TransactionOptions.  If a 
      * transaction is already open in this context, an IllegalStateException
      * is thrown.
-     * @param options
-     * @return 
+     * @param options The TransactionOptions to apply to this transaction.
+     * @return A new Transaction object representing the transaction open in this context.
+     * @throws IllegalStateException if a transaction is already open in this context.
      */
     public Transaction openTransaction(TransactionOptions options);
     

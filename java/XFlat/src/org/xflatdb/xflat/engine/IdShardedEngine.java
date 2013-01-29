@@ -18,13 +18,13 @@ package org.xflatdb.xflat.engine;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jdom2.Element;
 import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.DuplicateKeyException;
 import org.xflatdb.xflat.KeyNotFoundException;
@@ -41,7 +41,6 @@ import org.xflatdb.xflat.query.IntervalProvider;
 import org.xflatdb.xflat.query.IntervalSet;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
-import org.jdom2.Element;
 
 /**
  * An engine that shards the table based on ID.  This engine manages several sub-engines,
@@ -52,6 +51,13 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     
     private Map<Cursor<Element>, String> crossShardQueries = new ConcurrentHashMap<>();
     
+    /**
+     * Creates a new IdShardedEngine for the given directory, with the given table name,
+     * using the given configuration.
+     * @param file The directory in which the shard files will be located.
+     * @param tableName The name of the sharded table.
+     * @param config The configuration of the sharded table.
+     */
     public IdShardedEngine(File file, String tableName, ShardsetConfig<T> config){
         super(file, tableName, config);
         
@@ -61,6 +67,10 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         }
     }
     
+    /**
+     * Returns true if all cross-shard queries are finished.
+     * @return 
+     */
     @Override
     protected boolean isSpunDown(){
         return super.isSpunDown() && crossShardQueries.isEmpty();
@@ -70,8 +80,8 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
      * Gets a list of shard intervals over which the query should be executed.
      * This is obtained by dissecting the query according to ID and then
      * looking for known shards that intersect the dissected query.
-     * @param query
-     * @return 
+     * @param query The query to dissect in order to create the execution plan.
+     * @return A set of intervals mapping to shards over which this query needs to execute.
      */
     private List<Interval<T>> getExecutionPlan(XPathQuery query){
         final IntervalProvider<T> provider = config.getIntervalProvider();

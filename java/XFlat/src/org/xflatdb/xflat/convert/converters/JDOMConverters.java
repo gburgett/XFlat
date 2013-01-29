@@ -15,19 +15,18 @@
 */
 package org.xflatdb.xflat.convert.converters;
 
-import org.xflatdb.xflat.convert.ConversionException;
+import org.jdom2.*;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.Converter;
-import org.jdom2.*;
 
 /**
- *
+ * A number of converters that converts JDOM values to and from several types.
  * @author gordon
  */
 public class JDOMConverters {
     
     /**
-     * Registers all the string converters to the given ConversionService.
+     * Registers all the JDOM converters to the given ConversionService.
      * @param service 
      */
     public static void registerTo(ConversionService service){
