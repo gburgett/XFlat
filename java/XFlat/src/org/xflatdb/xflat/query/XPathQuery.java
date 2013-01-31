@@ -44,6 +44,8 @@ import org.jdom2.xpath.XPathFactory;
  * The XPath expressions select elements or attributes in the row data which
  * are convertible to the query's value type, and then the converted value
  * type is compared to the given value to see if the row matches the query.
+ * <p/>
+ * The row is matched to the query if any one 
  * @author Gordon
  */
 public class XPathQuery {
@@ -513,44 +515,52 @@ public class XPathQuery {
 
         @Override
         protected boolean matchesSafely(Element item) {
-            Object selected;
-            
-            selected = selector.evaluateFirst(item);
-            
-            if(selected == null){
-                if(expectedType != null && conversionService != null && 
-                        conversionService.canConvert(null, expectedType)){
-                    try {
-                        return subMatcher.matches(conversionService.convert(null, expectedType));
-                    } catch (ConversionException ex) {
-                        Log log = LogFactory.getLog(getClass());
-                        log.warn("Unable to convert null to " + expectedType);
-                        return false;
-                    }
-                }
-
-                return subMatcher.matches(null);
-            }
-            
-            if(expectedType != null){
-                if(!expectedType.isAssignableFrom(selected.getClass())){
-                    //need to convert
-                    if(conversionService != null && conversionService.canConvert(selected.getClass(), expectedType)){
-                        try{
-                            selected = conversionService.convert(selected, expectedType);
-                        }catch(ConversionException ex){
-                            //if we can't convert then the data is in the wrong format
-                            //and probably was not intended to be selected
-                            return false;
+            boolean anyMatches = false;
+            for(Object selected : selector.evaluate(item)){
+                anyMatches = true;
+                System.out.println("selected: " + selected);
+                if(expectedType != null){
+                    if(!expectedType.isAssignableFrom(selected.getClass())){
+                        //need to convert
+                        if(conversionService != null && conversionService.canConvert(selected.getClass(), expectedType)){
+                            try{
+                                selected = conversionService.convert(selected, expectedType);
+                            }catch(ConversionException ex){
+                                //if we can't convert then the data is in the wrong format
+                                //and probably was not intended to be selected
+                                continue;
+                            }
+                        }
+                        else{
+                            continue;
                         }
                     }
-                    else{
-                        return false;
-                    }
+                }
+                
+                if(subMatcher.matches(selected)){
+                    return true;
+                }
+            }
+            
+            if(anyMatches){
+                //we didn't match this row
+                return false;
+            }
+            
+            //not a single match in all the selected nodes,
+            //check to see if we are matching null (as in, not exists)
+            if(expectedType != null && conversionService != null && 
+                    conversionService.canConvert(null, expectedType)){
+                try {
+                    return subMatcher.matches(conversionService.convert(null, expectedType));
+                } catch (ConversionException ex) {
+                    //if we can't convert then the data is in the wrong format
+                                //and probably was not intended to be selected
+                    return false;
                 }
             }
 
-            return subMatcher.matches(selected);
+            return subMatcher.matches(null);
         }
 
         @Override

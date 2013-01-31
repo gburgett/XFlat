@@ -865,6 +865,31 @@ public class XPathQueryTest {
     }//end testExists_DoesntExist_DoesntMatch
     
     @Test
+    public void testEq_MatchesSecondOfTwoSelected_Matches() throws Exception {
+        System.out.println("testEq_MatchesSecondOfTwoSelected_Matches");
+        
+        Element row = new Element("row");
+        row.addContent(new Element("data")
+                .setAttribute("val", "value"));
+        row.addContent(new Element("data")
+                .setAttribute("val", "value2"));
+        
+        XPathExpression<Object> path = xpath.compile("data/@val");
+        XPathQuery query = XPathQuery.eq(path, "value2");
+        
+        query.setConversionService(conversionService);
+        
+        System.out.println(path.getExpression() + ": " + path.evaluateFirst(row));
+        System.out.println(query);
+        
+        //act
+        boolean matches = query.getRowMatcher().matches(row);
+        
+        //assert
+        assertTrue(matches);
+    }
+    
+    @Test
     public void testDissect_NoMatchingIndex_ReturnsAll() throws Exception {
         System.out.println("testDissect_NoMatchingIndex_ReturnsAll");
         
