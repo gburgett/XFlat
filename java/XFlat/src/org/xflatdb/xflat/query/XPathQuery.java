@@ -17,6 +17,7 @@ package org.xflatdb.xflat.query;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.logging.Log;
@@ -53,28 +54,63 @@ public class XPathQuery {
     
     //<editor-fold desc="properties" >
     private XPathExpression<?> selector;
+    /**
+     * Gets the XPath expression that is the selector for this query.
+     * AND and OR queries have null here, their subqueries have this populated.
+     * @return the selecting expression for this query.
+     */
     public XPathExpression<?> getSelector(){
         return selector;
     }
 
     private Matcher<Element> rowMatcher;
+    /**
+     * Gets the Hamcrest matcher that matches database rows.  This is used to determine
+     * if a row is a match for a query.
+     * @return The database row hamcrest matcher.
+     */
     public Matcher<Element> getRowMatcher(){
         return rowMatcher;
     }
     
     private Object value;
+    /**
+     * Gets the value to which the element selected by the {@link #getSelector() selector}
+     * should be compared, according to this query's type. <br/>
+     * AND and OR queries have null here, their subqueries have this populated.
+     * @return the value that will be compared to the selected element.
+     */
     public Object getValue(){
         return value;
     }
     
     private Class<?> valueType;
+    /**
+     * Gets the type of {@link #getValue() the value}, to which the selected element
+     * should be convertible so it can be compared to the value.
+     * @return The type of the value, or null if the value is null.
+     */
     public Class<?> getValueType(){
         return valueType;
     }
     
     private QueryType queryType;
+    /**
+     * Gets the type of this query, ie. EQ, NE, AND, OR, etc.
+     * @return The type of query.
+     */
     public QueryType getQueryType(){
         return queryType;
+    }
+    
+    /**
+     * Gets the sub queries of this query.  This is only populated for
+     * AND and OR queries.
+     * @return A list of all the sub queries, or an empty list if this is not an AND
+     * or OR query.
+     */
+    public List<XPathQuery> getSubQueries(){
+        return queryChain == null ? Collections.EMPTY_LIST : Collections.unmodifiableList(queryChain);
     }
     
     private List<XPathQuery> queryChain;
@@ -232,6 +268,7 @@ public class XPathQuery {
                 
             case EXISTS:
             case MATCHES:
+            case ANY:
                 //always a full table scan
                 return IntervalSet.all();
                 
@@ -461,6 +498,15 @@ public class XPathQuery {
         
         return new XPathQuery(selector, QueryType.EXISTS, true, Object.class, m);
     }
+    
+    /**
+     * An XPathQuery that matches any and all rows regardless of content.
+     * useful for find all or delete all.
+     * @return A new XPathQuery that will match all rows.
+     */
+    public static XPathQuery any(){
+        return new XPathQuery(QueryType.ANY, Matchers.anyOf(Matchers.nullValue(), Matchers.any(Element.class)));
+    }
 
     //</editor-fold>
 
@@ -491,7 +537,9 @@ public class XPathQuery {
         /** Represents an exists query. */
         EXISTS,
         /** Represents a matches query. */
-        MATCHES
+        MATCHES,
+        /** Represents an Any query, which matches all rows. */
+        ANY
     }
        
     /**

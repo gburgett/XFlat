@@ -152,9 +152,6 @@ public class IdAccessor<T> {
             if(p.getReadMethod() == null || Object.class.equals(p.getReadMethod().getDeclaringClass()))
                 continue;
             
-            if(p.getWriteMethod() == null || Object.class.equals(p.getWriteMethod().getDeclaringClass()))
-                continue;
-            
             descriptors.add(p);
         }
         
@@ -295,7 +292,8 @@ public class IdAccessor<T> {
                 throws IllegalAccessException, InvocationTargetException 
     {
         if(this.idProperty != null){
-            this.idProperty.getWriteMethod().invoke(pojo, id);
+            if(this.idProperty.getWriteMethod() != null)
+                this.idProperty.getWriteMethod().invoke(pojo, id);
             return;
         }
         

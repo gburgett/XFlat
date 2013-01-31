@@ -69,7 +69,8 @@ public interface Table<T> {
     
     //UPDATE
     /**
-     * Replaces a value with the new value by ID.
+     * Replaces a value with the new value by ID.  This is the same as "Save"
+     * in some other document databases.
      * @param newValue The new value to replace the old value.
      */
     public void replace(T newValue)

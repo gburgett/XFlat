@@ -101,11 +101,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     private void setId(Element rowData, String sId){
         rowData.setAttribute("id", sId, XFlatDatabase.xFlatNs);
     }
-    
-    private Element convert(T data){
-        return convert(data, getId(data));
-    }
-    
+        
     private Element convert(T data, String id){
         Element ret;
         try {
@@ -136,15 +132,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             return ret;
         }
         
-        if(this.accessor.hasId()){
-            Object id = this.getIdGenerator().stringToId(sId, this.accessor.getIdType());
-            try {
-                this.accessor.setIdValue(ret, id);
-            } catch (IllegalAccessException | InvocationTargetException ex) {
-                throw new XFlatException("Cannot set ID", ex);
-            }
-        }
-        else if(this.idMap != null){
+        if(!this.accessor.hasId() && this.idMap != null){
             //cache the ID
             this.idMap.put(ret, sId);
         }
@@ -152,45 +140,56 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         return ret;
     }
 
-    private String generateId(T rowData){
+    private String getOrGenerateId(T rowData){
         
         if(this.accessor.hasId()){
-            Object id = this.getIdGenerator().generateNewId(this.accessor.getIdType());
-        
             try{
+                Object id = this.accessor.getIdValue(rowData);
+                if(id != null){
+                    //already have an ID
+                    return this.getIdGenerator().idToString(id);
+                }
+
+                id = this.getIdGenerator().generateNewId(this.accessor.getIdType());
+        
                 this.accessor.setIdValue(rowData, id);
+                
+                return this.getIdGenerator().idToString(id);
+                
             } catch (IllegalAccessException | InvocationTargetException ex) {
-                throw new XFlatException("Cannot set newly-generated ID", ex);
+                throw new XFlatException("Cannot generate ID", ex);
             }
-            return this.getIdGenerator().idToString(id);
         }
         else{
             //if no ID property, always use string
-            String id = (String)this.getIdGenerator().generateNewId(String.class);
             if(this.idMap != null){
-                this.idMap.put(rowData, id);
+                //doublecheck in the ID map
+                String id;
+                synchronized(this.idMap){
+                    id = this.idMap.get(rowData);
+                    if(id == null){
+                        id = (String)this.getIdGenerator().generateNewId(String.class);
+                        this.idMap.put(rowData, id);
+                    }
+                }
+                return id;
             }
-            return id;
+            
+            return (String)this.getIdGenerator().generateNewId(String.class);
         }
     }
     //</editor-fold>
     
     @Override
     public void insert(T row) throws DuplicateKeyException {
-        final Element e = convert(row);
-        String id = getId(e);
-        if(id == null){
-            //generate new ID
-             id = generateId(row);
-             setId(e, id);
-        }
-        
-        final String sId = id;
+        //generate new ID
+        final String id = getOrGenerateId(row);
+        final Element e = convert(row, id);
         
         this.doWithEngine(new EngineAction(){
             @Override
             public Object act(Engine engine) {
-                engine.insertRow(sId, e);
+                engine.insertRow(id, e);
                 return null;
             }
         });
@@ -305,7 +304,7 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             return false;
         }
 
-        Element data = convert(newValue);
+        Element data = convert(newValue, null);
         String replacedId = recursiveReplaceOne(query, data, existing);
         if(replacedId == null){
             return false;
@@ -347,32 +346,15 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
 
     @Override
     public boolean upsert(T newValue) {
-        final Element data = convert(newValue);
-        final String id = getId(data);
+        final String id = getOrGenerateId(newValue);
+        final Element data = convert(newValue, id);
         
-        if(id == null){
-            //insert
-            final String nId = generateId(newValue);
-            setId(data, nId);
-            
-            this.doWithEngine(new EngineAction(){
-                @Override
-                public Object act(Engine engine) {
-                    engine.insertRow(nId, data);
-                    return null;
-                }
-            });
-            
-            return true;    //inserted
-        }
-        else{
-            return this.doWithEngine(new EngineAction<Boolean>(){
-                @Override
-                public Boolean act(Engine engine) {
-                    return engine.upsertRow(id, data);
-                }
-            });
-        }
+        return this.doWithEngine(new EngineAction<Boolean>(){
+            @Override
+            public Boolean act(Engine engine) {
+                return engine.upsertRow(id, data);
+            }
+        });
     }
 
     @Override

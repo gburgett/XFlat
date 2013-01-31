@@ -865,6 +865,51 @@ public class XPathQueryTest {
     }//end testExists_DoesntExist_DoesntMatch
     
     @Test
+    public void testAny_MatchesNull() throws Exception {
+        System.out.println("testAny_MatchesNull");
+        
+        XPathQuery query = XPathQuery.any();
+        
+        //act
+        boolean matches = query.getRowMatcher().matches(null);
+        
+        //assert
+        assertTrue(matches);
+    }
+    
+    @Test
+    public void testAny_MatchesEmptyRow() throws Exception {
+        System.out.println("testAny_MatchesEmptyRow");
+        
+        XPathQuery query = XPathQuery.any();
+        
+        //act
+        boolean matches = query.getRowMatcher().matches(new Element("row", XFlatDatabase.xFlatNs));
+        
+        //assert
+        assertTrue(matches);
+    }
+    
+    @Test
+    public void testAny_MatchesFullRow() throws Exception {
+        System.out.println("testAny_MatchesEmptyRow");
+        
+        XPathQuery query = XPathQuery.any();
+        
+        //act
+        boolean matches = query.getRowMatcher().matches(
+                    new Element("row", XFlatDatabase.xFlatNs)
+                        .addContent(new Element("data").setAttribute("val", "value").setText("some data"))
+                        .addContent("some more text")
+                );
+        
+        //assert
+        assertTrue(matches);
+    }
+    
+    
+    
+    @Test
     public void testEq_MatchesSecondOfTwoSelected_Matches() throws Exception {
         System.out.println("testEq_MatchesSecondOfTwoSelected_Matches");
         

@@ -174,10 +174,10 @@ public class DatabaseIntegrationTest {
             try(Cursor<Foo> fooCursor = fooTable.find(XPathQuery.gte(expression, 100))){
 
                 int i = 100;
-                for(Foo f : fooCursor){
-                    assertThat("Expected items 100 to 499", f.fooInt,
+                for(Foo f2 : fooCursor){
+                    assertThat("Expected items 100 to 499", f2.fooInt,
                             Matchers.allOf(Matchers.greaterThanOrEqualTo(100), Matchers.lessThan(500)));
-                    assertThat("Expected to use integer ID generator", Integer.parseInt(f.getId()),
+                    assertThat("Expected to use integer ID generator", Integer.parseInt(f2.getId()),
                             Matchers.allOf(Matchers.greaterThan(0), Matchers.lessThanOrEqualTo(500)));
                     i++;
                 }

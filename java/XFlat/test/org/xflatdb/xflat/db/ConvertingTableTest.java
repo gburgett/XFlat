@@ -23,6 +23,7 @@ import org.xflatdb.xflat.db.Engine;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.KeyNotFoundException;
 import org.xflatdb.xflat.convert.ConversionService;
@@ -224,7 +225,7 @@ public class ConvertingTableTest {
         when(idGenerator.stringToId(any(String.class), eq(String.class)))
                 .thenAnswer(byReturningFirstParam());
         
-        Element inDb = new Element("foo");
+        Element inDb = new Element("foo").setAttribute("id", fooId, Foo.FooIdNs);
         setId(inDb, fooId);
         inDb.addContent(new Element("fooInt").setText("32"));
         when(engine.readRow(fooId))
@@ -300,9 +301,13 @@ public class ConvertingTableTest {
         when(idGenerator.stringToId(any(String.class), eq(String.class)))
                 .thenAnswer(byReturningFirstParam());
         
-        Element inDb1 = new Element("foo").addContent(new Element("fooInt").setText("32"));
+        Element inDb1 = new Element("foo")
+                .setAttribute("id", "id 1", Foo.FooIdNs)
+                .addContent(new Element("fooInt").setText("32"));
         setId(inDb1, "id 1");
-        Element inDb2 = new Element("foo").addContent(new Element("fooInt").setText("33"));
+        Element inDb2 = new Element("foo")
+                .setAttribute("id", "id 2", Foo.FooIdNs)
+                .addContent(new Element("fooInt").setText("33"));
         setId(inDb2, "id 2");
         
         XPathQuery query = XPathQuery.gte(xpath.compile("foo/fooInt"), 32);
@@ -342,9 +347,13 @@ public class ConvertingTableTest {
         when(idGenerator.stringToId(any(String.class), eq(String.class)))
                 .thenAnswer(byReturningFirstParam());
         
-        Element inDb1 = new Element("foo").addContent(new Element("fooInt").setText("32"));
+        Element inDb1 = new Element("foo")
+                .setAttribute("id", "id 1", Foo.FooIdNs)
+                .addContent(new Element("fooInt").setText("32"));
         setId(inDb1, "id 1");
-        Element inDb2 = new Element("foo").addContent(new Element("fooInt").setText("33"));
+        Element inDb2 = new Element("foo")
+                .setAttribute("id", "id 2", Foo.FooIdNs)
+                .addContent(new Element("fooInt").setText("33"));
         setId(inDb2, "id 2");
         
         XPathQuery query = XPathQuery.gte(xpath.compile("foo/fooInt"), 32);
@@ -556,6 +565,10 @@ public class ConvertingTableTest {
         when(idGenerator.generateNewId(String.class))
                 .thenReturn(id);
         
+        when(engine.upsertRow(eq(id), any(Element.class)))
+                .thenReturn(true);
+                
+        
         Foo toUpsert = new Foo();
         toUpsert.fooInt = 51;
         
@@ -566,7 +579,7 @@ public class ConvertingTableTest {
         assertTrue("Should have inserted new foo", didInsert);
         
         ArgumentCaptor<Element> data = ArgumentCaptor.forClass(Element.class);
-        verify(engine).insertRow(eq(id), data.capture());
+        verify(engine).upsertRow(eq(id), data.capture());
         
         assertEquals("Should have inserted correct data", "51",
                 data.getValue().getChild("fooInt").getText());
@@ -614,15 +627,18 @@ public class ConvertingTableTest {
         when(idGenerator.generateNewId(String.class))
                 .thenReturn(id, "second invocation");
         
+        when(engine.upsertRow(eq(id), any(Element.class)))
+                .thenReturn(true);
+        
         //ACT
         ConvertingTable<Bar> instance = this.getBarInstance();
         boolean didInsert = instance.upsert(toUpsert);
         
         //ASSERT
-        assertTrue("Should have inserted new foo", didInsert);
+        assertTrue("Should have inserted new bar", didInsert);
         
         ArgumentCaptor<Element> data = ArgumentCaptor.forClass(Element.class);
-        verify(engine).insertRow(eq(id), data.capture());
+        verify(engine).upsertRow(eq(id), data.capture());
         
         assertEquals("Should have inserted correct data", "test data",
                 data.getValue().getChild("barString").getText());
