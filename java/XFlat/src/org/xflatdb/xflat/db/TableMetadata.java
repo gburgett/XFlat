@@ -15,17 +15,20 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.TableConfig;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jdom2.Element;
+import org.jdom2.xpath.XPathExpression;
+import org.xflatdb.xflat.EngineStateException;
+import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.db.EngineBase.SpinDownEvent;
 import org.xflatdb.xflat.db.EngineBase.SpinDownEventHandler;
-import org.jdom2.Element;
-import org.jdom2.xpath.XPathExpression;
 
 /**
  * A class containing metadata about a Table, and providing the ability to spin up
@@ -52,6 +55,9 @@ public class TableMetadata implements EngineProvider {
     Element engineMetadata;
 
     XFlatDatabase db;
+    
+    private ReadWriteLock lock = new ReentrantReadWriteLock();
+    
     //</editor-fold>
     
     IdGenerator idGenerator;
@@ -62,6 +68,11 @@ public class TableMetadata implements EngineProvider {
     
     Log log = LogFactory.getLog(getClass());
     
+    /**
+     * Called to determine whether the table has been inactive long enough
+     * that it can be spun down.
+     * @return true if the engine is inactive and has no uncommitted data.
+     */
     public boolean canSpinDown(){
         EngineBase engine = this.engine.get();
         return lastActivity + config.getInactivityShutdownMs() < System.currentTimeMillis() && engine == null || !engine.hasUncomittedData();
@@ -92,8 +103,9 @@ public class TableMetadata implements EngineProvider {
             throw new IllegalArgumentException("clazz cannot be null");
         }
         
-        this.ensureSpinUp();
-
+        //go ahead and spin up the engine if necessary
+        provideEngine();
+        
         TableBase table = makeTableForClass(clazz);
         table.setIdGenerator(idGenerator);
         table.setEngineProvider(this);
@@ -142,35 +154,53 @@ public class TableMetadata implements EngineProvider {
     
     @Override
     public EngineBase provideEngine(){
-        this.lastActivity = System.currentTimeMillis();
-        return this.ensureSpinUp();
+        long newActivity = System.currentTimeMillis();
+        boolean didLock = false;
+        try{
+            //are we within 100ms of being able to be spun down?
+            if(lastActivity + config.getInactivityShutdownMs() - 100 < newActivity){
+                //if so, lock
+                lock.readLock().lock();
+                
+                didLock = true;
+            }
+            
+            //for the next 2990ms (default inactivity shutdown) we should be OK to not lock,
+            //just want to be careful anytime we're close to interacting with a spin down.
+            this.lastActivity = System.currentTimeMillis();
+            
+            return this.ensureSpinUp(didLock);
+        }
+        finally{
+            if(didLock)
+                lock.readLock().unlock();
+        }
     }
     
     private EngineBase makeNewEngine(File file){
-        synchronized(this){
-            //TODO: engines will in the future be configurable & based on a strategy
-            
-            EngineBase ret = db.getEngineFactory().newEngine(file, name, config);
+        
+        //TODO: engines will in the future be configurable & based on a strategy
 
-            ret.setConversionService(db.getConversionService());
-            ret.setExecutorService(db.getExecutorService());
-            ret.setTransactionManager(db.getEngineTransactionManager());
-            
-            if(ret instanceof ShardedEngineBase){
-                //give it a metadata factory centered in its own file.  If it uses this,
-                //it must also use the file as a directory.
-                ((ShardedEngineBase)ret).setMetadataFactory(new TableMetadataFactory(this.db, file));
-            }
-            
-            ret.loadMetadata(engineMetadata);
-            
-            
-            
-            return ret;
+        EngineBase ret = db.getEngineFactory().newEngine(file, name, config);
+
+        ret.setConversionService(db.getConversionService());
+        ret.setExecutorService(db.getExecutorService());
+        ret.setTransactionManager(db.getEngineTransactionManager());
+
+        if(ret instanceof ShardedEngineBase){
+            //give it a metadata factory centered in its own file.  If it uses this,
+            //it must also use the file as a directory.
+            ((ShardedEngineBase)ret).setMetadataFactory(new TableMetadataFactory(this.db, file));
         }
+
+        ret.loadMetadata(engineMetadata);
+
+
+
+        return ret;
     }
 
-    private EngineBase ensureSpinUp(){
+    private EngineBase ensureSpinUp(final boolean didLock){
         EngineBase engine = this.engine.get();
         
         EngineState state;
@@ -178,27 +208,37 @@ public class TableMetadata implements EngineProvider {
         if(engine == null ||
                 (state = engine.getState()) == EngineState.SpinningDown ||
                 state == EngineState.SpunDown){
-            EngineBase newEngine = makeNewEngine(engineFile);
-            if(!this.engine.compareAndSet(engine, newEngine)){
-                //another thread has changed the engine - spinwait and retry if necessary
-                long waitUntil = System.nanoTime() + 250;
-                while(System.nanoTime() - waitUntil < 0){
-                    engine = this.engine.get();
-                    if(engine == null)
-                        continue;
+            
+            //must unlock a read lock before we enter a write lock
+            if(didLock)
+                lock.readLock().unlock();
+            lock.writeLock().lock();
+            try{
+                //re-check condition after locking
+                engine = this.engine.get();
+                if(engine == null ||
+                (state = engine.getState()) == EngineState.SpinningDown ||
+                state == EngineState.SpunDown){
                     
-                    if(engine.getState() == EngineState.SpinningUp ||
-                            engine.getState() == EngineState.SpunUp ||
-                            engine.getState() == EngineState.Running){
-                        return engine;
+                    EngineBase newEngine = makeNewEngine(engineFile);
+                    if(this.engine.compareAndSet(engine, newEngine)){
+                        engine = newEngine;
+                        if(log.isTraceEnabled())
+                            log.trace(String.format("Spinning up new engine for table %s", this.name));
+                    }else{
+                        //dunno how we got here, so long as we have the lock there ought to be no way.
+                        newEngine = this.engine.get();
+                        throw new EngineStateException("Synchronization error on spin up, could not put new engine", 
+                                newEngine == null ? EngineState.Uninitialized : newEngine.getState());
                     }
-                    //still in the wrong state, retry recursive
-                    return this.ensureSpinUp();
                 }
-            }else{
-                engine = newEngine;
-                if(log.isTraceEnabled())
-                    log.trace(String.format("Spinning up new engine for table %s", this.name));
+            }finally{
+                //we can downgrade to a readlock
+                if(didLock)
+                    lock.readLock().lock();
+                
+                lock.writeLock().unlock();
+                
             }
         }
         else if(state == EngineState.SpinningUp ||
@@ -215,8 +255,17 @@ public class TableMetadata implements EngineProvider {
         return engine;
     }
     
+    /**
+     * Spins down the engine, leaving the metadata in a state where it will
+     * be required to spin up a new engine before providing it.
+     * @param force Whether to force a spin down even if the engine has uncommitted
+     * data, effectively automatically reverting it.  Usually only set when the
+     * entire database is being shut down.
+     * @return The engine that was spun down.
+     */
     public EngineBase spinDown(boolean force){
-        synchronized(this){
+        lock.writeLock().lock();
+        try{
             EngineBase engine = this.engine.get();
             
             EngineState state;
@@ -260,6 +309,9 @@ public class TableMetadata implements EngineProvider {
             }
             
             return engine;
+        }
+        finally{
+            lock.writeLock().unlock();
         }
     }
     
