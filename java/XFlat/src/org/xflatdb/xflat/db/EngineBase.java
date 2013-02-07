@@ -34,6 +34,7 @@ import org.xflatdb.xflat.db.EngineBase.RowData;
 import org.xflatdb.xflat.transaction.Transaction;
 import org.xflatdb.xflat.transaction.TransactionException;
 import org.xflatdb.xflat.transaction.TransactionManager;
+import org.xflatdb.xflat.transaction.TransactionOptions;
 
 /**
  * The base class for Engine objects.  The Database uses the functionality
@@ -232,9 +233,18 @@ public abstract class EngineBase implements Engine {
         }
         
         Transaction tx = this.transactionManager.getTransaction();
-        if(tx != null && tx.getOptions().getReadOnly()){
-            throw new TransactionException("Cannot write in a read-only transaction");
+        if(tx != null){
+            if(tx.isReadOnly()){
+                throw new TransactionException("Cannot write in a read-only transaction");
+            }
+            if(tx.isCommitted()){
+                throw new TransactionException("Cannot write in an already committed transaction");
+            }
+            if(tx.isReverted()){
+                throw new TransactionException("Cannot write in an already reverted transaction");
+            }
         }
+        
         
         //check the engine state
         EngineState state = this.state.get();
@@ -417,7 +427,7 @@ public abstract class EngineBase implements Engine {
      * After this method returns, the data should be stored in non-volatile storage.
      * @param tx 
      */
-    public void commit(Transaction tx){
+    public void commit(Transaction tx, TransactionOptions options){
         
     }
     
@@ -467,16 +477,16 @@ public abstract class EngineBase implements Engine {
         /**
          * Chooses the most recent committed RowData that was committed before the given transaction.
          * If the transaction is null, this will choose the most recent committed
-         * RowData globally.
+         * RowData globally.  This is 
          * <p/>
          * ALWAYS invoke this while synchronized on the Row.
          * @param currentTransaction The current transaction, or null.
-         * @param transactionId The transaction ID to use if the current transaction is null
+         * @param transactionId The transaction ID to use iff the current transaction is null.
+         * This is overwritten if the transaction is not null.
          * @return The most recent committed RowData in this row, committed before the transaction.
          */
         public RowData chooseMostRecentCommitted(Transaction currentTransaction, long transactionId){
             if(currentTransaction != null){
-                //override the given transaction ID just in case
                 transactionId = currentTransaction.getTransactionId();
             }
             
@@ -509,11 +519,16 @@ public abstract class EngineBase implements Engine {
                     if(transactionId > data.commitId){
                         //the current transaction is null or began after the transaction was committed
 
-                        if(retCommitId < data.commitId){
-                            //the last valid version we saw was before this version.
+                        //check if the transaction is an in-progress commit
+                        if(!transactionManager.isCommitInProgress(data.transactionId)){
+                            //the transaction is wholly committed.
+                        
+                            if(retCommitId < data.commitId){
+                                //the last valid version we saw was before this version.
 
-                            ret = data;
-                            retCommitId = data.commitId;
+                                ret = data;
+                                retCommitId = data.commitId;
+                            }
                         }
                     }
                 }
@@ -538,7 +553,7 @@ public abstract class EngineBase implements Engine {
          * @param snapshotId The Transaction ID representing the time at which a snapshot of the data should be obtained.
          * @return The most recent committed RowData in this row, committed before the given snapshot.
          */
-        public RowData chooseMostRecentCommitted(Long snapshotId){
+        public RowData chooseMostRecentCommitted(long snapshotId){
             return chooseMostRecentCommitted(null, snapshotId);
         }
 
@@ -573,6 +588,10 @@ public abstract class EngineBase implements Engine {
                         continue;
                     }
                 }
+                
+                //the data might be committed
+                if(transactionManager.isCommitInProgress(data.transactionId))
+                    continue;
                 
                 //the data is committed
                 

@@ -37,6 +37,7 @@ public class ThreadContextTransactionManagerTest extends EngineTransactionManage
     
     @Override
     public ThreadContextTransactionManager getInstance(){
-        return new ThreadContextTransactionManager(new FakeDocumentFileWrapper(doc));
+        ThreadContextTransactionManager ret = new ThreadContextTransactionManager(new FakeDocumentFileWrapper(doc));        
+        return ret;
     }
 }

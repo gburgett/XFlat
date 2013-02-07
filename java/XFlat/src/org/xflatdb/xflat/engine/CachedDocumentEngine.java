@@ -51,6 +51,7 @@ import org.hamcrest.Matcher;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
+import org.xflatdb.xflat.transaction.TransactionOptions;
 
 /**
  * This is an engine that caches the entire table in memory as a JDOM {@link Document}.
@@ -528,7 +529,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private AtomicLong currentlyCommitting = new AtomicLong(-1);
     
     @Override
-    public void commit(Transaction tx){
+    public void commit(Transaction tx, TransactionOptions options){
         synchronized(syncRoot){
             if(!currentlyCommitting.compareAndSet(-1, tx.getTransactionId())){
                 //see if this transaction is completely finished committing, or if it reverted
@@ -548,7 +549,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 if(log.isTraceEnabled())
                     this.log.trace("committing row " + row.rowId);
                 synchronized(row){
-                    if(tx.getOptions().getIsolationLevel() == Isolation.SNAPSHOT){
+                    if(options.getIsolationLevel() == Isolation.SNAPSHOT){
                         //check for conflicts
                         for(RowData data : row.rowData.values()){
                             if(data.commitId > tx.getTransactionId()){                                

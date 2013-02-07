@@ -15,9 +15,6 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.db.XFlatDatabase;
-import org.xflatdb.xflat.db.EngineBase;
-import org.xflatdb.xflat.db.EngineState;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,6 +60,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import test.Utils;
 import static org.mockito.Mockito.*;
+import org.xflatdb.xflat.transaction.TransactionScope;
 
 /**
  *
@@ -1259,7 +1257,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         XPathUpdate update = XPathUpdate.set(xpath.compile("third"), "updated text");
         
         //ACT
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
         
             int result = ctx.instance.update(query, update);
             
@@ -1303,7 +1301,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                     .setText("fourth text data");
         
         //ACT
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
         
             ctx.instance.replaceRow("0", fourth);
             
@@ -1340,7 +1338,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinUp(ctx);
         
         //ACT
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
         
             ctx.instance.deleteRow("0");
                         
@@ -1373,7 +1371,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         Element outsideTransaction;
         Element insideTransaction;
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
         
             Element rowData = new Element("data").setText("some text data");
 
@@ -1429,7 +1427,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         
         List<Element> fromCursor = new ArrayList<>();
-        try(Transaction tx = ctx.transactionManager.openTransaction(TransactionOptions.Default.withReadOnly(true))){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction(TransactionOptions.DEFAULT.withReadOnly(true))){
         
             Element rowData = new Element("data")
                     .setAttribute("fooInt", "17")
@@ -1484,7 +1482,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, null);
         spinUp(ctx);
         
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
         
             Element rowData = new Element("data").setText("some text data");
 
@@ -1516,7 +1514,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         prepFileContents(ctx, null);
         spinUp(ctx);
         
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
         
             Element rowData = new Element("data").setText("some text data");
 
@@ -1524,7 +1522,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             
             //swap out the transaction
             ctx.transactionManager.setContextId(1L);
-            try(Transaction tx2 = ctx.transactionManager.openTransaction()){
+            try(TransactionScope tx2 = ctx.transactionManager.openTransaction()){
                 //insert conflicting data
                 ctx.instance.insertRow("1", new Element("other").setText("other text data"));
 
@@ -1544,6 +1542,9 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
         }
     }
+ 
+    
+    
     
     //</editor-fold>
     
@@ -1564,7 +1565,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         ctx.executorService = mock(ScheduledExecutorService.class);
         ctx.instance.setExecutorService(ctx.executorService);
         
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
             
             ctx.instance.insertRow("0", new Element("data").setText("some text data"));
             ctx.instance.insertRow("1", new Element("second").setText("second text data"));
@@ -1614,7 +1615,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
             
             @Override
-            public void commit(Transaction tx){
+            public void commit(Transaction tx, TransactionOptions options){
                 //set up the second engine to throw an exception on commit
             
                 throw new RuntimeException("Test");
@@ -1700,7 +1701,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertEquals("HashSet doesn't work as i thought", ctx.instance, it.next());
         assertEquals("HashSet doesn't work as i thought", eng2, it.next());
         
-        try(Transaction tx = ctx.transactionManager.openTransaction()){
+        try(TransactionScope tx = ctx.transactionManager.openTransaction()){
             
             ctx.transactionManager.bindEngineToCurrentTransaction(eng2);
             

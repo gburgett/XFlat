@@ -108,6 +108,12 @@ public class TableConfig {
     
     //TODO: future configuration options
     
+    /**
+     * Gets the default table config.  Equivalent to instantiating
+     * a new instance, but this is a singleton.
+     */
+    public static TableConfig DEFAULT = new TableConfig();
+    
 
     @Override
     public int hashCode() {

@@ -23,32 +23,34 @@ package org.xflatdb.xflat.transaction;
 public interface TransactionManager {
     
     /**
-     * Gets the current transaction, or null if none exists.  The current
-     * transaction is defined as the transaction retrieved by the last call to
-     * {@link #openTransaction(org.xflatdb.xflat.transaction.TransactionOptions) }
-     * in this context (usually a thread context).
-     * @return The current transaction, or null.
+     * Gets the current transaction representing the ambient transaction scope,
+     * or null if the current scope is transactionless.
      */
     public Transaction getTransaction();
     
     /**
-     * Opens a new transaction, using the {@link TransactionOptions#Default} options.
+     * Opens a new transaction scope, using the {@link TransactionOptions#Default} options.
      * If a transaction is already open in this context, an IllegalStateException
      * is thrown.
      * @return A new Transaction object representing the transaction open in this context.
      * @throws IllegalStateException if a transaction is already open in this context.
      */
-    public Transaction openTransaction();
+    public TransactionScope openTransaction();
     
     /**
-     * Opens a new transaction, using the given TransactionOptions.  If a 
-     * transaction is already open in this context, an IllegalStateException
-     * is thrown.
+     * Opens a new transaction scope, using the given TransactionOptions.  A
+     * TransactionScope will create or participate in an ambient transaction,
+     * depending on the Propagation options.  
+     * <p/>
+     * The ambient transaction is committed
+     * only when all its associated TransactionScopes are committed.<br/>
+     * If any TransactionScope is reverted, the entire ambient transaction is reverted.<br/>
+     * The ambient transaction is destroyed when the last TransactionScope is closed.
      * @param options The TransactionOptions to apply to this transaction.
      * @return A new Transaction object representing the transaction open in this context.
      * @throws IllegalStateException if a transaction is already open in this context.
      */
-    public Transaction openTransaction(TransactionOptions options);
+    public TransactionScope openTransaction(TransactionOptions options);
     
     
 }

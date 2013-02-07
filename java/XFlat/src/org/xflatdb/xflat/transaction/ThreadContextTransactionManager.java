@@ -18,17 +18,21 @@ package org.xflatdb.xflat.transaction;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.Converter;
@@ -36,9 +40,6 @@ import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineTransactionManager;
 import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.JDOMException;
 
 /**
  * A {@link TransactionManager} that uses the current thread as the context for transactions.
@@ -51,9 +52,9 @@ import org.jdom2.JDOMException;
  */
 public class ThreadContextTransactionManager extends EngineTransactionManager {
 
-    private Map<Long, ThreadedTransaction> currentTransactions = new ConcurrentHashMap<>();
+    private Map<Long, AmbientThreadedTransactionScope> currentTransactions = new ConcurrentHashMap<>();
     
-    private Map<Long, ThreadedTransaction> committedTransactions = new ConcurrentHashMap<>();
+    private Map<Long, AmbientThreadedTransactionScope> committedTransactions = new ConcurrentHashMap<>();
     
     private DocumentFileWrapper journalWrapper;
     private Document transactionJournal = null;
@@ -71,7 +72,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     }
     
     /**
-     * Gets the Id of the current context, which is the current thread's ID.
+     * Gets the Id of the current context, which is the current thread's ID.     
      * @return The current thread's ID.
      */
     protected Long getContextId(){
@@ -80,40 +81,108 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     
     @Override
     public Transaction getTransaction() {
-        return currentTransactions.get(getContextId());
+        TransactionBase tx = currentTransactions.get(getContextId());
+        if(tx == null || tx.getOptions().getPropagation() == Propagation.NOT_SUPPORTED)
+            return null;
+        
+        return tx.getTransaction();
     }
 
     @Override
-    public Transaction openTransaction() {
-        return openTransaction(TransactionOptions.Default);
+    public TransactionScope openTransaction() {
+        return openTransaction(TransactionOptions.DEFAULT);
     }
 
     @Override
-    public Transaction openTransaction(TransactionOptions options) {
-        if(currentTransactions.get(getContextId()) != null){
-            throw new IllegalStateException("Transaction already open on current thread.");
-        }
+    public TransactionScope openTransaction(TransactionOptions options) {
         
-        ThreadedTransaction ret = new ThreadedTransaction(generateNewId(), options);
-        if(currentTransactions.put(getContextId(), ret) != null){
-            //how could this happen? I dunno, programs surprise me all the time.
-            throw new IllegalStateException("Transaction already open on current thread");
-        }
+        AmbientThreadedTransactionScope ret;
+        long contextId = getContextId();
         
-        return ret;
+        switch(options.getPropagation()){
+            case MANDATORY:
+                ret = currentTransactions.get(contextId);
+                if(ret == null || ret.getOptions().getPropagation() == Propagation.NOT_SUPPORTED){
+                    throw new TransactionPropagationException("propagation MANDATORY, but no current transaction.");
+                }
+                //use the current transaction, with a wrapper to prevent
+                    //this instance from closing it prematurely.
+                return new WrappingTransactionScope(ret, options.getReadOnly());
+                
+            case NESTED:
+                throw new UnsupportedOperationException("Nested transactions not yet supported");
+                
+            case NEVER:
+                ret = currentTransactions.get(contextId);
+                if(ret != null && ret.getOptions().getPropagation() != Propagation.NOT_SUPPORTED){
+                    throw new TransactionPropagationException("propagation NEVER, but current transaction exists");
+                }
+                //return a shell object representing the non-transactional operation.
+                return new EmptyTransactionScope(options);
+                
+            case NOT_SUPPORTED:
+                ret = currentTransactions.remove(contextId);
+                if(ret == null || ret.getOptions().getPropagation() == Propagation.NOT_SUPPORTED){
+                    //we are already operating non-transactionally, just need
+                    //to return a shell object.
+                    return new EmptyTransactionScope(options);
+                }
+                //need to return a shell that will also replace the suspended
+                //transaction when it is closed.                
+                return new NotSupportedTransaction(ret, options);
+                
+            case REQUIRED:
+                ret = currentTransactions.get(contextId);
+                if(ret == null || ret.getOptions().getPropagation() == Propagation.NOT_SUPPORTED){
+                    //no current transaction, create a new one
+                    //suspending the NOT_SUPPORTED transaction if it exists.
+                    ret = new AmbientThreadedTransactionScope(generateNewId(), ret, options);
+                    currentTransactions.put(contextId, ret);
+                }
+                
+                //use the current transaction, with a wrapper to prevent
+                //this instance from closing it prematurely.
+                return new WrappingTransactionScope(ret, options.getReadOnly());
+
+                
+            case REQUIRES_NEW:
+                //create a new transaction, suspending the current one if it exists.
+                ret = currentTransactions.get(contextId);
+                ret = new AmbientThreadedTransactionScope(generateNewId(), ret, options);
+                currentTransactions.put(contextId, ret);
+                
+                //use the current transaction, with a wrapper to prevent
+                //this instance from closing it prematurely.
+                return new WrappingTransactionScope(ret, options.getReadOnly());
+                
+            case SUPPORTS:
+                ret = currentTransactions.get(contextId);
+                if(ret == null || ret.getOptions().getPropagation() == Propagation.NOT_SUPPORTED){
+                    //we are already operating non-transactionally, just need
+                    //to return a shell object.
+                    return new EmptyTransactionScope(options);
+                }
+                
+                //use the current transaction, with a wrapper to prevent
+                //this instance from closing it prematurely.
+                return new WrappingTransactionScope(ret, options.getReadOnly());
+                
+            default:
+                throw new UnsupportedOperationException("Propagation behavior not supported: " + options.getPropagation().toString());
+        }        
     }
 
     @Override
     public long isTransactionCommitted(long transactionId) {
-        ThreadedTransaction tx = committedTransactions.get(transactionId);
-        return tx == null ? -1 : tx.getCommitId();
+        TransactionBase tx = committedTransactions.get(transactionId);
+        return tx == null ? -1 : tx.commitId;
     }
     
     @Override
     public boolean isTransactionReverted(long transactionId) {
         //if we find it in the current transactions, check the transaction
-        for(Transaction tx : currentTransactions.values()){
-            if(tx.getTransactionId() == transactionId){
+        for(TransactionBase tx : currentTransactions.values()){
+            if(tx.id == transactionId){
                 return tx.isReverted();
             }
         }
@@ -136,9 +205,9 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     @Override
     public long getLowestOpenTransaction() {
         long lowest = Long.MAX_VALUE;
-        for(Transaction tx : currentTransactions.values()){
-            if(tx.getTransactionId() < lowest){
-                lowest = tx.getTransactionId();
+        for(TransactionBase tx : currentTransactions.values()){
+            if(tx.id < lowest){
+                lowest = tx.id;
             }
         }
         
@@ -148,7 +217,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     @Override
     public void bindEngineToCurrentTransaction(EngineBase engine) {
         
-        ThreadedTransaction tx = currentTransactions.get(getContextId());
+        TransactionBase tx = currentTransactions.get(getContextId());
         if(tx == null){
             return;
         }
@@ -163,10 +232,10 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     @Override
     public synchronized void unbindEngineExceptFrom(EngineBase engine, Collection<Long> transactionIds) {
                 
-        Iterator<ThreadedTransaction> it = this.committedTransactions.values().iterator();
+        Iterator<AmbientThreadedTransactionScope> it = this.committedTransactions.values().iterator();
         while(it.hasNext()){
-            ThreadedTransaction tx = it.next();
-            if(transactionIds.contains(tx.getTransactionId())){
+            TransactionBase tx = it.next();
+            if(transactionIds.contains(tx.id)){
                 continue;
             }
             
@@ -193,7 +262,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         }
     }
     
-    private synchronized void commit(ThreadedTransaction tx){
+    private synchronized void commit(AmbientThreadedTransactionScope tx){
         //journal the entry so we can recover if catastrophic failure occurs
         TransactionJournalEntry entry = new TransactionJournalEntry();
         entry.txId = tx.id;
@@ -219,7 +288,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             for(EngineBase e : tx.boundEngines){
                 if(log.isTraceEnabled())
                     log.trace(String.format("committing transaction %d to table %s", tx.id, e.getTableName()));
-                e.commit(tx);
+                e.commit(tx.getTransaction(), tx.getOptions());
             }
         }catch(Exception ex){
             try{
@@ -315,96 +384,100 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             throw new XFlatException("Unable to recover", ex);
         }
     }
-        
-    /**
-     * A Transaction that is meant to exist within the context of one thread.
-     * There should be no cross-thread transactional data access, only cross-thread
-     * state querying.
-     */
-    protected class ThreadedTransaction implements Transaction{
 
-        private TransactionOptions options;
+    @Override
+    public boolean isCommitInProgress(long transactionId) {
+        TransactionBase tx = this.currentTransactions.get(transactionId);
+        if(tx == null)
+            return false;
         
-        private AtomicBoolean isCompleted = new AtomicBoolean(false);
-        private AtomicBoolean isRollbackOnly = new AtomicBoolean(false);
+        //in-progress if the commit ID was assigned and the tx was not yet committed.
+        return tx.commitId != -1 && !tx.isCommitted();
+    }
+    
+    /**
+     * The base class for the different types of transactions handled by this
+     * transaction manager.  The different implementations are dependent on
+     * the propagation level used when the transaction was opened.
+     */
+    protected abstract class TransactionBase implements TransactionScope {
+        protected TransactionOptions options;
         
-        private final long id;
+        protected AtomicBoolean isCompleted = new AtomicBoolean(false);
+        protected AtomicBoolean isRollbackOnly = new AtomicBoolean(false);
         
-        private AtomicReference<Set<TransactionListener>> listeners = new AtomicReference<>(null);
+        protected volatile boolean isClosed = false;
+        
+        protected final long id;
+        
+        protected AmbientThreadedTransactionScope suspended;
         
         //we can get away with this being an unsynchronized HashSet because it will only ever be added to by one
         //thread, and then only so long as the transaction is open, and then will be removed from
         //by a different thread, but only one at a time, synchronized elsewhere, and after all adds are finished.
         final Set<EngineBase> boundEngines = new HashSet<>();
         
-        private long commitId = -1;
-        @Override
-        public long getCommitId(){
-            return commitId;
+        protected AtomicReference<Set<TransactionListener>> listeners = new AtomicReference<>(null);
+    
+        protected long commitId = -1;
+        
+        //The transaction representing this transaction scope.
+        private final Transaction transaction = new Transaction(){
+            @Override
+            public long getTransactionId() {
+                return id;
+            }
+
+            @Override
+            public long getCommitId() {
+                return commitId;
+            }
+
+            @Override
+            public boolean isCommitted() {
+                return TransactionBase.this.isCommitted();
+            }
+
+            @Override
+            public boolean isReverted() {
+                return TransactionBase.this.isReverted();
+            }
+
+            @Override
+            public boolean isReadOnly() {
+                return options.getReadOnly();
+            }
+            
+        };
+        
+        public Transaction getTransaction(){
+            return transaction;
         }
         
-        protected ThreadedTransaction(long id, TransactionOptions options){
+        
+        protected TransactionBase(long id, AmbientThreadedTransactionScope suspended, TransactionOptions options){
+            this.id = id;
+            this.suspended = suspended;
+            
             this.options = options;
             if(this.options.getReadOnly()){
                 this.isRollbackOnly.set(true);
             }
-            this.id = id;
         }
         
-        @Override
-        public void commit() throws TransactionException {
-            if(this.isRollbackOnly.get()){
-                throw new IllegalTransactionStateException("Cannot commit a rollback-only transaction");
-            }
-            if(this.isCompleted.get()){
-                throw new IllegalTransactionStateException("Cannot commit a completed transaction");
-            }
+        protected void fireEvent(int event){
+            Set<TransactionListener> listeners = this.listeners.get();
+            if(listeners == null)
+                return;
             
-            commitId = generateNewId();
-            ThreadContextTransactionManager.this.commit(this);
-            //soon as commit returns, we are committed.
-            this.isCompleted.set(true);
-            
-            fireEvent(TransactionEventObject.COMMITTED);
-        }
-
-        @Override
-        public void revert() {
-            if(!isCompleted.compareAndSet(false, true)){
-                throw new IllegalTransactionStateException("Cannot rollback a completed transaction");
-            }
-            
-            ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
-            
-            fireEvent(TransactionEventObject.REVERTED);
-        }
-
-        @Override
-        public void setRevertOnly() {
-            this.isRollbackOnly.set(true);
-        }
-
-        @Override
-        public long getTransactionId() {
-            return this.id;
-        }
-
-        @Override
-        public void close() {
-            if(isCompleted.compareAndSet(false, true)){
-                //we completed in the close, need to revert.
-                ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
-            }
-            
-            //remove the transaction from the current transactions map
-            Iterator<ThreadedTransaction> it = currentTransactions.values().iterator();
-            while(it.hasNext()){
-                if(it.next() == this){
-                    it.remove();
+            TransactionEventObject evtObj = new TransactionEventObject(ThreadContextTransactionManager.this, this.transaction, event);
+            synchronized(listeners){
+                for(Object l : listeners.toArray()){
+                    ((TransactionListener)l).TransactionEvent(evtObj);
                 }
             }
         }
-
+        
         @Override
         public boolean isCommitted() {
             return this.isCompleted.get() && commitId > -1;
@@ -414,7 +487,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         public boolean isReverted() {
             return isCompleted.get() && commitId == -1;
         }
-
+        
         @Override
         public void putTransactionListener(TransactionListener listener) {
             Set<TransactionListener> l = this.listeners.get();
@@ -439,27 +512,301 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 l.remove(listener);
             }
         }
+        
+        @Override
+        public void setRevertOnly() {
+            this.isRollbackOnly.set(true);
+        }
 
         @Override
         public TransactionOptions getOptions() {
             return this.options;
         }
         
-        private void fireEvent(int event){
-            Set<TransactionListener> listeners = this.listeners.get();
-            if(listeners == null)
-                return;
-            
-            TransactionEventObject evtObj = new TransactionEventObject(ThreadContextTransactionManager.this, this, event);
-            synchronized(listeners){
-                for(Object l : listeners.toArray()){
-                    ((TransactionListener)l).TransactionEvent(evtObj);
-                }
+        
+        @Override
+        public void close() {
+            if(suspended != null && !suspended.isClosed){
+                //need to put back the suspended transaction
+                ThreadContextTransactionManager.this.currentTransactions.put(getContextId(), suspended);
+                suspended = null;
             }
+            
+            this.isClosed = true;
         }
     }
     
+    /**
+     * A Transaction that is meant to exist within the context of one thread.
+     * There should be no cross-thread transactional data access, only cross-thread
+     * state querying.
+     */
+    protected class AmbientThreadedTransactionScope extends TransactionBase {
+
+        private List<WrappingTransactionScope> uncommittedScopes = new LinkedList<>();
+        private List<WrappingTransactionScope> wrappingScopes = new LinkedList<>();
+        
+        protected AmbientThreadedTransactionScope(long id, AmbientThreadedTransactionScope suspended, TransactionOptions options){
+            super(id, suspended, options);
+        }
+        
+        @Override
+        public void commit() throws TransactionException {
+            throw new UnsupportedOperationException("should not be called directly");
+        }
+        
+        private void doCommit() throws TransactionException {
+            if(this.isRollbackOnly.get()){
+                throw new IllegalTransactionStateException("Cannot commit a rollback-only transaction");
+            }
+            if(this.isCompleted.get()){
+                throw new IllegalTransactionStateException("Cannot commit a completed transaction");
+            }
+            
+            commitId = generateNewId();
+            ThreadContextTransactionManager.this.commit(this);
+            
+            //soon as commit returns, we are committed.
+            this.isCompleted.set(true);
+            
+            fireEvent(TransactionEventObject.COMMITTED);
+        }
+        
+        void completeWrappingScope(WrappingTransactionScope scope){
+            if(uncommittedScopes.remove(scope) && uncommittedScopes.isEmpty()){
+                //all wrapping transaction scopes have completed, we can commit
+                doCommit();
+            }
+            //otherwise we do nothing, simply mark the wrapping scope as completed by removing it from the list.
+        }
+        
+        void addWrappingScope(WrappingTransactionScope scope){
+            synchronized(this){
+                //add them at the beginning because the most recent ones
+                //are most likely to close first.
+                if(!scope.getOptions().getReadOnly()){
+                    //only add it to uncommitted scopes if it can actually write.
+                    //ReadOnly scopes can close without commit, but an explicit revert
+                    //will still revert the entire ambient scope.
+                    uncommittedScopes.add(0, scope);
+                }
+                wrappingScopes.add(0, scope);
+            }
+        }
+        
+        
+        @Override
+        public void revert() {
+            if(!isCompleted.compareAndSet(false, true)){
+                throw new IllegalTransactionStateException("Cannot rollback a completed transaction");
+            }
+            
+            doRevert();
+            
+            fireEvent(TransactionEventObject.REVERTED);
+        }
+
+        public void doRevert(){            
+            ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
+        }
+        
+        void closeWrappingScope(WrappingTransactionScope scope){
+            synchronized(this){
+                if(uncommittedScopes.remove(scope) && !this.isCompleted.get()){
+                    //the scope was uncommitted, need to revert the transaction
+                    revert();
+                }
+
+                if(wrappingScopes.remove(scope) && wrappingScopes.isEmpty()){
+                    //all wrapping transaction scopes have closed, we can close.
+                    close();
+                }
+                //otherwise, can't close yet, still have some open scopes.
+            }
+        }
+        
+        @Override
+        public void close(){
+            if(isCompleted.compareAndSet(false, true)){
+                //we completed in the close, need to revert.
+                doRevert();
+            }
+            
+            //remove the transaction scope from the current transactions map
+            Iterator<AmbientThreadedTransactionScope> it = currentTransactions.values().iterator();
+            while(it.hasNext()){
+                //Object equality because we don't know which 
+                if(it.next() == this){
+                    it.remove();
+                    break;
+                }
+            }
+            
+            super.close();
+        }
+    }
     
+    /** 
+     * A transaction that implements the {@link Propagation#NOT_SUPPORTED} behavior,
+     * maintaining a reference to the suspended transaction so that it can be
+     * replaced when this is closed.
+     */
+    protected class NotSupportedTransaction extends TransactionBase {
+        public NotSupportedTransaction(AmbientThreadedTransactionScope suspended, TransactionOptions options){
+            super(-1, suspended, options);
+        }
+                
+        @Override
+        public void commit() throws TransactionException {
+            throw new TransactionException("Cannot commit a transaction opened with propagation " + 
+                    "NEVER or NOT_SUPPORTED");
+        }
+
+        @Override
+        public void revert() {
+            throw new TransactionException("Cannot revert a transaction opened with propagation " + 
+                    "NEVER or NOT_SUPPORTED");
+        }
+        
+    }
+        
+    /**
+     * A transaction object that represents no open transaction.  This is
+     * created by opening a transaction with the {@link Propagation#NEVER} or
+     * with {@link Propagation#NOT_SUPPORTED} when the 
+     */
+    protected class EmptyTransactionScope implements TransactionScope{
+
+        private TransactionOptions options;
+        
+        private volatile boolean isCommitted = false;
+        private volatile boolean isReverted = false;
+        private volatile boolean isClosed = false;        
+        
+        
+        public EmptyTransactionScope(TransactionOptions options){
+            this.options = options;
+        }
+        
+        
+        @Override
+        public void commit() throws TransactionException {
+            throw new TransactionException("Cannot commit a transaction opened with propagation " + 
+                    "NEVER or NOT_SUPPORTED");
+        }
+
+        @Override
+        public void revert() {
+            throw new TransactionException("Cannot revert a transaction opened with propagation " + 
+                    "NEVER or NOT_SUPPORTED");
+        }
+
+        @Override
+        public void setRevertOnly() {
+            
+        }
+        
+        @Override
+        public boolean isCommitted() {
+            return isCommitted;
+        }
+
+        @Override
+        public boolean isReverted() {
+            return isReverted;
+        }
+
+        @Override
+        public TransactionOptions getOptions() {
+            return options;
+        }
+
+        @Override
+        public void close() {
+            //nothing to do
+            isClosed = true;
+        }
+
+        @Override
+        public void putTransactionListener(TransactionListener listener) {
+
+        }
+
+        @Override
+        public void removeTransactionListener(TransactionListener listener) {
+
+        }
+        
+        
+    }
+    
+    /**
+     * A TransactionScope object that provides a view onto the ambient scope.
+     * There may be multiple wrapping transaction scopes all pointing to the
+     * same ambient transaction scope.  When ALL of these is committed, the
+     * underlying ambient transaction is committed.
+     */
+    protected class WrappingTransactionScope implements TransactionScope {
+
+        private AmbientThreadedTransactionScope wrapped;
+        
+        private TransactionOptions options;
+        
+        protected WrappingTransactionScope(AmbientThreadedTransactionScope wrapped, boolean isReadOnly){
+            this.wrapped = wrapped;
+            this.options = wrapped.getOptions().withReadOnly(isReadOnly);
+            
+            wrapped.addWrappingScope(this);
+        }
+        
+        @Override
+        public void commit() throws TransactionException {
+            wrapped.completeWrappingScope(this);
+        }
+
+        @Override
+        public void revert() {
+            wrapped.revert();
+        }
+
+        @Override
+        public void setRevertOnly() {
+            wrapped.setRevertOnly();
+        }
+
+        @Override
+        public boolean isCommitted() {
+            return wrapped.isCommitted();
+        }
+
+        @Override
+        public boolean isReverted() {
+            return wrapped.isReverted();
+        }
+
+        @Override
+        public TransactionOptions getOptions() {
+            return this.options;
+        }
+
+        @Override
+        public void close() {
+            wrapped.closeWrappingScope(this);
+        }
+
+        @Override
+        public void putTransactionListener(TransactionListener listener) {
+            wrapped.putTransactionListener(listener);
+        }
+
+        @Override
+        public void removeTransactionListener(TransactionListener listener) {
+            wrapped.removeTransactionListener(listener);
+        }
+        
+    }
+    
+    //<editor-fold desc="transaction journal">
     private class TransactionJournalEntry{
         public long txId;
         public long commitId;
@@ -510,4 +857,6 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             return ret;
         }
     };
+
+    //</editor-fold>
 }

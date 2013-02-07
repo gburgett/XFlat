@@ -77,6 +77,17 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
     public abstract long isTransactionCommitted(long transactionId);
     
     /**
+     * Checks to see if the given transaction ID is not yet finished committing.
+     * <p/>
+     * If true, then the transaction has a commit ID assigned and some rows may
+     * be marked with that commit ID, but {@link org.xflatdb.xflat.transaction.Transaction#isCommitted() }
+     * will be false.
+     * @param transactionId The ID of the transaction to check.
+     * @return true if the transaction has begun committing but is not yet finished.
+     */
+    public abstract boolean isCommitInProgress(long transactionId);
+    
+    /**
      * Checks to see if the given transaction ID has been reverted.  If so,
      * returns true, otherwise false.
      * </p>

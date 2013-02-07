@@ -21,7 +21,12 @@ package org.xflatdb.xflat.transaction;
  */
 public enum Isolation {
     /**
-     * Snapshot isolation level.
+     * Represents an isolation level of Snapshot.  <br/>
+     * Snapshot isolation level means that operations within the transaction
+     * context operate on a "snapshot" of the data taken at the time the transaction
+     * was opened.  <br/>
+     * When the transaction is committed, if concurrent operations have modified the
+     * same rows a {@link WriteConflictException} is thrown.
      * <p/>
      * see <a href="http://en.wikipedia.org/wiki/Snapshot_isolation">http://en.wikipedia.org/wiki/Snapshot_isolation</a>
      */

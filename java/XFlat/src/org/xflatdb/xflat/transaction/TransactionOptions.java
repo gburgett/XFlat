@@ -16,7 +16,9 @@
 package org.xflatdb.xflat.transaction;
 
 /**
- * An object representing the options that can be applied to a transaction.
+ * An object representing the options that can be applied to a transaction. <br/>
+ * Note that these options may be ignored if a currently open transaction is
+ * propagated.  Control this with the {@link #getPropagation() Propagation} option.
  * <p/>
  * The TransactionOptions object is immutable; all set methods return a new
  * instance that has the given option set.
@@ -42,6 +44,12 @@ public class TransactionOptions {
         return this.isolation;
     }
     
+    private Propagation propagation;
+    
+    
+    public Propagation getPropagation(){
+        return propagation;
+    }
     
     /**
      * Sets whether this transaction is Read Only.  A ReadOnly transaction
@@ -77,24 +85,67 @@ public class TransactionOptions {
     }
     
     /**
+     * Sets the propagation behavior to apply when opening this transaction.
+     * The propagation behavior determines how the transaction manager should
+     * react to the current transaction scope when creating this transaction.
+     * 
+     * @param propagation The propagation to apply when this transaction is opened.
+     * @return a new TransactionOptions object with Propagation == the given value.
+     */
+    public TransactionOptions withPropagation(Propagation propagation) {
+        TransactionOptions ret = new TransactionOptions(this);
+        ret.propagation = propagation;
+        return ret;
+    }
+    
+    /**
      * Creates a new TransactionOptions object with the default options.
      */
     public TransactionOptions(){   
         this.readOnly = false;
         this.isolation = Isolation.SNAPSHOT;
+        this.propagation = Propagation.REQUIRED;
     }
     
     private TransactionOptions(TransactionOptions other){
         this.readOnly = other.readOnly;
         this.isolation = other.isolation;
+        this.propagation = other.propagation;
     }
     
     /**
-     * The default transaction options.
-     * <p/>
-     * ReadOnly: false, <br/>
-     * IsolationLevel: SNAPSHOT <br/>
+     * Gets the default transaction options.  Equivalent to instantiating
+     * a new instance.
      */
-    public static final TransactionOptions Default = new TransactionOptions();
-    
+    public static TransactionOptions DEFAULT = new TransactionOptions();
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 97 * hash + (this.readOnly ? 1 : 0);
+        hash = 97 * hash + (this.isolation != null ? this.isolation.hashCode() : 0);
+        hash = 97 * hash + (this.propagation != null ? this.propagation.hashCode() : 0);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final TransactionOptions other = (TransactionOptions) obj;
+        if (this.readOnly != other.readOnly) {
+            return false;
+        }
+        if (this.isolation != other.isolation) {
+            return false;
+        }
+        if (this.propagation != other.propagation) {
+            return false;
+        }
+        return true;
+    }
 }

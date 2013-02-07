@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.db.IdGenerator;
 import org.xflatdb.xflat.db.IntegerIdGenerator;
@@ -176,4 +177,61 @@ public class DatabaseConfig {
         ret.defaultTableConfig = tableConfig;
         return ret;
     }
+    
+    /**
+     * Gets the default database config.  Equivalent to instantiating
+     * a new instance, but this is a singleton.
+     */
+    public static DatabaseConfig DEFAULT = new DatabaseConfig();
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 43 * hash + this.threadCount;
+        hash = 43 * hash + Objects.hashCode(this.pojoConverterClass);
+        hash = 43 * hash + Objects.hashCode(this.defaultTableConfig);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final DatabaseConfig other = (DatabaseConfig) obj;
+        if(this.idGeneratorStrategy == null){
+            if(other.idGeneratorStrategy != null)
+                return false;
+        }
+        else{
+            if(other.idGeneratorStrategy == null){
+                return false;
+            }
+            
+            if(this.idGeneratorStrategy.size() != other.idGeneratorStrategy.size()){
+                return false;
+            }
+            
+            for(int i = 0; i < this.idGeneratorStrategy.size(); i++){
+                if(!Objects.equals(this.idGeneratorStrategy.get(i), other.idGeneratorStrategy.get(i)))
+                    return false;
+            }
+        }
+        
+        if (this.threadCount != other.threadCount) {
+            return false;
+        }
+        if (!Objects.equals(this.pojoConverterClass, other.pojoConverterClass)) {
+            return false;
+        }
+        if (!Objects.equals(this.defaultTableConfig, other.defaultTableConfig)) {
+            return false;
+        }
+        return true;
+    }
+    
+    
 }
