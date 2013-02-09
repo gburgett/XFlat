@@ -115,13 +115,13 @@ public class StringConverters {
                 @Override
                 public java.text.DateFormat initialValue(){
                     //SimpleDateFormat is not thread-safe
-                    return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
+                    return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
                 }
             };
     public static final Converter<String, Date> StringToDateConverter = new Converter<String, Date>(){
         @Override
         public Date convert(String source) throws ConversionException {
-            try{
+            try{                
                 return format.get().parse(source);
             }catch(ParseException ex){
                 throw new ConversionException("error parsing date", ex);

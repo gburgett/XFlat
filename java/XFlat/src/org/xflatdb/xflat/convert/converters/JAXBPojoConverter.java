@@ -28,6 +28,8 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.ConversionNotSupportedException;
 import org.xflatdb.xflat.convert.ConversionService;

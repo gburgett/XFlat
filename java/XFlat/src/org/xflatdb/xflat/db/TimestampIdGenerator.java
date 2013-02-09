@@ -15,13 +15,10 @@
 */
 package org.xflatdb.xflat.db;
 
+import java.text.ParseException;
 import java.util.Date;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.xflatdb.xflat.XFlatException;
-import org.xflatdb.xflat.convert.ConversionException;
-import org.xflatdb.xflat.convert.converters.StringConverters;
 import org.jdom2.Element;
 
 /**
@@ -34,7 +31,18 @@ import org.jdom2.Element;
  */
 public class TimestampIdGenerator extends IdGenerator {
 
-    AtomicLong lastDate = new AtomicLong(0l);
+    private AtomicLong lastDate = new AtomicLong(0l);
+    
+    public static final ThreadLocal<java.text.DateFormat> format =
+            new ThreadLocal<java.text.DateFormat>(){
+                @Override
+                public java.text.DateFormat initialValue(){
+                    //SimpleDateFormat is not thread-safe
+                    java.text.SimpleDateFormat ret = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX");
+                    ret.setTimeZone(TimeZone.getTimeZone("UTC"));
+                    return ret;
+                }
+            };
     
     @Override
     public boolean supports(Class<?> idType) {
@@ -63,13 +71,8 @@ public class TimestampIdGenerator extends IdGenerator {
         if(Date.class.equals(idType)){
             return ret;
         }
-        if(String.class.equals(idType)){
-            try {
-                return StringConverters.DateToStringConverter.convert(ret);
-            } catch (ConversionException ex) {
-                //Should never happen
-                throw new XFlatException("Unable to convert Integer to String", ex);
-            }
+        if(String.class.equals(idType)){            
+            return format.get().format(ret);
         }
         
         throw new UnsupportedOperationException("Unsupported ID type " + idType);
@@ -94,11 +97,8 @@ public class TimestampIdGenerator extends IdGenerator {
         else{
             throw new UnsupportedOperationException("Unknown ID type " + id.getClass());
         }
-        try {
-            return StringConverters.DateToStringConverter.convert(ret);
-        } catch (ConversionException ex) {
-            return "0";
-        }
+        
+        return format.get().format(ret);
     }
 
     @Override
@@ -114,8 +114,8 @@ public class TimestampIdGenerator extends IdGenerator {
         }
         else{
             try {
-                date = StringConverters.StringToDateConverter.convert(id);
-            } catch (ConversionException ex) {
+                date = format.get().parse(id);
+            } catch (ParseException ex) {
                 date = new Date(0);
             }
         }

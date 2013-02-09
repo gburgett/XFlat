@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.db.IdGenerator;
-import org.xflatdb.xflat.db.IntegerIdGenerator;
+import org.xflatdb.xflat.db.BigIntIdGenerator;
 import org.xflatdb.xflat.db.TimestampIdGenerator;
 import org.xflatdb.xflat.db.UuidIdGenerator;
 import org.xflatdb.xflat.db.XFlatDatabase;
@@ -92,8 +92,9 @@ public class DatabaseConfig {
         this.defaultTableConfig = new TableConfig();
         this.idGeneratorStrategy = Arrays.asList(
                 UuidIdGenerator.class,
-                TimestampIdGenerator.class,
-                IntegerIdGenerator.class);
+                BigIntIdGenerator.class,
+                TimestampIdGenerator.class
+            );
     }
     
     private DatabaseConfig(DatabaseConfig other){

@@ -17,7 +17,7 @@ package org.xflatdb.xflat.db;
 
 import org.xflatdb.xflat.db.TimestampIdGenerator;
 import org.xflatdb.xflat.db.XFlatDatabase;
-import org.xflatdb.xflat.db.IntegerIdGenerator;
+import org.xflatdb.xflat.db.BigIntIdGenerator;
 import org.xflatdb.xflat.TableConfig;
 import java.io.File;
 import java.io.IOException;
@@ -157,7 +157,7 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
         db.configureTable("Foo", new TableConfig()
-                .withIdGenerator(IntegerIdGenerator.class));
+                .withIdGenerator(BigIntIdGenerator.class));
         
         db.Initialize();
         try{
@@ -206,7 +206,7 @@ public class DatabaseIntegrationTest {
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
         db.configureTable("Foo", new TableConfig()
-                .withIdGenerator(IntegerIdGenerator.class));
+                .withIdGenerator(BigIntIdGenerator.class));
         
         db.Initialize();
         
@@ -326,7 +326,7 @@ public class DatabaseIntegrationTest {
         
         //use a different ID generator
         db.configureTable("Foo", new TableConfig()
-                .withIdGenerator(IntegerIdGenerator.class));
+                .withIdGenerator(BigIntIdGenerator.class));
         
         boolean didThrow = false;
         try {

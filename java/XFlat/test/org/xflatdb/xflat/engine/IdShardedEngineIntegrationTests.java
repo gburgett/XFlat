@@ -22,7 +22,7 @@ import java.util.List;
 import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.Table;
 import org.xflatdb.xflat.TableConfig;
-import org.xflatdb.xflat.db.IntegerIdGenerator;
+import org.xflatdb.xflat.db.BigIntIdGenerator;
 import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.NumericIntervalProvider;
 import org.xflatdb.xflat.query.XPathQuery;
@@ -54,7 +54,7 @@ public class IdShardedEngineIntegrationTests {
         XFlatDatabase ret = new XFlatDatabase(dbDir);
         
         ret.configureTable(tbl, new TableConfig()
-                                    .withIdGenerator(IntegerIdGenerator.class)
+                                    .withIdGenerator(BigIntIdGenerator.class)
                                     .sharded(ShardsetConfig.create(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
         
         ret.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());

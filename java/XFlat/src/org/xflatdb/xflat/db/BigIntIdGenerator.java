@@ -15,7 +15,7 @@
 */
 package org.xflatdb.xflat.db;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jdom2.Element;
 
 /**
@@ -24,9 +24,9 @@ import org.jdom2.Element;
  * {@link String} IDs.
  * @author gordon
  */
-public class IntegerIdGenerator extends IdGenerator {
+public class BigIntIdGenerator extends IdGenerator {
 
-    private AtomicInteger lastId = new AtomicInteger(0);
+    private AtomicLong lastId = new AtomicLong(0);
     
     @Override
     public boolean supports(Class<?> idType) {
@@ -40,10 +40,10 @@ public class IntegerIdGenerator extends IdGenerator {
     @Override
     public Object generateNewId(Class<?> idType) {
         
-        int id = lastId.incrementAndGet();
+        long id = lastId.incrementAndGet();
         
         if(Integer.class.equals(idType)){
-            return new Integer(id);
+            return new Integer((int)id);
         }
         if(Float.class.equals(idType)){
             return new Float(id);
@@ -55,7 +55,7 @@ public class IntegerIdGenerator extends IdGenerator {
             return new Long(id);
         }
         if(String.class.equals(idType)){
-            return Integer.toString(id);
+            return Long.toString(id);
         }
         
         throw new UnsupportedOperationException("Unsupported ID type " + idType);
@@ -81,7 +81,7 @@ public class IntegerIdGenerator extends IdGenerator {
             return Integer.toString(((Double)id).intValue());
         }
         if(Long.class.equals(idType)){
-            return Integer.toString(((Long)id).intValue());
+            return ((Long)id).toString();
         }
         
         throw new UnsupportedOperationException("Unsupported ID type " + idType);
@@ -125,7 +125,7 @@ public class IntegerIdGenerator extends IdGenerator {
      */
     @Override
     public void saveState(Element state){
-        state.setAttribute("maxId", Integer.toString(this.lastId.get()), XFlatDatabase.xFlatNs);
+        state.setAttribute("maxId", Long.toString(this.lastId.get()), XFlatDatabase.xFlatNs);
     }
     
     /**
@@ -135,7 +135,7 @@ public class IntegerIdGenerator extends IdGenerator {
     @Override
     public void loadState(Element state){
         String maxId = state.getAttributeValue("maxId", XFlatDatabase.xFlatNs);
-        this.lastId.set(Integer.parseInt(maxId));
+        this.lastId.set(Long.parseLong(maxId));
     }
     
 }

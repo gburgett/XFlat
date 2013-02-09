@@ -78,10 +78,15 @@ public class IdAccessor<T> {
         
         PropertyDescriptor idProp = null;
         Field idField = null;
+        
         try{
-            idProp = getIdProperty(pojoType);
-            if(idProp == null){
-                idField = getIdField(pojoType);
+            Object idPropOrField = getIdPropertyOrField(pojoType);
+            if(idPropOrField instanceof PropertyDescriptor){
+                idProp = (PropertyDescriptor)idPropOrField;
+            }
+            else{
+                idField = (Field)idPropOrField;
+                idField.setAccessible(true);
             }
         }
         catch(IntrospectionException ex){
@@ -145,7 +150,7 @@ public class IdAccessor<T> {
         return XPathFactory.instance().compile(expression, Filters.fpassthrough(), null, namespaces == null ? Collections.EMPTY_LIST : namespaces);
     }
     
-    private static PropertyDescriptor getIdProperty(Class<?> pojoType) throws IntrospectionException{
+    private static Object getIdPropertyOrField(Class<?> pojoType) throws IntrospectionException{
         List<PropertyDescriptor> descriptors = new ArrayList<>();
                 
         for(PropertyDescriptor p : Introspector.getBeanInfo(pojoType).getPropertyDescriptors()){
@@ -161,20 +166,9 @@ public class IdAccessor<T> {
             }
         }
         
-        //try properties named ID
-        for(PropertyDescriptor p : descriptors){
-            if("id".equalsIgnoreCase(p.getName())){
-                return p;
-            }
-        }
-        
-        return null;
-    }
-    
-    private static Field getIdField(Class<?> pojoType){
         List<Field> fields = new ArrayList<>();
         
-        for(Field f : pojoType.getFields()){
+        for(Field f : pojoType.getDeclaredFields()){
             if(Object.class.equals(f.getDeclaringClass()))
                 continue;
             
@@ -189,6 +183,13 @@ public class IdAccessor<T> {
         for(Field f : fields){
             if(f.getAnnotation(Id.class) != null){
                 return f;
+            }
+        }
+        
+        //try properties named ID
+        for(PropertyDescriptor p : descriptors){
+            if("id".equalsIgnoreCase(p.getName())){
+                return p;
             }
         }
         
