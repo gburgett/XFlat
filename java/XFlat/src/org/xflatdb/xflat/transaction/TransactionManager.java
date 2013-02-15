@@ -29,7 +29,7 @@ public interface TransactionManager {
     public Transaction getTransaction();
     
     /**
-     * Opens a new transaction scope, using the {@link TransactionOptions#Default} options.
+     * Opens a new transaction scope, using the {@link TransactionOptions#DEFAULT} options.
      * If a transaction is already open in this context, an IllegalStateException
      * is thrown.
      * @return A new Transaction object representing the transaction open in this context.

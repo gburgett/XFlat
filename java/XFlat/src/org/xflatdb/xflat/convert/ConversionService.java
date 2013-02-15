@@ -33,7 +33,7 @@ public interface ConversionService {
      * converting an instance of sourceType to targetType.
      * @param source the source type to convert from (may be null if source is null)
      * @param target the target type to convert to (required)
-     * @return 
+     * @return true if the conversion service has a conversion from the source to the target.
      */
     public boolean canConvert(Class<?> source, Class<?> target);
     

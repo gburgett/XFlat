@@ -62,7 +62,7 @@ public interface TransactionScope extends AutoCloseable  {
     
     /**
      * Gets the options with which this transaction was opened.
-     * @Return the TransactionOptions object provided when the transaction
+     * @return the TransactionOptions object provided when the transaction
      * was opened.
      */
     TransactionOptions getOptions();

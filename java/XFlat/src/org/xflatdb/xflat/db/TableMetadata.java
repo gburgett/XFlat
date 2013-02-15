@@ -137,12 +137,6 @@ public class TableMetadata implements EngineProvider {
             if(alternateId != null){
                 ret.setAlternateIdExpression(alternateId);
             }
-            else{
-                PojoConverter converter = this.db.getPojoConverter();
-                if(converter != null){
-                    ret.setAlternateIdExpression(converter.idSelector(clazz));
-                }
-            }
         }
         
         return ret;

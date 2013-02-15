@@ -108,7 +108,6 @@ public interface Engine {
     /**
      * Deletes the given row.  The row is removed from the table.
      * @param id The ID of the row to delete.
-     * @return The data that was deleted.
      */
     public void deleteRow(String id)
             throws KeyNotFoundException;

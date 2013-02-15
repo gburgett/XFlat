@@ -359,7 +359,6 @@ public class XPathQuery {
      * @param <U> the type of the value
      * @param selector The xpath selector to query
      * @param object The object that the result of the xpath selection should be less than.
-     * @param converter A function to convert a string to the appropriate type for comparison.
      * @return An XpathQuery object
      */
     public static <U  extends Comparable<U>> XPathQuery lt(XPathExpression<?> selector, U object){
@@ -626,7 +625,6 @@ public class XPathQuery {
     
     /**
      * Returns the string representation of this query.
-     * @return 
      */
     @Override
     public String toString(){

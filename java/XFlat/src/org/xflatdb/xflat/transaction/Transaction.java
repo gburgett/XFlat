@@ -53,7 +53,7 @@ public interface Transaction {
      * This refers to the
      * entire transaction scope; if this transaction's scope was opened within
      * a larger transaction scope (except
-     * by {@link Propagation#NESTED}), then calling {@link #commit() } on this object
+     * by {@link Propagation#NESTED}), then calling {@link TransactionScope#commit() } on the scope
      * will not result in a commit and this will return false until the larger
      * scope is committed.
      * @return true iff the entire ambient transaction successfully committed.
@@ -64,7 +64,7 @@ public interface Transaction {
      * Returns true if the transaction scope to which this transaction belongs has been reverted.
      * <p/>
      * If this transaction's scope was propagated from a larger transaction scope (except
-     * by {@link Propagation#NESTED}), then this will return true if {@link #revert() }
+     * by {@link Propagation#NESTED}), then this will return true if {@link TransactionScope#revert() }
      * has been called on ANY transaction scope participating in the transaction.
      * @return true iff the entire ambient transaction was reverted.
      */

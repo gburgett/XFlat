@@ -41,7 +41,7 @@ public class TableMetadataFactory {
     /**
      * Creates a new TableMetadataFactory with the given dependencies.
      * @param db The XFlatDatabase from which dependencies are retrieved when engines are provided.
-     * @param wrapper The metadata directory to which the factory should read and save table metadata.
+     * @param metadataDirectory The metadata directory to which the factory should read and save table metadata.
      */
     public TableMetadataFactory(XFlatDatabase db, File metadataDirectory){
         this(db, db.getConfig(), new DocumentFileWrapper(metadataDirectory));
@@ -125,7 +125,7 @@ public class TableMetadataFactory {
      * Creates a TableMetadata for the given table information.
      * @param name The name of the table
      * @param engineFile The file locating the engine.
-     * @param config The configuration of the table, null to use {@link TableConfig#defaultConfig}
+     * @param config The configuration of the table, null to use {@link TableConfig#DEFAULT}
      * @param idType The type of the ID property for the table.
      * @return A table metadata for the given table.
      */

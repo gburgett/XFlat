@@ -15,14 +15,14 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.Database;
 import org.jdom2.Element;
+import org.xflatdb.xflat.Database;
 
 /**
  * The base class for an ID generator.  ID generators are selected on a per-table
  * basis by the {@link Database} based on an ID generation strategy.  The strategy
  * selects the first IdGenerator in the strategy that supports the ID property's
- * type.  The strategy can be overridden by a custom {@link TableConfig}.
+ * type.  The strategy can be overridden by a custom {@link org.xflatdb.xflat.TableConfig }.
  * 
  * All IdGenerator implementations MUST have a no-args constructor so that they
  * can be constructed by reflection when necessary.

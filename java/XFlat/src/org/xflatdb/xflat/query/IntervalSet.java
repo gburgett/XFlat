@@ -34,7 +34,6 @@ public class IntervalSet<T> {
     
     /**
      * Gets all the intervals in this IntervalSet in ascending order.
-     * @return 
      */
     public List<Interval<T>> getIntervals(){
         return intervals;
@@ -109,7 +108,7 @@ public class IntervalSet<T> {
      * @param <U>
      * @param lower The exclusive lower bound of the interval set.
      * @param upper The inclusive upper bound of the interval set.
-     * @return 
+     * @return the interval "(lower, upper)"
      */
     public static <U> IntervalSet<U> between(U lower, U upper){
         Interval i = new Interval<>(lower, false, upper, false);
@@ -146,7 +145,7 @@ public class IntervalSet<T> {
      * Creates an interval set containing the entire number range.
      * That is, the interval (-∞, ∞)
      * @param <U>
-     * @return 
+     * @return the interval "(-∞, ∞)"
      */
     public static <U> IntervalSet<U> all(){
         Interval i = new Interval<>(null, false, null, false);
@@ -157,7 +156,7 @@ public class IntervalSet<T> {
      * Creates an interval set containing no intervals.
      * That is, the empty set.
      * @param <U>
-     * @return 
+     * @return the empty interval.
      */
     public static <U> IntervalSet<U> none(){
         Interval i = new Interval<>(null, false, null, false);
@@ -201,7 +200,7 @@ public class IntervalSet<T> {
      * The returned interval set is a new instance.
      * @param other The other interval set which has intersecting intervals.
      * @param comparer The comparer for values of the interval set.
-     * @return 
+     * @return the intersection of this interval and the given interval.
      */
     public IntervalSet<T> intersection(IntervalSet<T> other, final Comparator<T> comparer){
         Comparator<Interval<T>> sorter = sortingComparer(comparer);

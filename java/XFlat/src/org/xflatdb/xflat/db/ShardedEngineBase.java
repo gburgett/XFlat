@@ -61,7 +61,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
      * The metadata factory is set up to read and write metadata from the same
      * {@link File} given to the {@link EngineFactory#newEngine(java.io.File, java.lang.String, org.xflatdb.xflat.TableConfig) } method,
      * so if the engine uses this it must also use that file as a directory.
-     * @return 
+     * @return The metadata factory in use by the database, injected into this sharded engine.
      */
     protected TableMetadataFactory getMetadataFactory(){
         return this.metadataFactory;
@@ -229,7 +229,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     
     /**
      * Returns true if any of the individual shards have uncommitted data.
-     * @return 
+     * @return true if any open shards return true.
      */
     @Override
     protected boolean hasUncomittedData() {
@@ -389,8 +389,9 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
     /**
      * Invoked in a synchronized context to see if the sharded engine is 
      * fully spun down.  Default implementation checks whether the spinning
-     * down engines have all spun down.
-     * @return 
+     * down engines have all spun down.  ALWAYS synchronize on {@link #spinDownSyncRoot}
+     * before calling this.
+     * @return Whether there are no more {@link #spinningDownEngines}.
      */
     protected boolean isSpunDown(){
         return spinningDownEngines.isEmpty();

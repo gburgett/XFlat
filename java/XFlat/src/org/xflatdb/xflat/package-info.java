@@ -16,7 +16,7 @@
 
 /**
  * This package contains the public interface for XFlat.
- * All the classes important to the user excepting {@link XFlatDatabase}
+ * All the classes important for accessing and modifying data in the database
  * go here.
  */
 package org.xflatdb.xflat;

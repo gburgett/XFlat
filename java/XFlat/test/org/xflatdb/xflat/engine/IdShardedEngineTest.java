@@ -93,11 +93,6 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             public ConversionService extend(ConversionService service) {
                 return conversionService;
             }
-
-            @Override
-            public XPathExpression<Object> idSelector(Class<?> clazz) {
-                return null;
-            }
         });
         db.setEngineFactory(new EngineFactory(){
             @Override

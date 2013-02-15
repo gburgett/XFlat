@@ -31,9 +31,10 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
     /**
      * Gets a new commit ID for a transactionless write operation.
      * All transactionless writes can be thought of as transactions that are
-     * automatically committed.  This allows us to provide isolation between
+     * automatically committed.  This allows us to provide snapshot isolation between
      * transactions and transactionless writes.
-     * @return 
+     * @return A transaction ID that functions as a "snapshot ID" for this particular
+     * transactionless operation.
      */
     public abstract long transactionlessCommitId();
     
@@ -58,7 +59,6 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
     /**
      * Unbinds the engine from all its bound and closed transactions except the given collection.<br/>
      * The engine will not be unbound from any open transactions.
-     * @see #unbindEngineFromTransaction(org.xflatdb.xflat.db.EngineBase, java.lang.Long) 
      * @param engine The engine to unbind.
      * @param transactionIds The transactions to remain bound to.
      */
@@ -140,13 +140,15 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
 
     /**
      * Returns true if any transactions are currently open.
-     * @return 
      */
     public abstract boolean anyOpenTransactions();
  
     /**
-     * Attempts to recover from an unexpected shutdown if necessary.
-     * @param db 
+     * Attempts to recover from an unexpected shutdown if necessary.  The
+     * transaction manager ought to use journaling so that it can revert partially-
+     * committed transactions here.
+     * @param db The database that initiated the recovery.  It is used to spin
+     * up the tables that any partially-committed transactions were bound to.
      */
     public abstract void recover(XFlatDatabase db);
     

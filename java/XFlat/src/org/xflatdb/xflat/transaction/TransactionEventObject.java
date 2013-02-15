@@ -34,7 +34,6 @@ public class TransactionEventObject extends java.util.EventObject {
     /**
      * Gets the transaction event type.
      * one of {@link #COMMITTED} or {@link #REVERTED}
-     * @return 
      */
     public int getEventType(){
         return eventType;
@@ -43,7 +42,6 @@ public class TransactionEventObject extends java.util.EventObject {
     private Transaction tx;
     /**
      * Gets the transaction in which the event occurred.
-     * @return 
      */
     public Transaction getTransaction(){
         return tx;

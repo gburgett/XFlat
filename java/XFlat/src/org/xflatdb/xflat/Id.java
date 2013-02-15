@@ -27,7 +27,7 @@ import org.jdom2.Element;
  * <p/>
  * The {@link #value() } property instructs XFlat that this object serializes
  * its ID property to the XML Element, and gives the XPath expression that should
- * be treated as equivalent to {@link XpathQuery#Id} when XFlat inspects a query.
+ * be treated as equivalent to {@link XPathQuery#Id} when XFlat inspects a query.
  * <p/>
  * Example (inside class Foo):<br/>
  * <pre>
@@ -41,12 +41,12 @@ public @interface Id {
     /**
      * The XPath expression which selects this property once it has been converted to an {@link Element}.
      * <br/>
-     * This tells XFlat that this expression is equivalent to {@link XpathQuery#Id}, so that XFlat can
+     * This tells XFlat that this expression is equivalent to {@link XPathQuery#Id}, so that XFlat can
      * apply optimizations based on ID if it encounters this expression in a query.<br/>
      * This must be the exact same expression used in queries in order for XFlat to match it.
      * <p/>
      * If this is not set, the {@link PojoConverter} will be invoked to take a "best guess".
-     * @return 
+     * @return The string value of the raw XPath selecting the ID in a query.
      */
     String value() default "";
     
@@ -59,7 +59,7 @@ public @interface Id {
      * xmlns:a="http://www.example.com/ns"
      * </pre>
      * 
-     * @return 
+     * @return An array of namespaces used in the XPath expression.
      */
     String[] namespaces() default "";
 }

@@ -60,7 +60,7 @@ public interface Table<T> {
     
     /**
      * Gets a list of all the values matching the Xpath query.
-     * This is the same as {@link #find(org.xflatdb.xflat.query.XpathQuery) }
+     * This is the same as {@link #find(org.xflatdb.xflat.query.XPathQuery) }
      * but without the hassle of a cursor.
      * @param query The query to match.
      * @return A list of all the matching values.
@@ -80,7 +80,7 @@ public interface Table<T> {
      * Replaces the first value matched by the query with the new value.
      * @param query The query to match.
      * @param newValue The new value to replace the row.
-     * @returns true if the query matched any rows, false otherwise.  If false,
+     * @return true if the query matched any rows, false otherwise.  If false,
      * the new value was not inserted.
      */
     public boolean replaceOne(XPathQuery query, T newValue);
@@ -88,7 +88,7 @@ public interface Table<T> {
     /**
      * Updates or inserts the row by ID.
      * @param newValue The new value to replace or insert.
-     * @returns false if an existing row was updated, true if a row was inserted.
+     * @return false if an existing row was updated, true if a row was inserted.
      */
     public boolean upsert(T newValue);
     
@@ -107,7 +107,7 @@ public interface Table<T> {
      * Applies an update to all data matching a given query.
      * @param query The query to match.
      * @param update The update to apply to each matching row.
-     * @returns the number of rows that were updated.
+     * @return the number of rows that were updated.
      */
     public int update(XPathQuery query, XPathUpdate update);
     
@@ -123,7 +123,7 @@ public interface Table<T> {
     /**
      * Deletes all rows matching the given query.
      * @param query The query selecting elements to delete.
-     * @returns the number of rows that were deleted.
+     * @return the number of rows that were deleted.
      */
     public int deleteAll(XPathQuery query);
 }

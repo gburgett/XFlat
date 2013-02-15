@@ -79,7 +79,6 @@ public class JAXBPojoConverter implements PojoConverter {
      * @param clazz The class for which an alternate ID selector is required.
      * @return The alternate ID selector, or null if the class hass no ID property.
      */
-    @Override
     public XPathExpression<Object> idSelector(Class<?> clazz) {
         
         if(!idSelectorCache.containsKey(clazz)){

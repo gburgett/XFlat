@@ -69,7 +69,6 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     
     /**
      * Returns true if all cross-shard queries are finished.
-     * @return 
      */
     @Override
     protected boolean isSpunDown(){

@@ -67,7 +67,7 @@ public abstract class EngineBase implements Engine {
     /**
      * Initializes the engine and instructs it to begin acquiring the resources
      * necessary to function.  At this point the engine may begin to respond to
-     * read-only requests, but any write requests MUST block until {@link #beginOperations() )
+     * read-only requests, but any write requests MUST block until {@link #beginOperations() } )
      * is called.
      */
     protected abstract boolean spinUp();
@@ -147,7 +147,6 @@ public abstract class EngineBase implements Engine {
     public static class SpinDownEvent extends java.util.EventObject{
         /**
          * The Engine that has spun down.
-         * @return 
          */
         @Override
         public Engine getSource(){
@@ -550,7 +549,7 @@ public abstract class EngineBase implements Engine {
         /**
          * Chooses the most recent committed RowData that was committed before the given transaction ID.
          * This prevents dirty reads in a non-transactional context by having a synchronizing transaction ID
-         * which can be obtained from {@link TransactionManager#transactionlessCommitId() }
+         * which can be obtained from {@link EngineTransactionManager#transactionlessCommitId() }
          * <p/>
          * ALWAYS invoke this while synchronized on the Row.
          * @param snapshotId The Transaction ID representing the time at which a snapshot of the data should be obtained.
@@ -563,9 +562,6 @@ public abstract class EngineBase implements Engine {
         /**
          * Cleans up the transactional data in this row.
          * Returns true if this row can then be removed because it contains no data.
-         * @param (optional) A set of transaction IDs that is added to when it is discovered
-         * that a transaction has been newly committed (and the associated RowData's commit ID
-         * is updated).
          * @return true if this row has no RowData or its only RowData is "nothing".
          */
         public boolean cleanup(){

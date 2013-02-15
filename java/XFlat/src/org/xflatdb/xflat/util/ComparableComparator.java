@@ -37,7 +37,7 @@ public class ComparableComparator<T extends Comparable<T>> implements Comparator
     /**
      * Gets the singleton comparator instance typed as needed.
      * @param <U>
-     * @return 
+     * @return The singleton, typed as necessary.
      */
     public static <U extends Comparable<U>> ComparableComparator<U> getComparator(Class<U> clazz){
         return singleton;

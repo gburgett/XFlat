@@ -235,7 +235,7 @@ public class IdAccessor<T> {
     
     /**
      * Indicates whether the POJO introspected by this accessor has an ID property.
-     * @return 
+     * @return true if an ID property or field was detected.
      */
     public boolean hasId(){
         return this.idProperty != null ||

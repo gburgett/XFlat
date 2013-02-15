@@ -51,8 +51,7 @@ public class TableConfig {
     private Class<? extends IdGenerator> idGenerator;
     /**
      * Gets the ID generator class used for this table.
-     * @return 
-     * @see #setIdGenerator(java.lang.Class) 
+     * @see #withIdGenerator(java.lang.Class)
      */
     public Class<? extends IdGenerator> getIdGenerator(){
         return this.idGenerator;

@@ -25,8 +25,8 @@ import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
 
 /**
- * The default engine factory, which chooses from among the engines available to 
- * the core of XFlat.
+ * The default engine factory, which chooses from among the engines packaged with
+ * the core XFlat Jar.
  * @author Gordon
  */
 public class DefaultEngineFactory implements EngineFactory {
@@ -36,10 +36,10 @@ public class DefaultEngineFactory implements EngineFactory {
     /**
      * Creates either an {@link IdShardedEngine} or a {@link CachedDocumentEngine}
      * based on whether the table is sharded.
-     * @param file
-     * @param tableName
-     * @param config
-     * @return 
+     * @param file The file for which an engine.
+     * @param tableName The name of the table we are getting an engine for.
+     * @param config The configuration of the table we are getting an engine for.
+     * @return A new engine implementation.
      */
     @Override
     public EngineBase newEngine(File file, String tableName, TableConfig config) {

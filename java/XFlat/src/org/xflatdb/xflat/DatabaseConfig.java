@@ -62,7 +62,7 @@ public class DatabaseConfig {
      * <p/>
      * This is unused if an executor service is provided to the Database upon construction.
      * @return the size of the database's thread pool
-     * @see #setThreadCount(int) 
+     * @see #withThreadCount(int)
      */
     public int getThreadCount(){
         return this.threadCount;
@@ -70,12 +70,14 @@ public class DatabaseConfig {
     
     private String pojoConverterClass;
     /**
-     * Gets the binary name of the class used by the database to convert 
-     * POJOs for the database.
+     * Gets the binary name of the class used by the database to automatically map
+     * and convert POJOs to XML for the database.  This class must implement 
+     * {@link PojoConverter}.
      * <p/>
      * The database will load this class using its {@link ClassLoader} in order
      * to convert pojos.
-     * @return 
+     * @return The binary name of the class which will be loaded in order to
+     * automatically map POJOs for conversion to XML.
      */
     public String getPojoConverterClass(){
         return this.pojoConverterClass;
@@ -167,8 +169,9 @@ public class DatabaseConfig {
     /**
      * Sets the {@link TableConfig} used for new tables that have not been
      * manually configured.
-     * If {@link Database#getTable(java.lang.String, java.lang.Class) } is called
-     * for a table that has not been manually configured using {@link Database#configureTable(java.lang.String, org.xflatdb.xflat.db.TableConfig) },
+     * If {@link Database#getTable(java.lang.Class) } is called
+     * for a table that has not been manually configured using 
+     * {@link XFlatDatabase#configureTable(java.lang.String, org.xflatdb.xflat.TableConfig) },
      * this configuration is used.
      * @param tableConfig The default table config to use.
      * @return A new instance with the defaultTableConfig property set.

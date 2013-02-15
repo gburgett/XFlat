@@ -68,8 +68,8 @@ public class XPathExpressionEqualityMatcher<U> extends TypeSafeMatcher<XPathExpr
     
     /**
      * Returns true if the matcher matches the given XPath expression.
-     * @param item
-     * @return 
+     * @param item The XPath expression to match.
+     * @return true if they are a match.
      */
     @Override
     protected boolean matchesSafely(XPathExpression<U> item) {

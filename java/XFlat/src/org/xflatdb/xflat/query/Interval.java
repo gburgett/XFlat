@@ -33,7 +33,6 @@ public class Interval<T> {
     
     /**
      * Gets the begin value of this interval.  A null value means negative infinity.
-     * @return
      */
     public T getBegin() {
         return begin;
@@ -41,7 +40,6 @@ public class Interval<T> {
 
     /**
      * Gets the end value of this interval.  A null value means positive infinity.
-     * @return
      */
     public T getEnd() {
         return end;
@@ -50,7 +48,6 @@ public class Interval<T> {
     /**
      * Gets whether the interval is inclusive of the beginning.
      * True means inclusive, false means exclusive.
-     * @return
      */
     public boolean getBeginInclusive() {
         //Too late I realized it would have been better to do this having the booleans mean inclusive.
@@ -63,7 +60,6 @@ public class Interval<T> {
     /**
      * Gets whether the interval is inclusive of the end.
      * True means inclusive, false means exclusive.
-     * @return
      */
     public boolean getEndInclusive() {
         return this.endInclusive;
