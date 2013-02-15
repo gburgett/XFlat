@@ -818,8 +818,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         @Override
         public Element convert(TransactionJournalEntry source) throws ConversionException {
             Element ret = new Element("entry");
-            ret.setAttribute("txId", Long.toString(source.txId));
-            ret.setAttribute("commit", Long.toString(source.commitId));
+            ret.setAttribute("txId", Long.toHexString(source.txId));
+            ret.setAttribute("commit", Long.toHexString(source.commitId));
             
             for(String s : source.tableNames){
                 ret.addContent(new Element("table").setText(s));
@@ -839,11 +839,11 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 if(txId == null){
                     throw new ConversionException("txId attribute required");
                 }
-                ret.txId = Long.parseLong(txId);
+                ret.txId = Long.parseLong(txId, 16);
             
                 String commitId = source.getAttributeValue("commit");
                 if(commitId != null){
-                    ret.commitId = Long.parseLong(commitId);
+                    ret.commitId = Long.parseLong(commitId, 16);
                 }
                 
                 for(Element e : source.getChildren("table")){

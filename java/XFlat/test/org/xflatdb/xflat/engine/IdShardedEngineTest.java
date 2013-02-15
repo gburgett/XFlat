@@ -51,6 +51,7 @@ import static org.mockito.Mockito.*;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.jdom2.output.XMLOutputter;
+import org.xflatdb.xflat.db.EngineTransactionManager;
 
 /**
  *
@@ -74,6 +75,11 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             @Override
             protected ScheduledExecutorService getExecutorService(){
                 return ctx.executorService;
+            }
+            
+            @Override
+            protected EngineTransactionManager getEngineTransactionManager(){
+                return ctx.transactionManager;
             }
             
             @Override
@@ -131,7 +137,6 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 return ret;
             }
         });
-        db.setTransactionManager(ctx.transactionManager);
         ctx.additionalContext.put("db", db);        
         
         IntervalProvider provider = NumericIntervalProvider.forInteger(1, 100);

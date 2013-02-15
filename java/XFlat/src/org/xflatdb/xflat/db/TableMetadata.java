@@ -258,12 +258,13 @@ public class TableMetadata implements EngineProvider {
     /**
      * Spins down the engine, leaving the metadata in a state where it will
      * be required to spin up a new engine before providing it.
-     * @param force Whether to force a spin down even if the engine has uncommitted
+     * @param ignoreUncommitted Whether to require a spin down even if the engine has uncommitted
      * data, effectively automatically reverting it.  Usually only set when the
      * entire database is being shut down.
+     * @param force whether to use forceSpinDown instead of a natural spin down.
      * @return The engine that was spun down.
      */
-    public EngineBase spinDown(boolean force){
+    public EngineBase spinDown(boolean ignoreUncommitted, boolean force){
         lock.writeLock().lock();
         try{
             EngineBase engine = this.engine.get();
@@ -280,7 +281,7 @@ public class TableMetadata implements EngineProvider {
             try{
             engine.getTableLock();
 
-                if(engine.hasUncomittedData() && !force){
+                if(engine.hasUncomittedData() && !ignoreUncommitted){
                     //can't spin it down, return the engine
                     return engine;
                 }
@@ -295,7 +296,7 @@ public class TableMetadata implements EngineProvider {
                 log.trace(String.format("Spinning down table %s", this.name));
         
             
-            if(engine.spinDown(new SpinDownEventHandler(){
+            if(!force && engine.spinDown(new SpinDownEventHandler(){
                     @Override
                     public void spinDownComplete(SpinDownEvent event) {                                         
                     }

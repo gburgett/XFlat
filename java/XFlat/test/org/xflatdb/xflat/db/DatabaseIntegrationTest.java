@@ -15,19 +15,10 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.db.TimestampIdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
-import org.xflatdb.xflat.db.BigIntIdGenerator;
-import org.xflatdb.xflat.TableConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.logging.LogFactory;
-import org.xflatdb.xflat.Cursor;
-import org.xflatdb.xflat.Table;
-import org.xflatdb.xflat.XFlatException;
-import org.xflatdb.xflat.query.XPathQuery;
-import org.xflatdb.xflat.util.DocumentFileWrapper;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -37,9 +28,15 @@ import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
+import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
+import org.xflatdb.xflat.Cursor;
+import org.xflatdb.xflat.Table;
+import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatException;
+import org.xflatdb.xflat.query.XPathQuery;
+import org.xflatdb.xflat.util.DocumentFileWrapper;
 import test.Baz;
 import test.Foo;
 import test.Utils;
@@ -50,7 +47,7 @@ import test.Utils;
  */
 public class DatabaseIntegrationTest {
     
-    static File workspace = new File("DbIntegrationTests");
+    static File workspace = new File("integrationtests");
     
     @BeforeClass
     public static void setUpClass(){

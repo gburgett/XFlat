@@ -212,7 +212,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         while(it.hasNext()){
             TableMetadata table = it.next();
             if(table.canSpinDown()){
-                EngineBase spinDown = table.spinDown(false);
+                EngineBase spinDown = table.spinDown(false, false);
                 
                 //don't remove any metadata.  It's too dangerous with the way the concurrency is structured.
                 
@@ -333,7 +333,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
 
             synchronized(spinDownSyncRoot){
                 for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
-                    EngineBase spinningDown = m.getValue().spinDown(true);
+                    EngineBase spinningDown = m.getValue().spinDown(true, false);
                     this.spinningDownEngines.put(m.getKey(), spinningDown);
                 }
             }
@@ -402,7 +402,7 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         
         synchronized(spinDownSyncRoot){
             for(Map.Entry<Interval<T>, TableMetadata> m : this.openShards.entrySet()){
-                EngineBase spinningDown = m.getValue().spinDown(true);
+                EngineBase spinningDown = m.getValue().spinDown(true, true);
                 this.spinningDownEngines.put(m.getKey(), spinningDown);
             }
             

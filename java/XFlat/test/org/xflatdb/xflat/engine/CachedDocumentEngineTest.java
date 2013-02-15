@@ -15,16 +15,14 @@
 */
 package org.xflatdb.xflat.engine;
 
-import org.xflatdb.xflat.engine.CachedDocumentEngine;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
-import org.xflatdb.xflat.db.EngineBase;
-import org.xflatdb.xflat.db.EngineTestsBase;
-import org.xflatdb.xflat.util.DocumentFileWrapper;
-import org.xflatdb.xflat.util.FakeDocumentFileWrapper;
 import org.jdom2.Document;
 import org.jdom2.JDOMException;
+import org.xflatdb.xflat.db.EngineBase;
+import org.xflatdb.xflat.db.EngineTestsBase;
+import org.xflatdb.xflat.util.FakeDocumentFileWrapper;
 
 /**
  *

@@ -17,6 +17,7 @@ package org.xflatdb.xflat.engine;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -452,10 +453,11 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     
     
-    private void updateTask(){
+    private void updateTask(boolean cleanAll){
         
         Set<Long> remainingTransactions = new HashSet<>();
         Set<Row> rowsToRemove = new HashSet<>();
+        
         
         synchronized(syncRoot){
             if(this.currentlyCommitting.get() != -1){
@@ -467,15 +469,22 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 }
             }
             
-
-            Iterator<Row> it = this.uncommittedRows.values().iterator();
+            //What are we cleaning?  If cleanAll, then inspect the ENTIRE cache, not just uncommitted data.
+            Iterable<Row> toClean;
+            if(cleanAll)
+                toClean = this.cache.values();
+            else
+                toClean = this.uncommittedRows.values();
+        
+            Iterator<Row> it = toClean.iterator();
             while(it.hasNext()){
                 Row row = it.next();
                 synchronized(row){
                     if(row.cleanup()){
                         rowsToRemove.add(row);
                         //fully committed, we can remove it from uncommitted rows.
-                        it.remove();
+                        if(!cleanAll)
+                            it.remove();
                     }
                     else{
                         boolean isFullyCommitted = true;
@@ -487,7 +496,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                             }
                         }
                         
-                        if(isFullyCommitted){
+                        if(!cleanAll && isFullyCommitted){
                             //fully committed, we can remove it from uncommitted rows.
                             it.remove();
                         }
@@ -530,6 +539,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     @Override
     public void commit(Transaction tx, TransactionOptions options){
+        super.commit(tx, options);
+        
         synchronized(syncRoot){
             if(!currentlyCommitting.compareAndSet(-1, tx.getTransactionId())){
                 //see if this transaction is completely finished committing, or if it reverted
@@ -574,7 +585,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             //we must immediately dump the cache, we cannot say we are committed
             //until the data is on disk.
             lastModified.set(System.currentTimeMillis());
-            dumpCacheNow();
+            dumpCacheNow(true);
             
             currentlyCommitting.compareAndSet(tx.getTransactionId(), -1);
         }
@@ -582,10 +593,20 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     @Override
     public void revert(long txId, boolean isRecovering){
+        super.revert(txId, isRecovering);
+        
         synchronized(syncRoot){
             boolean mustDump = false;
 
-            Iterator<Row> it = this.uncommittedRows.values().iterator();
+            Iterable<Row> toRevert;
+            if(isRecovering)
+                //need to revert over the entire cache.
+                toRevert = this.cache.values();
+            else
+                //need to revert only over the uncommitted rows.
+                toRevert = this.uncommittedRows.values();
+            
+            Iterator<Row> it = toRevert.iterator();
             while(it.hasNext()){
                 Row row = it.next();
                 synchronized(row){
@@ -602,7 +623,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
             if(mustDump){
                 lastModified.set(System.currentTimeMillis());
-                this.dumpCacheNow();
+                this.dumpCacheNow(true);
             }
             //else we can leave dumping the cache for the cleanup task.
 
@@ -633,37 +654,53 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     if(row.getChildren().isEmpty()){
                         continue;
                     }
-                    Element data = row.getChildren().get(0).detach();
                     
                     String id = getId(row);
-                    //default it to zero so that we know it's committed but if we don't get an actual
-                    //value for the commit then we have the lowest value.
-                    long txId = 0;
-                    long commitId = 0;
+                        
+                    Row newRow = null;
                     
-                    String a = row.getAttributeValue("tx", XFlatDatabase.xFlatNs);
-                    if(a != null && !"".equals(a)){
-                        try{
-                            txId = Long.parseLong(a);
-                        }catch(NumberFormatException ex){
-                            //just leave it as 0.
+                    for(Element data : row.getChildren()){
+                        //default it to zero so that we know it's committed but if we don't get an actual
+                        //value for the commit then we have the lowest value.
+                        long txId = 0;
+                        long commitId = 0;
+
+                        String a = data.getAttributeValue("tx", XFlatDatabase.xFlatNs);
+                        if(a != null && !"".equals(a)){
+                            try{
+                                txId = Long.parseLong(a, 16);
+                            }catch(NumberFormatException ex){
+                                //just leave it as 0.
+                            }
                         }
-                    }
-                    a = row.getAttributeValue("commit", XFlatDatabase.xFlatNs);
-                    if(a != null && !"".equals(a)){
-                        try{
-                            commitId = Long.parseLong(a);
-                        }catch(NumberFormatException ex){
-                            //just leave it as 0.
+                        a = data.getAttributeValue("commit", XFlatDatabase.xFlatNs);
+                        if(a != null && !"".equals(a)){
+                            try{
+                                commitId = Long.parseLong(a, 16);
+                            }catch(NumberFormatException ex){
+                                //just leave it as 0.
+                            }
                         }
+                        
+                        if("delete".equals(data.getName()) && XFlatDatabase.xFlatNs.equals(data.getNamespace())){
+                            //it's a delete marker
+                            data = null;
+                        }
+                        else{
+                            data = data.detach();
+                        }
+
+                        RowData rData = new RowData(txId, data, id);
+                        rData.commitId = commitId;
+                        
+                        if(newRow == null)
+                             newRow = new Row(id, rData);
+                        else
+                            newRow.rowData.put(txId, rData);
                     }
                     
-                    RowData rData = new RowData(txId, data, id);
-                    rData.commitId = commitId;
-                    
-                    Row newRow = new Row(id, rData);
-                    
-                    this.cache.put(id, newRow);
+                    if(newRow != null)
+                        this.cache.put(id, newRow);
                 }
             } catch (JDOMException | IOException ex) {
                 throw new XFlatException("Error building document cache", ex);
@@ -680,13 +717,18 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
         
         //schedule the update task
         this.getExecutorService().scheduleWithFixedDelay(new Runnable(){
+                int runCount = 0;
+            
                 @Override
                 public void run() {
                     if(state.get() == EngineState.SpinningDown || state.get() == EngineState.SpunDown){
                         throw new RuntimeException("task termination");
                     }
                     
-                    updateTask();
+                    runCount = (runCount + 1) % 100;
+                    
+                    //every 100 iterations, clean the entire cache.
+                    updateTask(runCount == 0);
                 }
             }, 500, 500, TimeUnit.MILLISECONDS);
         
@@ -756,16 +798,19 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             if(log.isTraceEnabled())
                 log.trace(String.format("Table %s Spinning down", this.getTableName()));
 
+            
+            //do the transactional data cleanup task, ensuring we clean the entire cache.
+            updateTask(true);
 
             final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
-            if(this.cache != null && lastModified.get() >= lastDump.get()){
+            if(this.cache != null){
                 //schedule immediate dump
                  cacheDumpTask.set(this.getExecutorService().schedule(
                     new Runnable(){
                         @Override
                         public void run() {
                             try{
-                                dumpCacheNow();
+                                dumpCacheNow(true);
                             }
                             catch(Exception ex){
                                 log.warn("Unable to dump cached data", ex);
@@ -873,7 +918,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     @Override
                     public void run() {
                         try{
-                            dumpCacheNow();
+                            dumpCacheNow(false);
                         }
                         catch(XFlatException ex){
                             log.warn("Unable to dump cached data", ex);
@@ -897,41 +942,69 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
     
     private final Object dumpSyncRoot = new Object();
-    private void dumpCacheNow(){
+    /**
+     * Dumps the cache immediately, on this thread.
+     * @param required true if a dump is absolutely required, false to allow this
+     * method to choose not to dump if it feels that a dump is unnecessary.
+     */
+    private void dumpCacheNow(boolean required){
         synchronized(dumpSyncRoot){
-            if(lastModified.get() < lastDump.get()){
+            if(!required && lastModified.get() < lastDump.get()){
                 //no need to dump
                 return;
             }
             
             long lastDump = System.currentTimeMillis();
             
-            //take a 'snapshot' of the detached elements
+            
             Document doc = new Document();
             Element root = new Element("table", XFlatDatabase.xFlatNs)
                     .setAttribute("name", this.getTableName(), XFlatDatabase.xFlatNs);
             doc.setRootElement(root);
             
-            //get a transaction ID so we are taking a snapshot of the committed data at this point in time.
-            long snapshotId = getTransactionManager().transactionlessCommitId();
-            
             for(Row row : this.cache.values()){
                 synchronized(row){
-                    RowData rData = row.chooseMostRecentCommitted(snapshotId);
-                    if(rData == null || rData.data == null){
-                        //the data was deleted
-                        continue;
-                    }                    
+                    Element rowEl = null;
                     
+                    int nonDeleteData = 0;
                     
-                    Element rowEl = new Element("row", XFlatDatabase.xFlatNs);
-                    setId(rowEl, row.rowId);
-                    rowEl.setAttribute("tx", Long.toString(rData.transactionId), XFlatDatabase.xFlatNs);
-                    rowEl.setAttribute("commit", Long.toString(rData.commitId), XFlatDatabase.xFlatNs);
+                    //put ALL committed data to disk, even some that might otherwise
+                    //be cleaned up, because we may be in the process of committing
+                    //one of N engines and will need all previous values if we revert.
+                    for(RowData rData : row.rowData.values()){
+                        if(rData == null) 
+                            continue;
+                        
+                        if(rData.commitId == -1)
+                            //uncommitted data is not put to disk
+                            continue;
+                        
+                        if(rowEl == null){
+                            rowEl = new Element("row", XFlatDatabase.xFlatNs);
+                            setId(rowEl, row.rowId);
+                        }
+                        
+                        Element dataEl;
+                        if(rData.data == null){
+                            //the data was deleted - make sure we mark that on the row
+                            dataEl = new Element("delete", XFlatDatabase.xFlatNs);
+                        }
+                        else{
+                            dataEl = rData.data.clone();
+                            nonDeleteData++;
+                        }
+                        
+                        dataEl.setAttribute("tx", Long.toHexString(rData.transactionId), XFlatDatabase.xFlatNs);
+                        dataEl.setAttribute("commit", Long.toHexString(rData.commitId), XFlatDatabase.xFlatNs);
+
+                        rowEl.addContent(dataEl);
+                    }
                     
-                    rowEl.addContent(rData.data.clone());
-                    
-                    root.addContent(rowEl);
+                    //doublecheck - only write out an element if there's actually
+                    //any data to write.  Delete marker elements don't count.
+                    if(rowEl != null && nonDeleteData > 0){
+                        root.addContent(rowEl);
+                    }
                 }
             }
             

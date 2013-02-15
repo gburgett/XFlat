@@ -17,6 +17,7 @@ package org.xflatdb.xflat.db;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -428,7 +429,9 @@ public abstract class EngineBase implements Engine {
      * @param tx 
      */
     public void commit(Transaction tx, TransactionOptions options){
-        
+        if(tx.isCommitted() || tx.isReverted()){
+            throw new UnsupportedOperationException("Cannot commit an already finished transaction.");
+        }
     }
     
     /**
@@ -629,7 +632,7 @@ public abstract class EngineBase implements Engine {
             
             //if there's no more row datas, or there is only one row data and it's value is "nothing", then return true.
             return rowData.isEmpty() || (rowData.size() == 1 && rowData.values().iterator().next().data == null);
-        }
+        }    
     }
     
     protected class RowData{

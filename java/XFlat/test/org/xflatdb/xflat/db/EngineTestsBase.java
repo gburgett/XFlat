@@ -30,6 +30,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.DuplicateKeyException;
@@ -54,12 +55,17 @@ import org.hamcrest.TypeSafeMatcher;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
+import org.jdom2.output.XMLOutputter;
+import org.jdom2.xpath.XPathFactory;
 import org.junit.AfterClass;
 import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import test.Utils;
 import static org.mockito.Mockito.*;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.xflatdb.xflat.transaction.TransactionManager;
 import org.xflatdb.xflat.transaction.TransactionScope;
 
 /**
@@ -1130,7 +1136,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
+        System.out.println(dumpDoc(doc));
+        
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        
+        
         assertEquals("Document should have one fewer element", 1, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1225,6 +1235,8 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
+        System.out.println(dumpDoc(doc));
+        
         List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
         assertEquals("Document should have fewer elements", 1, children.size());
         
@@ -1379,11 +1391,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             ctx.instance.insertRow("1", rowData);
             
             //swap out the transaction
-            ctx.transactionManager.setContextId(1L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(1L);
             outsideTransaction = ctx.instance.readRow("1");
             
             //swap the transaction back
-            ctx.transactionManager.setContextId(0L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(0L);
             insideTransaction = ctx.instance.readRow("1");
             
             tx.commit();
@@ -1434,12 +1446,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                     .setText("some text data");
             
             //now that we've opened the transaction, switch contexts and insert
-            ctx.transactionManager.setContextId(1L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(1L);
             ctx.instance.insertRow("4", rowData);
 
             //ACT
             //switch back and query
-            ctx.transactionManager.setContextId(0L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(0L);
             try(Cursor<Element> cursor = ctx.instance.queryTable(query)){
                 Iterator<Element> it = cursor.iterator();
                 
@@ -1447,13 +1459,13 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 
             
                 //switch contexts and insert again
-                ctx.transactionManager.setContextId(1L);
+                ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(1L);
                 ctx.instance.insertRow("5", new Element("fifth")
                     .setAttribute("fooInt", "17")
                     .setText("fifth text data"));
                 
                 
-                ctx.transactionManager.setContextId(0L);
+                ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(0L);
                 while(it.hasNext()){
                     fromCursor.add(it.next());
                 }
@@ -1489,12 +1501,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             ctx.instance.insertRow("1", rowData);
             
             //swap out the transaction
-            ctx.transactionManager.setContextId(1L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(1L);
             
             ctx.instance.insertRow("1", new Element("other").setText("other text data"));
             
             //swap the transaction back
-            ctx.transactionManager.setContextId(0L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(0L);
             
             try{
                 tx.commit();
@@ -1521,13 +1533,13 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             ctx.instance.insertRow("1", rowData);
             
             //swap out the transaction
-            ctx.transactionManager.setContextId(1L);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(1L);
             try(TransactionScope tx2 = ctx.transactionManager.openTransaction()){
                 //insert conflicting data
                 ctx.instance.insertRow("1", new Element("other").setText("other text data"));
 
                 //swap the transaction back
-                ctx.transactionManager.setContextId(0L);
+                ((FakeThreadContextTransactionManager)ctx.transactionManager).setContextId(0L);
                 //should be OK
                 tx.commit();
 
@@ -1703,7 +1715,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         try(TransactionScope tx = ctx.transactionManager.openTransaction()){
             
-            ctx.transactionManager.bindEngineToCurrentTransaction(eng2);
+            ((FakeThreadContextTransactionManager)ctx.transactionManager).bindEngineToCurrentTransaction(eng2);
             
             ctx.instance.insertRow("0", new Element("data").setText("some text data"));
             ctx.instance.insertRow("1", new Element("second").setText("second text data"));
@@ -1719,6 +1731,107 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         assertNull("Should have reverted data after partial commit", ctx.instance.readRow("0"));
         assertNull("Should have reverted data after partial commit", ctx.instance.readRow("1"));
     }
+    
+    /**
+     * Test that the data persisted to disk is full enough that a new engine can revert
+     * a committed transaction.  This tests durability of transactions.
+     * @throws Exception 
+     */
+    @Test
+    public void testCommit_EngineShutDown_NewEngineCanRevertCommittedData() throws Exception {
+        System.out.println("testCommit_EngineShutDown_NewEngineCanRevertCommittedData");
+        
+        final TestContext ctx = getContext();
+        
+        EngineTransactionManager txManager = mock(EngineTransactionManager.class);
+        ctx.transactionManager = txManager;
+        ctx.instance.setTransactionManager(txManager);
+        
+        
+        final AtomicLong txIds = new AtomicLong(37);
+        
+        when(txManager.transactionlessCommitId())
+                .then(new Answer<Long>(){
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                return txIds.incrementAndGet();
+            }
+                });
+        
+        prepFileContents(ctx, null);
+        spinUp(ctx);
+        
+        ctx.instance.insertRow("0", new Element("data").setText("some text data"));
+        ctx.instance.insertRow("1", new Element("second").setText("second text data"));
+        
+        //now we open a transaction - should not need transactionless ID anymore
+        when(txManager.transactionlessCommitId())
+                .thenThrow(Exception.class);
+        Transaction tx = mock(Transaction.class);
+        //assign TX and commit IDs
+        long txId = txIds.incrementAndGet();
+        when(tx.getTransactionId())
+                .thenReturn(txId);
+        long commitId = txIds.incrementAndGet();
+        when(tx.getCommitId())
+                .thenReturn(commitId);
+        
+        when(txManager.getTransaction())
+                .thenReturn(tx);
+        when(txManager.isTransactionCommitted(txId))
+                .thenReturn(-1L);
+        when(txManager.anyOpenTransactions())
+                .thenReturn(true);
+        when(txManager.getLowestOpenTransaction())
+                .thenReturn(txId);
+        
+        
+        //insert the transactional data
+        ctx.instance.insertRow("2", new Element("transactional3").setText("tx text 3"));
+        ctx.instance.update("1", XPathUpdate.set(XPathFactory.instance().compile("second"), "tx updated text"));
+        ctx.instance.deleteRow("0");
+        
+        //ACT
+        when(txManager.isCommitInProgress(tx.getCommitId()))
+                .thenReturn(true);
+        ctx.instance.commit(tx, TransactionOptions.DEFAULT);
+        //pretend the process is failing, but let it do it's normal tasks (we're still in the process of committing anyways).
+        ctx.executorService.shutdown();
+        ctx.executorService.awaitTermination(5, TimeUnit.SECONDS);
+        
+        ctx.instance.forceSpinDown();
+        
+        System.out.println("partially committed data");
+        System.out.println(dumpDoc(getFileContents(ctx)));
+        
+        //spin up a new engine instance and ask it to revert the old transaction
+        ctx.executorService = new ScheduledThreadPoolExecutor(2);
+        //ctx.executorService = mock(ScheduledExecutorService.class); //uncomment this for debugging        
+        ctx.transactionManager = new FakeThreadContextTransactionManager(new FakeDocumentFileWrapper(ctx.transactionJournal));
+        ctx.instance = setupEngine(ctx);
+        
+        spinUp(ctx);
+        
+        //wait a sec cause it might take us a while to actually end up reverting when we spin up
+        Thread.sleep(1000);
+        
+        ctx.instance.revert(tx.getTransactionId(), true);
+        
+        //ASSERT
+        Element row = ctx.instance.readRow("0");
+        assertNotNull("Original data should exist", row);
+        assertThat("Should have original data", row, isNamed("data"));
+        assertThat("Should have original data", row, hasText("some text data"));
+        
+        row = ctx.instance.readRow("1");
+        assertNotNull("Original data should exist", row);
+        assertThat("Should have original data", row, isNamed("second"));
+        assertThat("Should have original data", row, hasText("second text data"));
+        
+        row = ctx.instance.readRow("2");
+        assertNull("Should not have kept transactionally inserted data", row);
+    }
+    
     //</editor-fold>
     
     //</editor-fold>
@@ -1800,6 +1913,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         };
     }
     
+    private static final XMLOutputter outputter = new XMLOutputter();
+    /**
+     * Dumps a document to a string for debugging purposes.
+     * @param doc
+     * @return The string representation of the document.
+     */
+    protected String dumpDoc(Document doc){
+        return outputter.outputString(doc);
+    }
+    
     protected class TestContext{
         public TEngine instance;
         
@@ -1811,7 +1934,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         public AtomicReference<Document> transactionJournal = new AtomicReference<>(new Document().setRootElement(new Element("transactionJournal")));
         
-        public FakeThreadContextTransactionManager transactionManager = new FakeThreadContextTransactionManager(new FakeDocumentFileWrapper(transactionJournal));
+        public EngineTransactionManager transactionManager = new FakeThreadContextTransactionManager(new FakeDocumentFileWrapper(transactionJournal));
         
         public final Map<String, Object> additionalContext;
         

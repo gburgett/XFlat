@@ -81,12 +81,14 @@ public class IdAccessor<T> {
         
         try{
             Object idPropOrField = getIdPropertyOrField(pojoType);
-            if(idPropOrField instanceof PropertyDescriptor){
-                idProp = (PropertyDescriptor)idPropOrField;
-            }
-            else{
-                idField = (Field)idPropOrField;
-                idField.setAccessible(true);
+            if(idPropOrField != null){
+                if(idPropOrField instanceof PropertyDescriptor){
+                    idProp = (PropertyDescriptor)idPropOrField;
+                }
+                else{
+                    idField = (Field)idPropOrField;
+                    idField.setAccessible(true);
+                }
             }
         }
         catch(IntrospectionException ex){
@@ -168,15 +170,18 @@ public class IdAccessor<T> {
         
         List<Field> fields = new ArrayList<>();
         
-        for(Field f : pojoType.getDeclaredFields()){
-            if(Object.class.equals(f.getDeclaringClass()))
-                continue;
-            
-            if((f.getModifiers() & Modifier.STATIC) == Modifier.STATIC ||
-                (f.getModifiers() & Modifier.FINAL) == Modifier.FINAL)
-                continue;
-            
-            fields.add(f);
+        while(!Object.class.equals(pojoType)){
+            for(Field f : pojoType.getDeclaredFields()){
+                if(Object.class.equals(f.getDeclaringClass()))
+                    continue;
+
+                if((f.getModifiers() & Modifier.STATIC) == Modifier.STATIC ||
+                    (f.getModifiers() & Modifier.FINAL) == Modifier.FINAL)
+                    continue;
+
+                fields.add(f);
+            }
+            pojoType = pojoType.getSuperclass();
         }
         
         //try fields marked with ID attribute

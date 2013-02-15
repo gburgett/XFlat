@@ -110,7 +110,7 @@ public class XFlatDatabase implements Database {
         return this.transactionManager;
     }
     
-    EngineTransactionManager getEngineTransactionManager(){
+    protected EngineTransactionManager getEngineTransactionManager(){
         return this.transactionManager;
     }
     
@@ -294,7 +294,7 @@ public class XFlatDatabase implements Database {
         Set<EngineBase> engines = new HashSet<>();
         for(Map.Entry<String, TableMetadata> table : this.tables.entrySet()){
             try{
-                EngineBase e = table.getValue().spinDown(true);
+                EngineBase e = table.getValue().spinDown(true, false);
                 if(e != null){
                     if(e.getState() == EngineState.Running){
                         //don't care, force spin down
@@ -409,7 +409,7 @@ public class XFlatDatabase implements Database {
         for(TableMetadata m : this.tables.values()){
             if(m.canSpinDown()){
                 //spin down if no uncommitted data
-                m.spinDown(false);
+                m.spinDown(false, false);
             }
             //don't ever remove TableMetadata.  It's too dangerous with the way we do locking and isn't worth it.
         }
