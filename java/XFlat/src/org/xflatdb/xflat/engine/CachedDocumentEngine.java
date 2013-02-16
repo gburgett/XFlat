@@ -60,6 +60,9 @@ import org.xflatdb.xflat.transaction.TransactionOptions;
  */
 public class CachedDocumentEngine extends EngineBase implements Engine {
 
+    /** The radix of transaction IDs when serialized to an attribute, ex. 16 for hexadecimal */
+    private static final int TRANSACTION_ID_RADIX = 10;
+    
     //TODO: can we replace this by taking a table lock on spin-up?
     private final AtomicBoolean operationsReady = new AtomicBoolean(false);
     
@@ -668,7 +671,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         String a = data.getAttributeValue("tx", XFlatDatabase.xFlatNs);
                         if(a != null && !"".equals(a)){
                             try{
-                                txId = Long.parseLong(a, 16);
+                                txId = Long.parseLong(a, TRANSACTION_ID_RADIX);
                             }catch(NumberFormatException ex){
                                 //just leave it as 0.
                             }
@@ -676,7 +679,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                         a = data.getAttributeValue("commit", XFlatDatabase.xFlatNs);
                         if(a != null && !"".equals(a)){
                             try{
-                                commitId = Long.parseLong(a, 16);
+                                commitId = Long.parseLong(a, TRANSACTION_ID_RADIX);
                             }catch(NumberFormatException ex){
                                 //just leave it as 0.
                             }
@@ -994,8 +997,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                             nonDeleteData++;
                         }
                         
-                        dataEl.setAttribute("tx", Long.toHexString(rData.transactionId), XFlatDatabase.xFlatNs);
-                        dataEl.setAttribute("commit", Long.toHexString(rData.commitId), XFlatDatabase.xFlatNs);
+                        dataEl.setAttribute("tx", Long.toString(rData.transactionId, TRANSACTION_ID_RADIX), XFlatDatabase.xFlatNs);
+                        dataEl.setAttribute("commit", Long.toString(rData.commitId, TRANSACTION_ID_RADIX), XFlatDatabase.xFlatNs);
 
                         rowEl.addContent(dataEl);
                     }

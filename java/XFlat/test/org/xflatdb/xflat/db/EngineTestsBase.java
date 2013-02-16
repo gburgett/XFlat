@@ -108,7 +108,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         TestContext ctx = new TestContext();
         
-        ctx.workspace = new File(workspace, Long.toHexString(ctx.id));
+        ctx.workspace = new File(workspace, Long.toString(ctx.id));
         if(!ctx.workspace.exists()){
             ctx.workspace.mkdirs();
         }
