@@ -115,7 +115,7 @@ public class StringConverters {
                 @Override
                 public java.text.DateFormat initialValue(){
                     //SimpleDateFormat is not thread-safe
-                    return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+                    return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX");
                 }
             };
     public static final Converter<String, Date> StringToDateConverter = new Converter<String, Date>(){

@@ -601,12 +601,14 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 throw new IllegalTransactionStateException("Cannot rollback a completed transaction");
             }
             
-            doRevert();
+            if(!this.options.getReadOnly()){
+                doRevert();
+            }
             
             fireEvent(TransactionEventObject.REVERTED);
         }
 
-        public void doRevert(){            
+        protected void doRevert(){            
             ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
         }
         
