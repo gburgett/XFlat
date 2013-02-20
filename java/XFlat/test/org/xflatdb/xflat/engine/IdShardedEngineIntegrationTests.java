@@ -19,6 +19,11 @@ import java.io.File;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
 import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.Table;
 import org.xflatdb.xflat.TableConfig;
@@ -32,6 +37,8 @@ import org.junit.Test;
 import test.Foo;
 import test.Utils;
 import static org.junit.Assert.*;
+import org.xflatdb.xflat.Id;
+import org.xflatdb.xflat.db.TimestampIdGenerator;
 
 /**
  *
@@ -55,7 +62,7 @@ public class IdShardedEngineIntegrationTests {
         
         ret.configureTable(tbl, new TableConfig()
                                     .withIdGenerator(BigIntIdGenerator.class)
-                                    .sharded(ShardsetConfig.create(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
+                                    .sharded(ShardsetConfig.by(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
         
         ret.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         ret.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -73,7 +80,7 @@ public class IdShardedEngineIntegrationTests {
         
         db.Initialize();
         
-        Table<Foo> table = db.getTable(Foo.class, this.tbl);
+        Table<Foo> table = db.getTable(Foo.class, tbl);
         
         Foo foo = new Foo();
         foo.fooInt = 1;
@@ -86,7 +93,7 @@ public class IdShardedEngineIntegrationTests {
         
         db.shutdown();
         
-        File shardDir = new File(new File(workspace, testName), this.tbl + ".xml");
+        File shardDir = new File(new File(workspace, testName), tbl + ".xml");
         assertTrue("shard directory should exist", shardDir.exists());
         assertTrue("shard directory should be a directory", shardDir.isDirectory());
         
@@ -104,7 +111,7 @@ public class IdShardedEngineIntegrationTests {
         
         db.Initialize();
         
-        Table<Foo> table = db.getTable(Foo.class, this.tbl);
+        Table<Foo> table = db.getTable(Foo.class, tbl);
         
         Foo foo = new Foo();
         foo.fooInt = 1;        
@@ -145,4 +152,92 @@ public class IdShardedEngineIntegrationTests {
         assertTrue("Should be named after the range of data", new File(shardDir, "2.xml").exists());
     }
     
+    
+    @Test
+    public void testInsertRetrieve_DifferentIdRepresentation_UsesIdGeneratorForConversion() throws Exception {
+        String testName = "testInsertRetrieve_DifferentIdRepresentation_UsesIdGeneratorForConversion";
+        
+        System.out.println(testName);
+        
+        XFlatDatabase db = getDatabase(testName);
+        
+        db.configureTable(tbl, new TableConfig()
+                                    .withIdGenerator(TimestampIdGenerator.class)
+                                    .sharded(ShardsetConfig.by(XPathQuery.Id, Long.class, NumericIntervalProvider.forLong(2, 100))));
+        
+        db.Initialize();
+        
+        Table<FooLongId> table = db.getTable(FooLongId.class, tbl);
+        
+        FooLongId foo = new FooLongId();
+        foo.setFooString("junk");
+        
+        table.insert(foo);
+        
+        FooLongId foo2 = table.find(foo.getId());
+        
+        assertEquals("should retrieve same data", foo, foo2);
+        
+        db.shutdown();
+    }
+    
+    
+}
+
+@XmlRootElement
+@XmlAccessorType(XmlAccessType.NONE)
+class FooLongId {
+    
+    @Id
+    private Long id;
+    
+    public Long getId(){
+        return id;
+    }
+    
+    @XmlElement
+    private String fooString;
+    /**
+     * Gets the fooString.
+     */
+    public String getFooString(){
+        return this.fooString;
+    }
+    /**
+     * Sets the fooString.
+     */
+    public void setFooString(String fooString){
+        this.fooString = fooString;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 97 * hash + Objects.hashCode(this.id);
+        hash = 97 * hash + Objects.hashCode(this.fooString);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final FooLongId other = (FooLongId) obj;
+        if (!Objects.equals(this.id, other.id)) {
+            return false;
+        }
+        if (!Objects.equals(this.fooString, other.fooString)) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public String toString() {
+        return "FooLongId{" + "id=" + id + ", fooString=" + fooString + '}';
+    }    
 }

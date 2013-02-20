@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.logging.LogFactory;
 import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.DuplicateKeyException;
 import org.xflatdb.xflat.KeyNotFoundException;
@@ -135,6 +136,13 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
         if(!this.accessor.hasId() && this.idMap != null){
             //cache the ID
             this.idMap.put(ret, sId);
+        }
+        else{
+            try {
+                this.accessor.setIdValue(ret, this.getIdGenerator().stringToId(sId, this.accessor.getIdType()));
+            } catch (IllegalAccessException | InvocationTargetException ex) {
+                LogFactory.getLog(getClass()).warn("Exception setting ID value " + sId + " on type " + this.accessor.getIdType(), ex);
+            }
         }
         
         return ret;
@@ -270,9 +278,6 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
             for(Element e : data){
                 ret.add(convert(e));
             }
-        }
-        catch(Exception ex){
-            throw new XFlatException("Unable to close cursor", ex);
         }
         
         return ret;

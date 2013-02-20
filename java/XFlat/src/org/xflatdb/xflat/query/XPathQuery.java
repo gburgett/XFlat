@@ -20,12 +20,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.xflatdb.xflat.convert.ConversionException;
-import org.xflatdb.xflat.convert.ConversionService;
-import org.xflatdb.xflat.db.XFlatDatabase;
-import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -37,6 +33,10 @@ import org.jdom2.Element;
 import org.jdom2.filter.AttributeFilter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
+import org.xflatdb.xflat.convert.ConversionException;
+import org.xflatdb.xflat.convert.ConversionService;
+import org.xflatdb.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
 
 /**
  * Represents a query in the XPath Query Language. 
@@ -231,8 +231,19 @@ public class XPathQuery {
             return IntervalSet.all();
         }
         
+        U convertedValue;
         if(this.value != null && !indexClass.isAssignableFrom(this.valueType)){
-            throw new InvalidQueryException(this, indexClass);
+            try {
+                //is it convertible?
+                convertedValue = this.conversionService.convert(value, indexClass);
+            } catch (ConversionException ex) {
+                //nope
+                throw new InvalidQueryException(this, indexClass);
+            }
+        }
+        else{
+            //it's assignable, go ahead and assign it.
+            convertedValue = (U)value;
         }
         
         switch(this.queryType){
@@ -243,7 +254,7 @@ public class XPathQuery {
                     return IntervalSet.none();
                 }
 
-                return IntervalSet.eq((U)value);
+                return IntervalSet.eq(convertedValue);
                 
             case NE:
                 if(this.value == null){
@@ -252,19 +263,19 @@ public class XPathQuery {
                     return IntervalSet.all();
                 }
 
-                return IntervalSet.ne((U)value);
+                return IntervalSet.ne(convertedValue);
                 
             case LT:
-                return IntervalSet.lt((U) value);
+                return IntervalSet.lt(convertedValue);
                 
             case LTE:
-                return IntervalSet.lte((U) value);
+                return IntervalSet.lte(convertedValue);
                 
             case GT:
-                return IntervalSet.gt((U) value);
+                return IntervalSet.gt(convertedValue);
                 
             case GTE:
-                return IntervalSet.gte((U) value);
+                return IntervalSet.gte(convertedValue);
                 
             case EXISTS:
             case MATCHES:

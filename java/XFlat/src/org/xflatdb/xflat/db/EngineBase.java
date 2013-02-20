@@ -17,7 +17,6 @@ package org.xflatdb.xflat.db;
 
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -34,7 +33,6 @@ import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.db.EngineBase.RowData;
 import org.xflatdb.xflat.transaction.Transaction;
 import org.xflatdb.xflat.transaction.TransactionException;
-import org.xflatdb.xflat.transaction.TransactionManager;
 import org.xflatdb.xflat.transaction.TransactionOptions;
 
 /**
@@ -196,6 +194,20 @@ public abstract class EngineBase implements Engine {
      */
     protected void setTransactionManager(EngineTransactionManager transactionManager){
         this.transactionManager = transactionManager;
+    }
+    
+    private IdGenerator idGenerator;
+    /**
+     * Gets the ID generator which generates IDs for this table.
+     */
+    protected IdGenerator getIdGenerator(){
+        return idGenerator;
+    }
+    /**
+     * Sets the ID generator which generates IDs for this table.
+     */
+    protected void setIdGenerator(IdGenerator idGenerator){
+        this.idGenerator = idGenerator;
     }
     
     //</editor-fold>

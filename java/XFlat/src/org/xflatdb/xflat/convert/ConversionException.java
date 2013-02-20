@@ -28,6 +28,7 @@ public class ConversionException extends Exception {
      * <code>ConversionException</code> without detail message.
      */
     public ConversionException(String msg, Throwable cause) {
+        super(msg, cause);
     }
 
     /**

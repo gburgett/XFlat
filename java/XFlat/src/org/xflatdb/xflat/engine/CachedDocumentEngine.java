@@ -812,12 +812,16 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     new Runnable(){
                         @Override
                         public void run() {
-                            try{
-                                dumpCacheNow(true);
-                            }
-                            catch(Exception ex){
-                                log.warn("Unable to dump cached data", ex);
-                            }
+                            int failures = 0;
+                            do{
+                                try{
+                                    dumpCacheNow(true);
+                                }
+                                catch(Exception ex){
+                                    log.warn("Unable to dump cached data", ex);                                
+                                }
+                                //give it 3 attempts
+                            }while(++failures < 3);
                         }
                     }, 0, TimeUnit.MILLISECONDS));
             }
@@ -931,7 +935,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             scheduledDump.set(dumpTask);
         }
         
-        if(dumpFailures.get() > 10){
+        if(dumpFailures.get() > 5){
             //get this on the thread that is doing the writing, so someone notices
             while(!dumpTask.isDone()){
                 try {
@@ -1014,7 +1018,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             try{
                 this.file.writeFile(doc);
             }
-            catch(IOException ex) {
+            catch(Exception ex) {
                 dumpFailures.incrementAndGet();
                 throw new XFlatException("Unable to dump cache to file", ex);
             }

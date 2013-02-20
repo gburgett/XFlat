@@ -43,6 +43,7 @@ import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.DefaultConversionService;
 import org.xflatdb.xflat.convert.PojoConverter;
+import org.xflatdb.xflat.convert.converters.DateConverters;
 import org.xflatdb.xflat.convert.converters.JDOMConverters;
 import org.xflatdb.xflat.convert.converters.StringConverters;
 import org.xflatdb.xflat.engine.DefaultEngineFactory;
@@ -191,6 +192,7 @@ public class XFlatDatabase implements Database {
         this.conversionService = new DefaultConversionService();
         StringConverters.registerTo(conversionService);
         JDOMConverters.registerTo(conversionService);
+        DateConverters.registerTo(conversionService);
         
         this.executorService = executorService;
         

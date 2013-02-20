@@ -164,7 +164,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         IntervalProvider provider = (IntervalProvider)ctx.additionalContext.get("rangeProvider");
         XFlatDatabase db = (XFlatDatabase)ctx.additionalContext.get("db");
         
-        ShardsetConfig cfg = ShardsetConfig.create(XPathQuery.Id, Integer.class, provider);
+        ShardsetConfig cfg = ShardsetConfig.byId(Integer.class, provider);
         
         IdShardedEngine ret = new IdShardedEngine(file, name, cfg);
         setMetadataFactory(ret, new TableMetadataFactory(db, file));

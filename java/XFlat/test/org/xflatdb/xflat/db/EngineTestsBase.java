@@ -228,6 +228,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         instance.setExecutorService(ctx.executorService);
         instance.setConversionService(conversionService);
         instance.setTransactionManager(ctx.transactionManager);
+        instance.setIdGenerator(new BigIntIdGenerator());
         
         return instance;
     }

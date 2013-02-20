@@ -180,6 +180,7 @@ public class TableMetadata implements EngineProvider {
         ret.setConversionService(db.getConversionService());
         ret.setExecutorService(db.getExecutorService());
         ret.setTransactionManager(db.getEngineTransactionManager());
+        ret.setIdGenerator(this.idGenerator);
 
         if(ret instanceof ShardedEngineBase){
             //give it a metadata factory centered in its own file.  If it uses this,

@@ -110,7 +110,18 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         T converted;
         if(value == null || !this.config.getShardPropertyClass().isAssignableFrom(value.getClass())){
             try {
-                converted = this.getConversionService().convert(value, this.config.getShardPropertyClass());
+                if(this.config.isShardedById() && value != null){
+                    //if its sharded by ID, then getInterval ought to be selecting the ID attribute of the row,
+                    //which ought to be convertible to string and then run through the ID generator's conversion.
+                    String idVal = value instanceof String ? 
+                            (String)value :
+                            this.getConversionService().convert(value, String.class);
+                    
+                    converted = (T)this.getIdGenerator().stringToId(idVal, this.config.getShardPropertyClass());
+                }
+                else{
+                    converted = this.getConversionService().convert(value, this.config.getShardPropertyClass());
+                }
             } catch (ConversionException ex) {
                 throw new XFlatException("Data cannot be sharded: sharding expression " + config.getShardPropertySelector().getExpression() +
                         " selected non-convertible value " + value, ex);

@@ -33,25 +33,7 @@ import test.Foo;
  * @author gordon
  */
 public class JAXBPojoConverterTest {
-    
-    
-    @Test
-    public void testCanConvert_NonJaxbAnnotatedClass_CannotConvert() throws Exception {
-        System.out.println("testCanConvert_NonJaxbAnnotatedClass_CannotConvert");
-        
-        ConversionService mockConversion = mock(ConversionService.class);
-        when(mockConversion.canConvert(any(Class.class), any(Class.class)))
-                .thenReturn(false);
-        
-        ConversionService instance = new JAXBPojoConverter().extend(mockConversion);
-        
-        boolean canConvertToElement = instance.canConvert(Foo.class, Element.class);
-        boolean canConvertFromElement = instance.canConvert(Element.class, Foo.class);
-        
-        assertFalse("Should be able to convert non-annotated class", canConvertFromElement);
-        assertFalse("Should be able to convert non-annotated class", canConvertToElement);
-        
-    }//end testCanConvert_NonJaxbAnnotatedClass_CannotConvert
+
     
     @Test
     public void testCanConvert_AnnotatedClass_CanConvert() throws Exception {

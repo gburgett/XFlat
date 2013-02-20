@@ -28,14 +28,7 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
-import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.xflatdb.xflat.convert.ConversionException;
-import org.xflatdb.xflat.convert.ConversionNotSupportedException;
-import org.xflatdb.xflat.convert.ConversionService;
-import org.xflatdb.xflat.convert.Converter;
-import org.xflatdb.xflat.convert.PojoConverter;
-import org.xflatdb.xflat.db.IdAccessor;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -45,6 +38,12 @@ import org.jdom2.jaxb.JDOMStreamWriter;
 import org.jdom2.output.XMLOutputter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
+import org.xflatdb.xflat.convert.ConversionException;
+import org.xflatdb.xflat.convert.ConversionNotSupportedException;
+import org.xflatdb.xflat.convert.ConversionService;
+import org.xflatdb.xflat.convert.Converter;
+import org.xflatdb.xflat.convert.PojoConverter;
+import org.xflatdb.xflat.db.IdAccessor;
 
 /**
  * A PojoConverter that extends a ConversionService to convert all unknown
@@ -170,12 +169,15 @@ public class JAXBPojoConverter implements PojoConverter {
                 }
             }
             catch(ConversionException ex){
+                LogFactory.getLog(getClass())
+                    .trace("ConversionException encountered when attempting to map class with JAXB", ex);
                 return false;
             }
         }
 
         @Override
         public <T> T convert(Object source, Class<T> target) throws ConversionException {
+            
             try{
                 return base.convert(source, target);
             }
@@ -199,7 +201,7 @@ public class JAXBPojoConverter implements PojoConverter {
                 }
                 
                 //try again now that we successfully made JAXB converters
-                return convert(source, target);
+                return base.convert(source, target);
             }
         }
 
@@ -226,13 +228,6 @@ public class JAXBPojoConverter implements PojoConverter {
             
             //is it a class we previously tried and failed to map?
             if(cannotMap.contains(target)){
-                return false;
-            }
-            
-            //catch some of the most common errors
-            XmlRootElement rootAnnotation = target.getAnnotation(XmlRootElement.class);
-            if(rootAnnotation == null){
-                this.cannotMap.add(target);
                 return false;
             }
             
