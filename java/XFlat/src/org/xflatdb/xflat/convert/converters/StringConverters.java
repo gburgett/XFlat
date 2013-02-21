@@ -70,6 +70,20 @@ public class StringConverters {
     public static final Converter<String, Long> StringToLongConverter = new Converter<String, Long>() {
         @Override
         public Long convert(String source) throws ConversionException {
+            //is it all numbers? Longs can also represent dates.
+            for(int i = 0; i < source.length(); i++){
+                if(!Character.isDigit(source.codePointAt(i))){
+                    
+                    //it's a date format string or nothing
+                    try{                
+                        return format.get().parse(source).getTime();
+                    }catch(ParseException ex){
+                        //could also be represented as a long
+                        throw new ConversionException("error parsing date", ex);
+                    }
+                }
+            }
+                        
             try{
                 return Long.valueOf(source);
             }catch(NumberFormatException ex){
@@ -121,10 +135,27 @@ public class StringConverters {
     public static final Converter<String, Date> StringToDateConverter = new Converter<String, Date>(){
         @Override
         public Date convert(String source) throws ConversionException {
-            try{                
-                return format.get().parse(source);
-            }catch(ParseException ex){
-                throw new ConversionException("error parsing date", ex);
+            //first, is it all digits?  Dates can be represented as longs.
+            for(int i = 0; i < source.length(); i++){
+                if(!Character.isDigit(source.codePointAt(i))){
+                    
+                    //it's a date format string or nothing
+                    
+                    try{                
+                        return format.get().parse(source);
+                    }catch(ParseException ex){
+                        //could also be represented as a long
+                        throw new ConversionException("error parsing date", ex);
+                    }
+                }
+            }
+            
+            //it's all digits - it's a long or nothing
+            try{
+                return new Date(Long.parseLong(source));
+            }
+            catch(NumberFormatException ex2){
+                throw new ConversionException("error parsing date", ex2);
             }
         }
     };

@@ -623,9 +623,9 @@ public class XPathQuery {
 
         @Override
         public void describeTo(Description description) {
-            description.appendText("value at ")
+            description.appendText("a value at ")
                     .appendText(this.selector.getExpression())
-                    .appendText(" that ")
+                    .appendText(" that is ")
                     .appendDescriptionOf(this.subMatcher);
         }
     }

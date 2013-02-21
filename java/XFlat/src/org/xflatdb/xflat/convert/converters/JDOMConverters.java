@@ -15,6 +15,7 @@
 */
 package org.xflatdb.xflat.convert.converters;
 
+import java.util.Date;
 import org.jdom2.*;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.Converter;
@@ -40,9 +41,10 @@ public class JDOMConverters {
         
         service.addConverter(String.class, Text.class, StringToTextConverter);
         service.addConverter(String.class, CDATA.class, StringToCdataConverter);
-        service.addConverter(String.class, Content.class, StringToCdataConverter);
+        service.addConverter(String.class, Content.class, StringToTextConverter);
         
         registerNumbers(service);
+        registerDates(service);
     }
     
     //<editor-fold desc="string" >
@@ -156,5 +158,29 @@ public class JDOMConverters {
         = new TwoStepConverter<>(StringConverters.ObjectToStringConverter, StringToTextConverter);
     
     
-    //</editor-fold
+    //</editor-fold>
+
+    //<editor-fold desc="dates">
+    
+    private static void registerDates(ConversionService service){
+        service.addConverter(Content.class, Date.class, ContentToDateConverter);
+        service.addConverter(Element.class, Date.class, ContentToDateConverter);
+        service.addConverter(Text.class, Date.class, ContentToDateConverter);
+        service.addConverter(CDATA.class, Date.class, ContentToDateConverter);
+        service.addConverter(Attribute.class, Date.class, AttributeToDateConverter);
+        
+        service.addConverter(Date.class, Content.class, DateToTextConverter);
+        service.addConverter(Date.class, Text.class, DateToTextConverter);
+    }
+    
+    public static final Converter<Content, Date> ContentToDateConverter
+            = new TwoStepConverter<>(ContentToStringConverter, StringConverters.StringToDateConverter);
+    
+    public static final Converter<Attribute, Date> AttributeToDateConverter
+            = new TwoStepConverter<>(AttributeToStringConverter, StringConverters.StringToDateConverter);
+    
+    public static final Converter<Date, Text> DateToTextConverter
+            = new TwoStepConverter<>(StringConverters.DateToStringConverter, StringToTextConverter);
+    
+    //</editor-fold>
 }
