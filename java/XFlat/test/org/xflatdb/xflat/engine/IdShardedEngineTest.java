@@ -15,8 +15,6 @@
 */
 package org.xflatdb.xflat.engine;
 
-import org.xflatdb.xflat.engine.IdShardedEngine;
-import org.xflatdb.xflat.engine.CachedDocumentEngine;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -27,31 +25,29 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
+import org.jdom2.output.XMLOutputter;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineFactory;
+import org.xflatdb.xflat.db.EngineTransactionManager;
 import org.xflatdb.xflat.db.ShardedEngineTestsBase;
 import org.xflatdb.xflat.db.TableMetadataFactory;
 import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.Interval;
-import org.xflatdb.xflat.query.XPathQuery;
-import org.xflatdb.xflat.query.NumericIntervalProvider;
 import org.xflatdb.xflat.query.IntervalProvider;
+import org.xflatdb.xflat.query.NumericIntervalProvider;
 import org.xflatdb.xflat.transaction.TransactionManager;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.JDOMException;
-import org.jdom2.xpath.XPathExpression;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.jdom2.output.XMLOutputter;
-import org.xflatdb.xflat.db.EngineTransactionManager;
 
 /**
  *
@@ -85,6 +81,11 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             @Override
             public TransactionManager getTransactionManager(){
                 return ctx.transactionManager;
+            }
+            
+            @Override
+            public DatabaseState getState(){
+                return DatabaseState.Running;
             }
         };
         

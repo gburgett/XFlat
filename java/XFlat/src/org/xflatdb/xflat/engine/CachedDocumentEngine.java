@@ -16,8 +16,8 @@
 package org.xflatdb.xflat.engine;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -141,6 +141,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
     @Override
     public Element readRow(String id) {
+        this.ensureSpunUp();
+        
         Row row = this.cache.get(id);
         if(row == null){
             return null;
@@ -166,6 +168,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     @Override
     public Cursor<Element> queryTable(XPathQuery query) {
         query.setConversionService(this.getConversionService());
+        
+        this.ensureSpunUp();
         
         TableCursor ret = new TableCursor(this.cache.values(), query, getTransactionManager().getTransaction());
         
@@ -566,7 +570,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     if(options.getIsolationLevel() == Isolation.SNAPSHOT){
                         //check for conflicts
                         for(RowData data : row.rowData.values()){
-                            if(data.commitId > tx.getTransactionId()){                                
+                            if(data.commitId > tx.getTransactionId() && data.transactionId != tx.getTransactionId()){                                
                                 //committed data after our own transaction began
                                 throw new WriteConflictException(String.format("Conflicting data in table %s, row %s", this.getTableName(), row.rowId));
                             }
@@ -608,7 +612,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             else
                 //need to revert only over the uncommitted rows.
                 toRevert = this.uncommittedRows.values();
-            
+
             Iterator<Row> it = toRevert.iterator();
             while(it.hasNext()){
                 Row row = it.next();
@@ -642,106 +646,117 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             return false;
         }
         
-        //concurrency level 4 - don't expect to need more than this.
-        this.cache = new ConcurrentHashMap<>(16, 0.75f, 4);
-        this.uncommittedRows = new ConcurrentHashMap<>(16, 0.75f, 4);
-        
-        if(file.exists()){
-            try {
-                Document doc = this.file.readFile();
-                List<Element> rowList = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
-                
-                for(int i = rowList.size() - 1; i >= 0; i--){
-                    Element row = rowList.get(i);
-                    
-                    if(row.getChildren().isEmpty()){
-                        continue;
-                    }
-                    
-                    String id = getId(row);
-                        
-                    Row newRow = null;
-                    
-                    for(Element data : row.getChildren()){
-                        //default it to zero so that we know it's committed but if we don't get an actual
-                        //value for the commit then we have the lowest value.
-                        long txId = 0;
-                        long commitId = 0;
+        this.getTableLock();
+        try{
+            synchronized(syncRoot){
+                //concurrency level 4 - don't expect to need more than this.
+                this.cache = new ConcurrentHashMap<>(16, 0.75f, 4);
+                this.uncommittedRows = new ConcurrentHashMap<>(16, 0.75f, 4);
 
-                        String a = data.getAttributeValue("tx", XFlatDatabase.xFlatNs);
-                        if(a != null && !"".equals(a)){
-                            try{
-                                txId = Long.parseLong(a, TRANSACTION_ID_RADIX);
-                            }catch(NumberFormatException ex){
-                                //just leave it as 0.
-                            }
-                        }
-                        a = data.getAttributeValue("commit", XFlatDatabase.xFlatNs);
-                        if(a != null && !"".equals(a)){
-                            try{
-                                commitId = Long.parseLong(a, TRANSACTION_ID_RADIX);
-                            }catch(NumberFormatException ex){
-                                //just leave it as 0.
-                            }
-                        }
-                        
-                        if("delete".equals(data.getName()) && XFlatDatabase.xFlatNs.equals(data.getNamespace())){
-                            //it's a delete marker
-                            data = null;
-                        }
-                        else{
-                            data = data.detach();
-                        }
+                if(file.exists()){
+                    try {
+                        Document doc = this.file.readFile();
+                        List<Element> rowList = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
 
-                        RowData rData = new RowData(txId, data, id);
-                        rData.commitId = commitId;
-                        
-                        if(newRow == null)
-                             newRow = new Row(id, rData);
-                        else
-                            newRow.rowData.put(txId, rData);
+                        for(int i = rowList.size() - 1; i >= 0; i--){
+                            Element row = rowList.get(i);
+
+                            if(row.getChildren().isEmpty()){
+                                continue;
+                            }
+
+                            String id = getId(row);
+
+                            Row newRow = null;
+
+                            for(Element data : row.getChildren()){
+                                //default it to zero so that we know it's committed but if we don't get an actual
+                                //value for the commit then we have the lowest value.
+                                long txId = 0;
+                                long commitId = 0;
+
+                                String a = data.getAttributeValue("tx", XFlatDatabase.xFlatNs);
+                                if(a != null && !"".equals(a)){
+                                    try{
+                                        txId = Long.parseLong(a, TRANSACTION_ID_RADIX);
+                                    }catch(NumberFormatException ex){
+                                        //just leave it as 0.
+                                    }
+                                }
+                                a = data.getAttributeValue("commit", XFlatDatabase.xFlatNs);
+                                if(a != null && !"".equals(a)){
+                                    try{
+                                        commitId = Long.parseLong(a, TRANSACTION_ID_RADIX);
+                                    }catch(NumberFormatException ex){
+                                        //just leave it as 0.
+                                    }
+                                }
+
+                                if("delete".equals(data.getName()) && XFlatDatabase.xFlatNs.equals(data.getNamespace())){
+                                    //it's a delete marker
+                                    data = null;
+                                }
+                                else{
+                                    data = data.clone();
+                                }
+
+                                RowData rData = new RowData(txId, data, id);
+                                rData.commitId = commitId;
+
+                                if(newRow == null)
+                                     newRow = new Row(id, rData);
+                                else
+                                    newRow.rowData.put(txId, rData);
+                            }
+
+                            if(newRow != null)
+                                this.cache.put(id, newRow);
+                        }
+                    } catch (JDOMException | IOException ex) {
+                        throw new XFlatException("Error building document cache", ex);
                     }
-                    
-                    if(newRow != null)
-                        this.cache.put(id, newRow);
                 }
-            } catch (JDOMException | IOException ex) {
-                throw new XFlatException("Error building document cache", ex);
+
+                this.state.set(EngineState.SpunUp);
+                if(operationsReady.get()){
+                    this.state.set(EngineState.Running);
+                    synchronized(operationsReady){
+                        operationsReady.notifyAll();
+                    }
+                }
+
+
+
+                return true;
             }
         }
-        
-        this.state.set(EngineState.SpunUp);
-        if(operationsReady.get()){
-            this.state.set(EngineState.Running);
-            synchronized(operationsReady){
-                operationsReady.notifyAll();
-            }
+        finally{
+            this.releaseTableLock();
         }
-        
-        //schedule the update task
-        this.getExecutorService().scheduleWithFixedDelay(new Runnable(){
-                int runCount = 0;
-            
-                @Override
-                public void run() {
-                    if(state.get() == EngineState.SpinningDown || state.get() == EngineState.SpunDown){
-                        throw new RuntimeException("task termination");
-                    }
-                    
-                    runCount = (runCount + 1) % 100;
-                    
-                    //every 100 iterations, clean the entire cache.
-                    updateTask(runCount == 0);
-                }
-            }, 500, 500, TimeUnit.MILLISECONDS);
-        
-        return true;
     }
 
     @Override
     protected boolean beginOperations() {
         //could happen before spin up complete, in that case spinUp will handle the notifying
         operationsReady.set(true);
+        
+                //schedule the update task
+        this.getExecutorService().scheduleWithFixedDelay(new Runnable(){
+                int runCount = -1;
+
+                @Override
+                public void run() {
+                    if(state.get() == EngineState.SpinningDown || state.get() == EngineState.SpunDown){
+                        throw new RuntimeException("task termination");
+                    }
+
+                    runCount = (runCount + 1) % 10;
+
+                    //every 10 iterations, clean the entire cache.
+                    //Also do this on the first iteration.
+                    updateTask(runCount == 0);
+                }
+            }, 500, 500, TimeUnit.MILLISECONDS);
         
         if(this.state.compareAndSet(EngineState.SpunUp, EngineState.Running)){
             synchronized(operationsReady){
@@ -762,6 +777,12 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     protected Transaction ensureWriteReady(){
         Transaction tx = super.ensureWriteReady();
         
+        ensureSpunUp();
+        
+        return tx;
+    }
+    
+    private void ensureSpunUp(){
         //check if we're not yet running, if so wait until we are running
         if(!operationsReady.get() || state.get() != EngineState.Running){         
             synchronized(operationsReady){
@@ -771,15 +792,13 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     } catch (InterruptedException ex) {
                         if(operationsReady.get()){
                             //oh ok we're all good to go
-                            return tx;
+                            return;
                         }
                         throw new XFlatException("Interrupted while waiting for engine to be ready");
                     }
                 }
             }
         }
-        
-        return tx;
     }
     
     
@@ -798,73 +817,75 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 return false;
             }
 
-            if(log.isTraceEnabled())
-                log.trace(String.format("Table %s Spinning down", this.getTableName()));
+            synchronized(syncRoot){
+                if(log.isTraceEnabled())
+                    log.trace(String.format("Table %s Spinning down", this.getTableName()));
 
-            
-            //do the transactional data cleanup task, ensuring we clean the entire cache.
-            updateTask(true);
 
-            final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
-            if(this.cache != null){
-                //schedule immediate dump
-                 cacheDumpTask.set(this.getExecutorService().schedule(
-                    new Runnable(){
+                //do the transactional data cleanup task, ensuring we clean the entire cache.
+                updateTask(true);
+
+                final AtomicReference<ScheduledFuture<?>> cacheDumpTask = new AtomicReference<>(null);
+                if(this.cache != null){
+                    //schedule immediate dump
+                     cacheDumpTask.set(this.getExecutorService().schedule(
+                        new Runnable(){
+                            @Override
+                            public void run() {
+                                int failures = 0;
+                                do{
+                                    try{
+                                        dumpCacheNow(true);
+                                    }
+                                    catch(Exception ex){
+                                        log.warn("Unable to dump cached data", ex);                                
+                                    }
+                                    //give it 3 attempts
+                                }while(++failures < 3);
+                            }
+                        }, 0, TimeUnit.MILLISECONDS));
+                }
+
+                if(openCursors.isEmpty() && (cacheDumpTask.get() == null || cacheDumpTask.get().isDone())){
+                    this.state.set(EngineState.SpunDown);
+
+
+                    if(completionEventHandler != null)
+                        completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+
+                    //we're ok to finish our spin down now
+                    return forceSpinDown();
+
+                }
+
+                Runnable spinDownTask = new Runnable(){
                         @Override
                         public void run() {
-                            int failures = 0;
-                            do{
-                                try{
-                                    dumpCacheNow(true);
-                                }
-                                catch(Exception ex){
-                                    log.warn("Unable to dump cached data", ex);                                
-                                }
-                                //give it 3 attempts
-                            }while(++failures < 3);
+                            if(!openCursors.isEmpty())
+                                return;
+
+                            if(cacheDumpTask.get() != null && !cacheDumpTask.get().isDone()){
+                                return;
+                            }
+
+                            if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
+                                throw new RuntimeException("cancel task - in wrong state");
+                            }
+
+                            if(completionEventHandler != null)
+                                completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
+                            //we're ok to finish our spin down now
+                            forceSpinDown();
+
+                            throw new RuntimeException("Scheduled Task Complete");
+
                         }
-                    }, 0, TimeUnit.MILLISECONDS));
+                    };
+                this.getExecutorService().scheduleWithFixedDelay(
+                    spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
+
+                return true;
             }
-
-            if(openCursors.isEmpty() && (cacheDumpTask.get() == null || cacheDumpTask.get().isDone())){
-                this.state.set(EngineState.SpunDown);
-
-
-                if(completionEventHandler != null)
-                    completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-
-                //we're ok to finish our spin down now
-                return forceSpinDown();
-
-            }
-
-            Runnable spinDownTask = new Runnable(){
-                    @Override
-                    public void run() {
-                        if(!openCursors.isEmpty())
-                            return;
-
-                        if(cacheDumpTask.get() != null && !cacheDumpTask.get().isDone()){
-                            return;
-                        }
-
-                        if(!state.compareAndSet(EngineState.SpinningDown, EngineState.SpunDown)){
-                            throw new RuntimeException("cancel task - in wrong state");
-                        }
-
-                        if(completionEventHandler != null)
-                            completionEventHandler.spinDownComplete(new SpinDownEvent(CachedDocumentEngine.this));
-                        //we're ok to finish our spin down now
-                        forceSpinDown();
-
-                        throw new RuntimeException("Scheduled Task Complete");
-
-                    }
-                };
-            this.getExecutorService().scheduleWithFixedDelay(
-                spinDownTask, 5, 10, TimeUnit.MILLISECONDS);
-
-            return true;
         }
         finally{
             this.releaseTableLock();
@@ -1017,6 +1038,22 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             
             try{
                 this.file.writeFile(doc);
+            }
+            catch(FileNotFoundException ex){
+                //this is a transient issue that may be caused by another process opening the file quickly,
+                //the message is generally "The requested operation cannot be performed on a file with a user-mapped section open"
+                int failures = dumpFailures.incrementAndGet();
+                if(failures > 3)
+                    throw new XFlatException("Unable to dump cache to file", ex);
+                
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException interruptedEx) {
+                }
+                 
+               //try again
+                dumpCacheNow(required);
+                return;
             }
             catch(Exception ex) {
                 dumpFailures.incrementAndGet();

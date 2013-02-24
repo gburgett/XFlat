@@ -20,8 +20,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -576,7 +574,7 @@ public class XPathQuery {
             boolean anyMatches = false;
             for(Object selected : selector.evaluate(item)){
                 anyMatches = true;
-                System.out.println("selected: " + selected);
+                
                 if(expectedType != null){
                     if(!expectedType.isAssignableFrom(selected.getClass())){
                         //need to convert

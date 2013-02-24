@@ -18,7 +18,6 @@ package org.xflatdb.xflat.transaction;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -307,6 +306,11 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         
         //remove it from the transaction journal
         transactionJournal.getRootElement().removeContent(entryElement);
+        try {
+            journalWrapper.writeFile(transactionJournal);
+        } catch (IOException ex) {
+            throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
+        }
         
         //we're all committed, so we can finally say so.
         committedTransactions.put(tx.id, tx);

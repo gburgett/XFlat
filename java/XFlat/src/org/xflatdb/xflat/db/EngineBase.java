@@ -634,7 +634,7 @@ public abstract class EngineBase implements Engine {
             //remove the ones we couldn't remove during the iteration
             if(toRemove != null && toRemove.size() > 0){
                 for(RowData data : toRemove){
-                    rowData.remove(data.commitId);                    
+                    rowData.remove(data.transactionId);                    
                 }
             }
             

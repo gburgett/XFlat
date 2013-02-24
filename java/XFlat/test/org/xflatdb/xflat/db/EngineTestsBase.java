@@ -1811,12 +1811,16 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         ctx.transactionManager = new FakeThreadContextTransactionManager(new FakeDocumentFileWrapper(ctx.transactionJournal));
         ctx.instance = setupEngine(ctx);
         
-        spinUp(ctx);
+        ctx.spinDownInvoked.set(false);
+        ctx.instance.spinUp();
         
         //wait a sec cause it might take us a while to actually end up reverting when we spin up
         Thread.sleep(1000);
         
         ctx.instance.revert(tx.getTransactionId(), true);
+        
+        //now that weve recovered we can begin operations 
+        ctx.instance.beginOperations();
         
         //ASSERT
         Element row = ctx.instance.readRow("0");

@@ -171,6 +171,22 @@ public class TableMetadata implements EngineProvider {
         }
     }
     
+    public void notifyRecoveryComplete(){
+        this.lock.writeLock().lock();
+        try{
+            EngineBase engine = this.engine.get();
+            
+            if(engine.getState() == EngineState.SpunUp){
+                //need to give the engine the go-ahead
+                engine.beginOperations();
+            }
+            
+        }
+        finally{
+            this.lock.writeLock().unlock();
+        }
+    }
+    
     private EngineBase makeNewEngine(File file){
         
         //TODO: engines will in the future be configurable & based on a strategy
@@ -244,8 +260,13 @@ public class TableMetadata implements EngineProvider {
         }
         
         //spinUp returns true if this thread successfully spun it up
-        if(engine.spinUp())
-            engine.beginOperations();
+        if(engine.spinUp()){
+            if(this.db.getState() == XFlatDatabase.DatabaseState.Running){
+                //spin-up could be called when initializing, in which case
+                //the engine needs to be ready to do recovery but not running yet.
+                engine.beginOperations();
+            }
+        }
         
         return engine;
     }

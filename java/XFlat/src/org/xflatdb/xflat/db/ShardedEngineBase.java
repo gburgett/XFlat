@@ -278,9 +278,14 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             return;
         }
         
-        //we will need to revert over all known shards in order to recover.
-        for(Interval<T> interval : this.knownShards.keySet()){
-            this.getEngine(interval).revert(txId, isRecovering);
+        this.getTableLock();
+        try{        
+            //we will need to revert over all known shards in order to recover.
+            for(Interval<T> interval : this.knownShards.keySet()){
+                this.getEngine(interval).revert(txId, isRecovering);
+            }
+        }finally{
+            this.releaseTableLock();
         }
     }
    
@@ -296,14 +301,19 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
         else{
             //need to scan the directory for existing known shards.
             for(File f : directory.listFiles()){
-                if(!f.getName().endsWith(".xml")){
+                if(!f.getName().endsWith(".xml") || f.getName().endsWith("config.xml")){
                     continue;
                 }
                 
-                String shardName = f.getName().substring(0, f.getName().length() - 4);
-                Interval<T> i = config.getIntervalProvider().getInterval(shardName);
-                if(i != null){
-                    knownShards.put(i, f);
+                try{
+                    String shardName = f.getName().substring(0, f.getName().length() - 4);
+                    Interval<T> i = config.getIntervalProvider().getInterval(shardName);
+                    if(i != null){
+                        knownShards.put(i, f);
+                    }
+                }catch(Exception ex){
+                    this.log.warn("Error identifying interval for file " + f.getName(), ex);
+                    continue;
                 }
             }
         }

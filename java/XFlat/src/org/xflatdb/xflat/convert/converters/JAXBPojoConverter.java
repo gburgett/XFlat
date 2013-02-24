@@ -25,7 +25,6 @@ import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import org.apache.commons.logging.LogFactory;
@@ -256,8 +255,8 @@ public class JAXBPojoConverter implements PojoConverter {
      * @throws JAXBException If an error occurs when creating the marshaller or unmarshaller.
      */
     public static <T> void addJAXBConverters(JAXBContext context, Class<T> baseClass, ConversionService registerTo) throws JAXBException{
-        Converter<T, Element> marshaller = new JAXBMarshallingConverter(baseClass, context.createMarshaller());
-        Converter<Element, T> unmarshaller = new JAXBUnmarshallingConverter<>(baseClass, context.createUnmarshaller());
+        Converter<T, Element> marshaller = new JAXBMarshallingConverter(baseClass, context);
+        Converter<Element, T> unmarshaller = new JAXBUnmarshallingConverter<>(baseClass, context);
         
         registerTo.addConverter(baseClass, Element.class, marshaller);
         registerTo.addConverter(Element.class, baseClass, unmarshaller);
@@ -265,21 +264,35 @@ public class JAXBPojoConverter implements PojoConverter {
     
     private static class JAXBMarshallingConverter<T> implements Converter<T, Element>{
         XMLInputFactory factory = XMLInputFactory.newFactory();
-        Marshaller marshaller;
+        
+        ThreadLocal<Marshaller> marshaller;
+        JAXBContext context;
         Class<T> clazz;
         
-        public JAXBMarshallingConverter(Class<T> clazz, Marshaller marshaller){
+        public JAXBMarshallingConverter(final Class<T> clazz, final JAXBContext context){
             this.clazz = clazz;
-            this.marshaller = marshaller;
+            this.marshaller = new ThreadLocal<>();            
+            this.context = context;
         }
 
         @Override
         public Element convert(T source) throws ConversionException {
+            
+            Marshaller marshaller = this.marshaller.get();
+            if(marshaller == null){
+                try {
+                    this.marshaller.set(marshaller = context.createMarshaller());
+                } catch (JAXBException ex) {
+                    throw new ConversionException("Unable to create marshaller for class " + clazz, ex);
+                }
+            }
+            
+            
             try{
                 Document doc;
                 JDOMStreamWriter out = new JDOMStreamWriter();
                 try{
-                    this.marshaller.marshal(source, out);
+                    marshaller.marshal(source, out);
                     
                     doc = out.getDocument();
                 }
@@ -298,17 +311,28 @@ public class JAXBPojoConverter implements PojoConverter {
     private static class JAXBUnmarshallingConverter<T> implements Converter<Element, T>{
 
         org.jdom2.output.XMLOutputter outputter = new XMLOutputter();
-        Unmarshaller unmarshaller;
+        ThreadLocal<Unmarshaller> unmarshaller;
+        JAXBContext context;
         Class<T> clazz;
         
-        public JAXBUnmarshallingConverter(Class<T> clazz, Unmarshaller unmarshaller){
+        public JAXBUnmarshallingConverter(final Class<T> clazz, final JAXBContext context) throws JAXBException{
             this.clazz = clazz;
-            this.unmarshaller = unmarshaller;
+            this.unmarshaller = new ThreadLocal<>();
+            this.context = context;
         }
         
         @Override
         public T convert(Element source) throws ConversionException {
            
+            Unmarshaller unmarshaller = this.unmarshaller.get();
+            if(unmarshaller == null){
+                try {
+                    this.unmarshaller.set(unmarshaller = context.createUnmarshaller());
+                } catch (JAXBException ex) {
+                    throw new ConversionException("Unable to create unmarshaller for class " + clazz);
+                }
+            }
+            
             Document doc = new Document();
             doc.setRootElement(source.detach());
             

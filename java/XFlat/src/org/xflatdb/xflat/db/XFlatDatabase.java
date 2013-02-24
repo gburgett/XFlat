@@ -210,7 +210,7 @@ public class XFlatDatabase implements Database {
      * when {@link #shutdown() } is called.
      */
     public void Initialize(){
-        if(!this.state.compareAndSet(DatabaseState.Uninitialized, DatabaseState.Running)){
+        if(!this.state.compareAndSet(DatabaseState.Uninitialized, DatabaseState.Initializing)){
             return;
         }
         
@@ -234,8 +234,11 @@ public class XFlatDatabase implements Database {
         
             
             //recover transactional state if necessary
+            
             this.transactionManager.recover(this);
             
+            //done initializing
+            this.state.set(DatabaseState.Running);
         }catch(Exception ex){
             this.state.set(DatabaseState.Uninitialized);
             throw new XFlatException("Initialization error", ex);
@@ -554,6 +557,11 @@ public class XFlatDatabase implements Database {
          */
         Uninitialized,
         /**
+         * The state when the database is initializing, including potentially
+         * recovering from an unexpected shutdown.
+         */
+        Initializing,
+        /**
          * The state of a database that is running and capable of responding
          * to requests.
          */
@@ -562,7 +570,9 @@ public class XFlatDatabase implements Database {
          * The state of a database that is either in the process of or has already
          * shut down.  Requests on this database will throw.
          */
-        ShuttingDown
+        ShuttingDown,
+        
+        
     }
     
 }
