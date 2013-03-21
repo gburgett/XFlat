@@ -69,7 +69,6 @@ public class ShardsetConfig<T> {
     private boolean isId = false;
     /**
      * Gets a flag indicating whether the shard property selector is the {@link org.xflatdb.xflat.query.XPathQuery#Id} expression.
-     * @return 
      */
     public boolean isShardedById(){
         return this.isId;

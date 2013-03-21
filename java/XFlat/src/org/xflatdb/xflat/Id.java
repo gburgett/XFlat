@@ -30,10 +30,10 @@ import org.jdom2.Element;
  * be treated as equivalent to {@link XPathQuery#Id} when XFlat inspects a query.
  * <p/>
  * Example (inside class Foo):<br/>
- * <pre>
- * @Id(value="foo/@t:id", namespaces={"xmlns:t='http://www.example.com/ns'"})
+ * <code>
+ * {@literal @Id(value="foo/@t:id", namespaces={"xmlns:t='http://www.example.com/ns'"}) }<br/>
  * public String getId(){
- * </pre>
+ * </code>
  * @author gordon
  */
 @Retention(RetentionPolicy.RUNTIME)
