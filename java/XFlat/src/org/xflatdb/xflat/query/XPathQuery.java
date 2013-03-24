@@ -44,7 +44,10 @@ import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
  * are convertible to the query's value type, and then the converted value
  * type is compared to the given value to see if the row matches the query.
  * <p/>
- * The row is matched to the query if any one 
+ * The row is matched to the query if any one of the nodes selected by
+ * the XPath expression match the query.  This means that an Equals query
+ * which selects the individual item elements of a list will match if any item
+ * in the list matches the query.
  * @author Gordon
  */
 public class XPathQuery {

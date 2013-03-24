@@ -25,7 +25,7 @@ import org.xflatdb.xflat.convert.PojoConverter;
  * This PojoConverter maps Java beans to XML using {@link java.beans.XMLEncoder}.
  * @author Gordon
  */
-public class JavaBeansPojoMapper implements PojoConverter {
+public class JavaBeansPojoConverter implements PojoConverter {
 
     @Override
     public ConversionService extend(ConversionService service) {

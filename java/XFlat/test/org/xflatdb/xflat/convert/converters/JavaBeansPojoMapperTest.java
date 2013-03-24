@@ -118,7 +118,7 @@ public class JavaBeansPojoMapperTest {
         
         ConversionService service = new DefaultConversionService();
         
-        JavaBeansPojoMapper instance = new JavaBeansPojoMapper();
+        JavaBeansPojoConverter instance = new JavaBeansPojoConverter();
         //act
         service = instance.extend(service);
         

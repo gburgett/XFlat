@@ -172,6 +172,29 @@ public class XFlatDatabase implements Database {
     
     private Log log = LogFactory.getLog(getClass());
     
+    private AtomicBoolean pojoConverterLoaded = new AtomicBoolean(false);
+    private volatile PojoConverter pojoConverter;
+    /**
+     * Gets the PojoConverter that has been used to extend the database's conversion service.
+     * This overrides any PojoConverter that was defined in the Database Configuration.
+     * @param converter The converter that should extend the database's conversion service.
+     */
+    public PojoConverter getPojoConverter(){
+        return pojoConverter;
+    }
+    
+    /**
+     * Extends the database's conversion service with the given PojoConverter.
+     * This overrides any PojoConverter that was defined in the Database Configuration.
+     * @param converter The converter that should extend the database's conversion service.
+     */
+    public void setPojoConverter(PojoConverter converter){
+        synchronized(this){
+            this.conversionService = converter.extend(conversionService);
+            this.pojoConverter = converter;
+        }
+    }
+    
     /**
      * Creates a new database in the given directory.
      * @param directory The flat-file directory in which tables should be stored.
@@ -421,17 +444,7 @@ public class XFlatDatabase implements Database {
     }
     
     
-    /**
-     * Extends the database's conversion service with the given PojoConverter.
-     * It does this by invoking {@link PojoConverter#extend(org.xflatdb.xflat.convert.ConversionService) }
-     * using the database's current conversion service, in a synchronized context.
-     * @param extender The extender that should extend the database's conversion service.
-     */
-    public void extendConversionService(PojoConverter extender){
-        synchronized(this){
-            this.conversionService = extender.extend(conversionService);
-        }
-    }
+
         
 
     @Override
@@ -520,16 +533,16 @@ public class XFlatDatabase implements Database {
         return table;
     }
     
-    private AtomicBoolean pojoConverterLoaded = new AtomicBoolean(false);
-    private volatile PojoConverter pojoConverter;
-    public PojoConverter getPojoConverter(){
-        return pojoConverter;
-    }
     
     private void loadPojoConverter() throws ClassNotFoundException, InstantiationException, IllegalAccessException{
         if(!pojoConverterLoaded.compareAndSet(false, true)){
             return;
         }
+        if(this.pojoConverter != null){
+            //the user set a pojo converter via the Set method.
+            return;
+        }
+        
         Class<?> converter;
         
         converter = this.getClass().getClassLoader().loadClass(this.config.getPojoConverterClass());
@@ -542,9 +555,9 @@ public class XFlatDatabase implements Database {
         if(log.isTraceEnabled())
             log.trace(String.format("Activating Pojo Converter %s", converter.getName()));
         
-        this.pojoConverter = (PojoConverter)converter.newInstance();
+        PojoConverter instance = (PojoConverter)converter.newInstance();
         
-        this.extendConversionService(this.pojoConverter);
+        this.setPojoConverter(instance);
     }
     
     /**

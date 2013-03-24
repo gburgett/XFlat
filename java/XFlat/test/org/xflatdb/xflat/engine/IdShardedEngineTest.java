@@ -89,7 +89,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
             }
         };
         
-        db.extendConversionService(new PojoConverter(){
+        db.setPojoConverter(new PojoConverter(){
             @Override
             public ConversionService extend(ConversionService service) {
                 return conversionService;
