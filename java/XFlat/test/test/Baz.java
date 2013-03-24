@@ -15,6 +15,10 @@
 */
 package test;
 
+import com.thoughtworks.xstream.annotations.XStreamAlias;
+import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
+import com.thoughtworks.xstream.annotations.XStreamImplicit;
+import com.thoughtworks.xstream.annotations.XStreamOmitField;
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -28,12 +32,14 @@ import org.xflatdb.xflat.Id;
  * @author gordon
  */
 @XmlRootElement
+@XStreamAlias("baz")
 public class Baz {
     
+    @XStreamOmitField
     private String id;
     
     @Id
-    @XmlTransient
+    @XmlTransient    
     public String getId() {
         return this.id;
     }
@@ -42,6 +48,7 @@ public class Baz {
         this.id = id;
     }
     
+    @XStreamImplicit(itemFieldName="testData")
     private List<String> testData = new ArrayList<>();
     
     @XmlElement
@@ -49,8 +56,10 @@ public class Baz {
         return this.testData;
     }
     
+    @XStreamAsAttribute
     private int attrInt;
-    @XmlAttribute
+    
+    @XmlAttribute    
     public int getAttrInt() {
         return this.attrInt;
     }
