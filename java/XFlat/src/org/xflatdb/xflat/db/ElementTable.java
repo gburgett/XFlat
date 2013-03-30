@@ -33,11 +33,11 @@ import org.jdom2.Element;
  * This is the simple Table implementation for tables of JDOM Elements.
  * @author gordon
  */
-public class ElementTable extends TableBase<Element> implements Table<Element> {
+public class ElementTable extends TableBase implements Table<Element> {
 
     
     ElementTable(String tableName){
-        super(Element.class, tableName);
+        super(tableName);
     }
     
     @Override

@@ -22,17 +22,8 @@ import org.xflatdb.xflat.EngineStateException;
  * This provides dependencies to table implementations that are injected by the database.
  * @author gordon
  */
-public abstract class TableBase<T> {
+public abstract class TableBase {
         
-    private Class<T> tableType;
-    /**
-     * Gets the class of the items in the table.
-     * @return The class object
-     */
-    protected Class<T> getTableType(){
-        return this.tableType;
-    }
-    
     private String tableName;
     /**
      * Gets the table's name.
@@ -66,8 +57,7 @@ public abstract class TableBase<T> {
      * @param tableType The type of the objects in this table.
      * @param tableName The name of the table.
      */
-    protected TableBase(Class<T> tableType, String tableName){
-        this.tableType = tableType;
+    protected TableBase(String tableName){
         this.tableName = tableName;
     }
     

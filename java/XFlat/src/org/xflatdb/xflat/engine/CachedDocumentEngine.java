@@ -590,9 +590,9 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
             
             //we must immediately dump the cache, we cannot say we are committed
-            //until the data is on disk.
+            //until the data is on disk.  That is, if the transaction is durable.
             lastModified.set(System.currentTimeMillis());
-            dumpCacheNow(true);
+            dumpCacheNow(options.isDurable());
             
             currentlyCommitting.compareAndSet(tx.getTransactionId(), -1);
         }

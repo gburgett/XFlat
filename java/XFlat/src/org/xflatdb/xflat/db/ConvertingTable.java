@@ -22,8 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.LogFactory;
 import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.DuplicateKeyException;
@@ -42,8 +40,17 @@ import org.jdom2.xpath.XPathExpression;
  * using the database's conversion service.
  * @author gordon
  */
-public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
+public class ConvertingTable<T> extends TableBase implements Table<T> {
 
+    private Class<T> tableType;
+    /**
+     * Gets the class of the items in the table.
+     * @return The class object
+     */
+    protected Class<T> getTableType(){
+        return this.tableType;
+    }
+    
     private ConversionService conversionService;
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
@@ -59,7 +66,9 @@ public class ConvertingTable<T> extends TableBase<T> implements Table<T> {
     }
     
     ConvertingTable(Class<T> type, String name){
-        super(type, name);
+        super(name);
+        
+        this.tableType = type;
         
         this.accessor = IdAccessor.forClass(type);
         if(!this.accessor.hasId()){

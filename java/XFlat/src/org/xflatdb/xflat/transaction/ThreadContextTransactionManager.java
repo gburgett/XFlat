@@ -270,16 +270,19 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             entry.tableNames.add(e.getTableName());
         }
         
-        Element entryElement;
-        try {
-            if(transactionJournal == null){
-                loadJournal();
+        Element entryElement = null;
+        if(tx.options.isDurable()){
+            //use the transaction journal to ensure durability
+            try {
+                if(transactionJournal == null){
+                    loadJournal();
+                }
+                entryElement = toElement.convert(entry);
+                transactionJournal.getRootElement().addContent(entryElement);
+                journalWrapper.writeFile(transactionJournal);
+            } catch (ConversionException | IOException | JDOMException ex) {
+                throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
             }
-            entryElement = toElement.convert(entry);
-            transactionJournal.getRootElement().addContent(entryElement);
-            journalWrapper.writeFile(transactionJournal);
-        } catch (ConversionException | IOException | JDOMException ex) {
-            throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
         }
         
         //commit all, and if any fail revert all.
@@ -295,8 +298,19 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 tx.commitId = -1;
                 tx.revert();
             }catch(TransactionException ex2){
-                throw new TransactionException("Unable to commit, " + ex2.getMessage(), ex);
+                throw new TransactionException("Unable to commit, and another error occured during revert: " + ex2.getMessage(), ex);
             }
+            
+            //we were able to revert all, no need to keep the transaction in the journal.
+            if(tx.options.isDurable()){
+                transactionJournal.getRootElement().removeContent(entryElement);
+                try {
+                    journalWrapper.writeFile(transactionJournal);
+                } catch (IOException ioEx) {
+                    //this is not the most important exception
+                }
+            }
+            
             
             if(ex instanceof TransactionException)
                 throw ex;
@@ -305,11 +319,13 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         }
         
         //remove it from the transaction journal
-        transactionJournal.getRootElement().removeContent(entryElement);
-        try {
-            journalWrapper.writeFile(transactionJournal);
-        } catch (IOException ex) {
-            throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
+        if(tx.options.isDurable()){
+            transactionJournal.getRootElement().removeContent(entryElement);
+            try {
+                journalWrapper.writeFile(transactionJournal);
+            } catch (IOException ex) {
+                throw new TransactionException("Unable to commit, could not access journal file " + journalWrapper, ex);
+            }
         }
         
         //we're all committed, so we can finally say so.

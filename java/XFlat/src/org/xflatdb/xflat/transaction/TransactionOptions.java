@@ -98,6 +98,33 @@ public class TransactionOptions {
         return ret;
     }
     
+    private boolean durable;
+    /**
+     * Gets whether the transaction is durable.
+     * Defaults to true.
+     */
+    public boolean isDurable(){
+        return this.durable;
+    }
+    /**
+     * Sets the durability to apply to this transaction.  A Durable transaction
+     * is guaranteed to not return until the data is written to disk, and any
+     * errors (even power failures) during the commit operation will not result
+     * in partially-committed data.  This is of course subject to the durability
+     * of the operating system.<br/>
+     * A non-durable transaction makes none of these guarantees, but the commit
+     * operation may be substantially faster.
+     * <p/>
+     * The default value for this property is "true".
+     * @param durable true to ensure the transaction is durable, false to use a non-durable transaction.
+     * @return a new TransactionOptions object with Durable == the given value.
+     */
+    public TransactionOptions withDurability(boolean durable){
+        TransactionOptions ret = new TransactionOptions(this);
+        ret.durable = durable;
+        return ret;
+    }
+    
     /**
      * Creates a new TransactionOptions object with the default options.
      */
@@ -105,12 +132,14 @@ public class TransactionOptions {
         this.readOnly = false;
         this.isolation = Isolation.SNAPSHOT;
         this.propagation = Propagation.REQUIRED;
+        this.durable = true;
     }
     
     private TransactionOptions(TransactionOptions other){
         this.readOnly = other.readOnly;
         this.isolation = other.isolation;
         this.propagation = other.propagation;
+        this.durable = other.durable;
     }
     
     /**
@@ -123,6 +152,7 @@ public class TransactionOptions {
     public int hashCode() {
         int hash = 5;
         hash = 97 * hash + (this.readOnly ? 1 : 0);
+        hash = 97 * hash + (this.durable ? 1 : 0);
         hash = 97 * hash + (this.isolation != null ? this.isolation.hashCode() : 0);
         hash = 97 * hash + (this.propagation != null ? this.propagation.hashCode() : 0);
         return hash;
@@ -144,6 +174,9 @@ public class TransactionOptions {
             return false;
         }
         if (this.propagation != other.propagation) {
+            return false;
+        }
+        if(this.durable != other.durable){
             return false;
         }
         return true;

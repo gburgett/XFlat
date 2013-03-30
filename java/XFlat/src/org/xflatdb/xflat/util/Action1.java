@@ -13,30 +13,17 @@
 *	See the License for the specific language governing permissions and
 *	limitations under the License.
 */
-package org.xflatdb.xflat.transaction;
+package org.xflatdb.xflat.util;
 
 /**
- *
+ * Represents a first-class function that takes one value as a parameter.
+ * An action is invoked by calling the apply method.
  * @author Gordon
  */
-public class TransactionPropagationException extends TransactionException {
-
+public interface Action1<T> {
     /**
-     * Creates a new instance of
-     * <code>TransactionPropagationException</code> without detail message.
+     * Invokes the action with the given parameters.
+     * @param value The only parameter of this action.
      */
-    public TransactionPropagationException(String msg, Throwable cause) {
-        super(msg, cause);
-    }
-
-    /**
-     * Constructs an instance of
-     * <code>TransactionPropagationException</code> with the specified detail
-     * message.
-     *
-     * @param msg the detail message.
-     */
-    public TransactionPropagationException(String msg) {
-        super(msg);
-    }
+    public void apply(T value);
 }

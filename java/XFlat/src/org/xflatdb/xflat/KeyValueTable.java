@@ -20,103 +20,103 @@ import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
 
 /**
- * Represents a table in the database.  A Table provides CRUD access to the underlying
- * XML data store, and converts to and from the generic type.  This is the main
- * interface to access data inside XFlat.
- * @author gordon
+ * This interface represents a "KeyValue" view to an XFlat table.  The KeyValue
+ * view allows storing arbitrary convertible objects by key in the database.
+ * @author Gordon
  */
-public interface Table<T> {
+public interface KeyValueTable {
     
     //CREATE
     /**
-     * Inserts an object as a row in the database.
-     * @param row The value to insert as XML.
+     * Inserts a key value pair as a row in the table.
+     * @param key The key to which the value is associated.
+     * @param row The value to insert as XML.  Cannot be null.
+     * @throws DuplicateKeyException if a row with the given key already exists.
      */
-    public void insert(T row)
+    public <T> void add(String key, T row)
             throws DuplicateKeyException;
+    
+    /**
+     * Puts a value with the given key in the database.  If the value already
+     * exists, it is overwritten.
+     * @param <T>
+     * @param key The key to which the value is associated.
+     * @param row The new value for the row.  Cannot be null.
+     */
+    public <T> void set(String key, T row);
+    
+    /**
+     * Puts a value with the given key in the database.  If the value already
+     * exists, it is overwritten and the old value is returned.
+     * @param <T>
+     * @param key The key to which the value is associated.
+     * @param row The new value for the row.  Cannot be null.
+     * @return The old value for the row, or null if it did not previously exist.
+     */
+    public <T> T put(String key, T row);
     
     //READ
     /**
-     * Finds one value by ID
-     * @param id The ID of the value to find
+     * Finds one value by key
+     * @param key The key to which the value is associated.
+     * @param clazz The type as which the value should be deserialized.
      * @return The row value, or null if the row does not exist.
      */
-    public T find(Object id);
+    public <T> T get(String key, Class<T> clazz);
     
     /**
      * Finds the first value matching the Xpath query.
      * @param query The query to match.
+     * @param clazz The type as which the value should be deserialized. 
      * @return the value of the matched row, or null if no row was matched.
      */
-    public T findOne(XPathQuery query);
+    public <T> T findOne(XPathQuery query, Class<T> clazz);
     
     /**
      * Gets a cursor over all the values matching the Xpath query.
      * @param query The query to match.
+     * @param clazz The type as which the value should be deserialized.
      * @return A cursor over each matching row.
      */
-    public Cursor<T> find(XPathQuery query);
+    public <T> Cursor<T> find(XPathQuery query, Class<T> clazz);
     
     /**
      * Gets a list of all the values matching the Xpath query.
      * This is the same as {@link #find(org.xflatdb.xflat.query.XPathQuery) }
      * but without the hassle of a cursor.
      * @param query The query to match.
+     * @param clazz The type as which the value should be deserialized.
      * @return A list of all the matching values.
      */
-    public List<T> findAll(XPathQuery query);
+    public <T> List<T> findAll(XPathQuery query, Class<T> clazz);
     
     //UPDATE
     /**
      * Replaces a value with the new value by ID.  This is the same as "Save"
      * in some other document databases.
+     * @param key The key to which the value is associated.
      * @param newValue The new value to replace the old value.
      */
-    public void replace(T newValue)
+    public <T> void replace(String key, T newValue)
             throws KeyNotFoundException;
-    
-    /**
-     * Replaces the first value matched by the query with the new value.
-     * @param query The query to match.
-     * @param newValue The new value to replace the row.
-     * @return true if the query matched any rows, false otherwise.  If false,
-     * the new value was not inserted.
-     */
-    public boolean replaceOne(XPathQuery query, T newValue);
-    
-    /**
-     * Updates or inserts the row by ID.
-     * @param newValue The new value to replace or insert.
-     * @return false if an existing row was updated, true if a row was inserted.
-     */
-    public boolean upsert(T newValue);
-    
+ 
     /**
      * Applies an update to the data in a given row.
-     * @param id The ID of the row to match.
+     * @param key The key to which the value is associated.
      * @param update The update to apply.
      * @return true if the update actually applied, false if the row was found
      * but the update did not select an existing document element.
      * @throws KeyNotFoundException if the row does not exist.
      */
-    public boolean update(Object id, XPathUpdate update)
+    public boolean update(String key, XPathUpdate update)
             throws KeyNotFoundException;
-    
-    /**
-     * Applies an update to all data matching a given query.
-     * @param query The query to match.
-     * @param update The update to apply to each matching row.
-     * @return the number of rows that were updated.
-     */
-    public int update(XPathQuery query, XPathUpdate update);
-    
     
     //DELETE
     /**
-     * Deletes the row with the given ID.
-     * @param id The ID of the row to delete.
+     * Deletes the row associated to the given key.
+     * @param key The key to which the value is associated.
      */
-    public void delete(Object id)
+    public void delete(String key)
             throws KeyNotFoundException;
     
     /**

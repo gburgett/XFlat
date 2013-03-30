@@ -32,6 +32,7 @@ import static org.junit.Assert.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.xflatdb.xflat.Cursor;
+import org.xflatdb.xflat.KeyValueTable;
 import org.xflatdb.xflat.Table;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
@@ -373,6 +374,123 @@ public class DatabaseIntegrationTest {
                 rows.get(0).getChild("baz").getAttributeValue("attrInt"));
         
     }//end testInsert_Baz_UsesJaxbConversionService
+    
+    //<editor-fold desc="key value pair table">
+    
+    @Test
+    public void testAdd_Baz_NewBazAdded() throws Exception {
+        System.out.println("testAdd_Baz_NewBazAdded");
+        
+        XFlatDatabase db = getDatabase("Add_Baz_NewBazAdded");
+
+        db.Initialize();
+        try{
+        
+            KeyValueTable table = db.getKeyValueTable("kvFoo");
+
+            Baz b = new Baz();
+            b.setAttrInt(81);
+            b.getTestData().add("test data 1");
+            b.getTestData().add("test data 2");
+            b.getTestData().add("test data 3");
+
+            table.add("test", b);
+
+            Baz b2 = table.get("test", Baz.class);
+            
+            assertNotSame("Should not be the same baz", b, b2);
+            assertEquals("should be same data", b.getAttrInt(), b2.getAttrInt());
+            assertThat("should be same data", b2.getTestData(),
+                    Matchers.contains("test data 1", "test data 2", "test data 3"));
+        }
+        finally{
+            db.shutdown();
+        }
+        
+        Document tableDoc = this.loadTableDoc("Add_Baz_NewBazAdded", "kvFoo");
+        List<Element> rows = Utils.getRows(tableDoc);
+        assertEquals("Should have 1 row on disk", 1, rows.size());
+        assertEquals("Should have right data", "81",
+                rows.get(0).getChild("baz").getAttributeValue("attrInt"));
+    }
+    
+    @Test
+    public void testSet_Baz_ReplacesOld() throws Exception {
+        System.out.println("testSet_Baz_ReplacesOld");
+        
+        XFlatDatabase db = getDatabase("Set_Baz_ReplacesOld");
+                
+        db.Initialize();
+        try{
+        
+            KeyValueTable table = db.getKeyValueTable("kvFoo");
+
+            Baz b = new Baz();
+            b.setAttrInt(81);
+            b.getTestData().add("test data 1");
+            b.getTestData().add("test data 2");
+            b.getTestData().add("test data 3");
+
+            table.add("test", b);
+            
+            Baz b2 = new Baz();
+            b2.setAttrInt(82);
+            b2.getTestData().add("test data 4");
+
+            table.set("test", b2);
+        }
+        finally{
+            db.shutdown();
+        }
+        
+        Document tableDoc = this.loadTableDoc("Set_Baz_ReplacesOld", "kvFoo");
+        List<Element> rows = Utils.getRows(tableDoc);
+        assertEquals("Should have 1 row on disk", 1, rows.size());
+        assertEquals("Should have new data on disk", "82",
+                rows.get(0).getChild("baz").getAttributeValue("attrInt"));
+    }
+    
+    @Test
+    public void testPut_Baz_ReplacesOld() throws Exception {
+        System.out.println("testPut_Baz_ReplacesOld");
+        
+         XFlatDatabase db = getDatabase("Put_Baz_ReplacesOld");
+                
+        db.Initialize();
+        try{
+        
+            KeyValueTable table = db.getKeyValueTable("kvFoo");
+
+            Baz b = new Baz();
+            b.setAttrInt(81);
+            b.getTestData().add("test data 1");
+            b.getTestData().add("test data 2");
+            b.getTestData().add("test data 3");
+
+            table.add("test", b);
+            
+            Baz b2 = new Baz();
+            b2.setAttrInt(82);
+            b2.getTestData().add("test data 4");
+
+            Baz bOld = table.put("test", b2);
+            
+            assertEquals("should return old data", b.getAttrInt(), bOld.getAttrInt());
+            assertThat("should return old data", bOld.getTestData(),
+                    Matchers.contains("test data 1", "test data 2", "test data 3"));
+        }
+        finally{
+            db.shutdown();
+        }
+        
+        Document tableDoc = this.loadTableDoc("Put_Baz_ReplacesOld", "kvFoo");
+        List<Element> rows = Utils.getRows(tableDoc);
+        assertEquals("Should have 1 row on disk", 1, rows.size());
+        assertEquals("Should have new data on disk", "82",
+                rows.get(0).getChild("baz").getAttributeValue("attrInt"));
+    }
+    
+    //</editor-fold>
     
     private Matcher<Integer> isEven(){
         return new TypeSafeMatcher<Integer>(){

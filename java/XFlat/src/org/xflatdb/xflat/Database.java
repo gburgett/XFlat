@@ -51,6 +51,14 @@ public interface Database {
     public <T> Table<T> getTable(Class<T> persistentClass, String name);
     
     /**
+     * Gets the named table as a KeyValueTable, which can be used to store data
+     * as key-value pairs.
+     * @param name The name of the table.
+     * @return A table for manipulating rows of key-value data.
+     */
+    public KeyValueTable getKeyValueTable(String name);
+    
+    /**
      * Gets the database's {@link TransactionManager}.  The TransactionManager
      * allows opening transactions in the database.
      * @return The database's TransactionManager.

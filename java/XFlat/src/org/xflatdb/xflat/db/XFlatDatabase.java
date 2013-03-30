@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jdom2.Document;
@@ -36,6 +38,7 @@ import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.xflatdb.xflat.Database;
 import org.xflatdb.xflat.DatabaseConfig;
+import org.xflatdb.xflat.KeyValueTable;
 import org.xflatdb.xflat.Table;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
@@ -49,6 +52,7 @@ import org.xflatdb.xflat.convert.converters.StringConverters;
 import org.xflatdb.xflat.engine.DefaultEngineFactory;
 import org.xflatdb.xflat.transaction.ThreadContextTransactionManager;
 import org.xflatdb.xflat.transaction.TransactionManager;
+import org.xflatdb.xflat.util.Action1;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
 
 /**
@@ -459,6 +463,29 @@ public class XFlatDatabase implements Database {
         
         TableBase ret = table.getTable(type);
         return (Table<T>)ret;
+    }
+    
+    @Override
+    public KeyValueTable getKeyValueTable(String name){
+        TableMetadata table = getMetadata(null, name);
+        
+        ConvertingKeyValueTable ret = new ConvertingKeyValueTable(name);
+        ret.setConversionService(conversionService);
+        ret.setTransactionService(transactionManager);
+        ret.setEngineProvider(table);
+        ret.setLoadPojoMapperAction(new Action1<ConvertingKeyValueTable>(){
+            @Override
+            public void apply(ConvertingKeyValueTable val){
+                try {
+                    loadPojoConverter();
+                    val.setConversionService(conversionService);
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException ex) {
+                    throw new UnsupportedOperationException("No conversion available between your type and Element", ex);
+                }
+            }
+        });
+        
+        return ret;        
     }
     
     /**
