@@ -4,6 +4,7 @@ XFlat
 A lightweight embedded no-sql object DB persisting objects to flat XML files.
 XFlat is a completely free alternative to db4o for an embedded object DB.
 
+[![Build Status](https://travis-ci.org/gburgett/XFlat.png?branch=master,release)](https://travis-ci.org/gburgett/XFlat)
 ----
 
 So you've got a Java application, and need to persist some data.  Cool.  Just write it to a file.
