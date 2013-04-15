@@ -10,7 +10,7 @@
 <project name="XFlat" default="default" basedir=".">
     <description>Builds, tests, and runs the project XFlat.</description>
     
-	<target name="build" depends="-override-privates, version" unless="${already.built}" >
+	<target name="jar" depends="-override-privates, version" unless="${already.built}" >
 		<subant target="jar" inheritall="true">
 		  <fileset dir="." >		
 			<include name="java/*/build.xml" />
@@ -18,7 +18,7 @@
 		</subant>
 	</target>
 	
-	<target name="test" depends="build">
+	<target name="test" depends="jar">
 		<!-- tests all non-integration projects -->
 		<subant target="test" inheritall="true">
 			<fileset dir="." >
@@ -27,6 +27,15 @@
 			</fileset>
 		</subant>
 	</target>
+	
+	<target name="clean" depends="-override-privates" unless="${already.built}" >
+		<subant target="clean" inheritall="true">
+		  <fileset dir="." >		
+			<include name="java/*/build.xml" />
+		  </fileset>
+		</subant>
+	</target>
+	
 	
 	<target name="version">
 		<!-- git describe - v(last version)-(# of commits since)-(current commitish) -->
