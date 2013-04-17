@@ -87,18 +87,17 @@ public class TimestampIdGenerator extends IdGenerator {
         if(String.class.equals(clazz)){
             return (String)id;
         }
-        Date ret;
-        if(Date.class.equals(clazz)){
-            ret = (Date)id;
-        }
-        else if(Long.class.equals(clazz)){
-            ret = new Date((Long)id);
-        }
-        else{
-            throw new UnsupportedOperationException("Unknown ID type " + id.getClass());
+        
+        if(Long.class.equals(clazz)){
+            return ((Long)id).toString();
         }
         
-        return format.get().format(ret);
+        if(Date.class.equals(clazz)){
+            Date ret = (Date)id;
+            return Long.toString(ret.getTime());
+        }
+        
+        throw new UnsupportedOperationException("Unknown ID type " + id.getClass());        
     }
 
     @Override
@@ -108,23 +107,30 @@ public class TimestampIdGenerator extends IdGenerator {
             return id;
         }
         
-        Date date;
-        if(id == null){
-            date = new Date(0);
+        if(id == null)
+            return null;
+        
+        Long timestamp;
+        try{
+            timestamp = Long.valueOf(id);
         }
-        else{
+        catch(NumberFormatException ex){
+            //try parsing as a date
             try {
-                date = format.get().parse(id);
-            } catch (ParseException ex) {
-                date = new Date(0);
+                Date date = format.get().parse(id);
+                timestamp = date.getTime();
+            } catch (ParseException ex2) {
+                //can't parse, return null;
+                return null;
             }
         }
         
-        if(Date.class.equals(idType)){
-            return date;
+        if(idType.isAssignableFrom(Long.class)){
+            return timestamp;
         }
-        if(Long.class.equals(idType)){
-            return date.getTime();
+        
+        if(idType.isAssignableFrom(Date.class)){
+            return new Date(timestamp);
         }
         
         throw new UnsupportedOperationException("Unknown ID type " + idType);
