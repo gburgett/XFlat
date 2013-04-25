@@ -189,8 +189,6 @@ public class TableMetadata implements EngineProvider {
     
     private EngineBase makeNewEngine(File file){
         
-        //TODO: engines will in the future be configurable & based on a strategy
-
         EngineBase ret = db.getEngineFactory().newEngine(file, name, config);
 
         ret.setConversionService(db.getConversionService());

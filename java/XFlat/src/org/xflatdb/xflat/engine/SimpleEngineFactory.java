@@ -29,7 +29,7 @@ import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
  * the core XFlat Jar.
  * @author Gordon
  */
-public class DefaultEngineFactory implements EngineFactory {
+public class SimpleEngineFactory implements EngineFactory {
 
     private Matcher idPropertyMatcher = new XPathExpressionEqualityMatcher(XPathQuery.Id);
     

@@ -50,7 +50,7 @@ import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.convert.converters.DateConverters;
 import org.xflatdb.xflat.convert.converters.JDOMConverters;
 import org.xflatdb.xflat.convert.converters.StringConverters;
-import org.xflatdb.xflat.engine.DefaultEngineFactory;
+import org.xflatdb.xflat.engine.SimpleEngineFactory;
 import org.xflatdb.xflat.transaction.ThreadContextTransactionManager;
 import org.xflatdb.xflat.transaction.TransactionManager;
 import org.xflatdb.xflat.util.Action1;
@@ -91,7 +91,7 @@ public class LocalTransactionalDatabase implements Database {
         return this.conversionService;
     }
     
-    private EngineFactory engineFactory = new DefaultEngineFactory();
+    private EngineFactory engineFactory = new SimpleEngineFactory();
     /**
      * Sets the {@link EngineFactory} used to create {@link Engine} instances
      * for the tables.

@@ -16,10 +16,15 @@
 package org.xflatdb.xflat.db;
 
 /**
- *
+ * An internal interface which provides an engine to {@link TableBase} implementations.
  * @author gordon
  */
 interface EngineProvider {
     
+    /**
+     * Provides an engine when requested.  If necessary, the engine will be created,
+     * but should be cached for a time afterwards.
+     * @return The engine which the Table will use.
+     */
     public Engine provideEngine();
 }
