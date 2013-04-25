@@ -386,7 +386,7 @@ public abstract class EngineTransactionManagerTestBase {
         
         EngineBase e = mock(EngineBase.class);
         
-        XFlatDatabase db = mock(XFlatDatabase.class);
+        LocalTransactionalDatabase db = mock(LocalTransactionalDatabase.class);
         when(db.getEngine("Name"))
                 .thenReturn(e);
         

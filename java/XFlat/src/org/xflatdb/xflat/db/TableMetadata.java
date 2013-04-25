@@ -54,7 +54,7 @@ public class TableMetadata implements EngineProvider {
     
     Element engineMetadata;
 
-    XFlatDatabase db;
+    LocalTransactionalDatabase db;
     
     private ReadWriteLock lock = new ReentrantReadWriteLock();
     
@@ -90,7 +90,7 @@ public class TableMetadata implements EngineProvider {
         return engine.getState();
     }
 
-    public TableMetadata(String name, XFlatDatabase db, File engineFile){
+    public TableMetadata(String name, LocalTransactionalDatabase db, File engineFile){
         this.name = name;
         this.db = db;
         this.engineFile = engineFile;
@@ -261,7 +261,7 @@ public class TableMetadata implements EngineProvider {
         
         //spinUp returns true if this thread successfully spun it up
         if(engine.spinUp()){
-            if(this.db.getState() == XFlatDatabase.DatabaseState.Running){
+            if(this.db.getState() == LocalTransactionalDatabase.DatabaseState.Running){
                 //spin-up could be called when initializing, in which case
                 //the engine needs to be ready to do recovery but not running yet.
                 engine.beginOperations();

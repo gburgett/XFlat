@@ -15,11 +15,6 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.db.EngineProvider;
-import org.xflatdb.xflat.db.IdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
-import org.xflatdb.xflat.db.Engine;
-import org.xflatdb.xflat.db.ElementTable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -42,8 +37,7 @@ import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.*;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import test.Bar;
-import test.Foo;
+import org.xflatdb.xflat.XFlatConstants;
 
 /**
  *
@@ -89,15 +83,15 @@ public class ElementTableTest {
     }
 
     private String getId(Element data){
-        return data.getAttributeValue("id", XFlatDatabase.xFlatNs);
+        return data.getAttributeValue("id", XFlatConstants.xFlatNs);
     }
     
     private void setId(Element e, String id){
         if(id == null){
-            e.removeAttribute("id", XFlatDatabase.xFlatNs);
+            e.removeAttribute("id", XFlatConstants.xFlatNs);
             return;
         }
-        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
+        e.setAttribute("id", id, XFlatConstants.xFlatNs);
     }
     
     @Test

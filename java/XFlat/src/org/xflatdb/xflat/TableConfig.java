@@ -16,13 +16,11 @@
 package org.xflatdb.xflat;
 
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.jdom2.Element;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.Converter;
 import org.xflatdb.xflat.db.IdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
-import org.jdom2.Element;
+import org.xflatdb.xflat.db.LocalTransactionalDatabase;
 
 /**
  * Represents the configuration of one table. 
@@ -144,9 +142,9 @@ public class TableConfig {
     public static Converter<TableConfig, Element> ToElementConverter = new Converter<TableConfig, Element>(){
         @Override
         public Element convert(TableConfig source) throws ConversionException {
-            Element ret = new Element("config", XFlatDatabase.xFlatNs);
+            Element ret = new Element("config", XFlatConstants.xFlatNs);
             if(source.idGenerator != null)
-                ret.setAttribute("idGenerator", source.idGenerator.getName(), XFlatDatabase.xFlatNs);
+                ret.setAttribute("idGenerator", source.idGenerator.getName(), XFlatConstants.xFlatNs);
             return ret;
         }
     };
@@ -154,12 +152,12 @@ public class TableConfig {
     public static Converter<Element, TableConfig> FromElementConverter = new Converter<Element, TableConfig>(){
         @Override
         public TableConfig convert(Element source) throws ConversionException {
-            if(!"config".equals(source.getName()) || !XFlatDatabase.xFlatNs.equals(source.getNamespace())){
-                throw new ConversionException("Expected element named config in namespace " + XFlatDatabase.xFlatNs);
+            if(!"config".equals(source.getName()) || !XFlatConstants.xFlatNs.equals(source.getNamespace())){
+                throw new ConversionException("Expected element named config in namespace " + XFlatConstants.xFlatNs);
             }
             
             TableConfig ret = new TableConfig();
-            String idGenerator = source.getAttributeValue("idGenerator", XFlatDatabase.xFlatNs);
+            String idGenerator = source.getAttributeValue("idGenerator", XFlatConstants.xFlatNs);
             if(idGenerator != null){
                 try {
                     Class<?> cl = this.getClass().getClassLoader().loadClass(idGenerator);

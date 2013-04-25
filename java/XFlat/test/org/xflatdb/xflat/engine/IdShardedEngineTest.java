@@ -35,6 +35,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.db.EngineBase;
@@ -42,7 +43,7 @@ import org.xflatdb.xflat.db.EngineFactory;
 import org.xflatdb.xflat.db.EngineTransactionManager;
 import org.xflatdb.xflat.db.ShardedEngineTestsBase;
 import org.xflatdb.xflat.db.TableMetadataFactory;
-import org.xflatdb.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.db.LocalTransactionalDatabase;
 import org.xflatdb.xflat.query.Interval;
 import org.xflatdb.xflat.query.IntervalProvider;
 import org.xflatdb.xflat.query.NumericIntervalProvider;
@@ -66,7 +67,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 final Map<String, Document> docs = new ConcurrentHashMap<>();
         ctx.additionalContext.put("docs", docs);
         
-        XFlatDatabase db = new XFlatDatabase(workspace, ctx.executorService){
+        LocalTransactionalDatabase db = new LocalTransactionalDatabase(workspace, ctx.executorService){
             //override to always return the executor service set on the context
             @Override
             protected ScheduledExecutorService getExecutorService(){
@@ -163,7 +164,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
 
         File file = (File)ctx.additionalContext.get("file");
         IntervalProvider provider = (IntervalProvider)ctx.additionalContext.get("rangeProvider");
-        XFlatDatabase db = (XFlatDatabase)ctx.additionalContext.get("db");
+        LocalTransactionalDatabase db = (LocalTransactionalDatabase)ctx.additionalContext.get("db");
         
         ShardsetConfig cfg = ShardsetConfig.byId(Integer.class, provider);
         
@@ -186,14 +187,14 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 
         //shard by integer ID, as we had determined in the setup
         Map<Interval<Integer>, Document> files = new HashMap<>();
-        for(Element row : contents.getRootElement().getChildren("row", XFlatDatabase.xFlatNs)){
+        for(Element row : contents.getRootElement().getChildren("row", XFlatConstants.xFlatNs)){
             String id = getId(row);
             int iId = Integer.parseInt(id);
             
             Document shard = files.get(provider.getInterval(iId));
             if(shard == null){
                 shard = new Document();
-                shard.setRootElement(new Element("db", XFlatDatabase.xFlatNs));
+                shard.setRootElement(new Element("db", XFlatConstants.xFlatNs));
                 files.put(provider.getInterval(iId), shard);
             }
             
@@ -215,7 +216,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         IntervalProvider<Integer> provider = (IntervalProvider<Integer>)ctx.additionalContext.get("rangeProvider");
         
         Document ret = new Document();
-        ret.setRootElement(new Element("db", XFlatDatabase.xFlatNs));
+        ret.setRootElement(new Element("db", XFlatConstants.xFlatNs));
         
         SortedMap<Integer, Document> sortedDocs = new TreeMap<>();
         //will be spread across multiple documents, sort them by ID
@@ -229,7 +230,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
         
         //each range is now in order, add all the rows from each document
         for(Document d : sortedDocs.values()){
-            for(Element e : d.getRootElement().getChildren("row", XFlatDatabase.xFlatNs)){
+            for(Element e : d.getRootElement().getChildren("row", XFlatConstants.xFlatNs)){
                 ret.getRootElement().addContent(e.clone());
             }
         }

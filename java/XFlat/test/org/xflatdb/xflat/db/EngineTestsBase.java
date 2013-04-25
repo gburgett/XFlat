@@ -65,7 +65,7 @@ import test.Utils;
 import static org.mockito.Mockito.*;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.xflatdb.xflat.transaction.TransactionManager;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.transaction.TransactionScope;
 
 /**
@@ -270,11 +270,11 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
     
     
     protected String getId(Element row){
-        return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
+        return row.getAttributeValue("id", XFlatConstants.xFlatNs);
     }
     
     protected Element setId(Element row, String id){
-        row.setAttribute("id", id, XFlatDatabase.xFlatNs);
+        row.setAttribute("id", id, XFlatConstants.xFlatNs);
         return row;
     }
     
@@ -316,7 +316,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Should have 1 row", 1, children.size());
         Element data = children.get(0).getChild("data");
         assertNotNull("row should have the data", data);
@@ -354,7 +354,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Should have 2 rows", 2, children.size());
         
         Element data = findId(children, "1");
@@ -396,7 +396,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Document doc = getFileContents(ctx);
         
         assertNotNull("File contents should exist", doc);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Should have 1 row", 1, children.size());
         
         Element data = findId(children, "0");
@@ -660,7 +660,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         //ASSERT
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have no data", 0, children.size());
     }//end testReplaceRow_NoData_ThrowsKeyNotFoundException
     
@@ -693,7 +693,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have correct data", children,
@@ -734,7 +734,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -771,7 +771,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -812,7 +812,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have updated data", children,
@@ -852,7 +852,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -892,7 +892,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have old data", children,
@@ -934,7 +934,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have updated data", children,
@@ -993,7 +993,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 3, children.size());
         
         assertThat("Document should have updated data", children,
@@ -1033,7 +1033,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         
         assertNotNull("File contents should exist", doc);
         
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Should have 1 row", 1, children.size());
         
         Element data = children.get(0).getChild("data");
@@ -1072,7 +1072,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1106,7 +1106,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have no elements", 0, children.size());
         
     }//end testDeleteRow_RowDoesntExist_ThrowsKeyNotFoundException
@@ -1139,7 +1139,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Document doc = getFileContents(ctx);
         System.out.println(dumpDoc(doc));
         
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         
         
         assertEquals("Document should have one fewer element", 1, children.size());
@@ -1185,7 +1185,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have same number of elements", 2, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1238,7 +1238,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Document doc = getFileContents(ctx);
         System.out.println(dumpDoc(doc));
         
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         assertEquals("Document should have fewer elements", 1, children.size());
         
         assertThat("Document should have correct data", children,
@@ -1288,7 +1288,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         
         assertEquals("Should have reverted data", "third text data", children.get(0).getChild("third").getText());
     }
@@ -1330,7 +1330,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         
         assertEquals("Should have committed data", "fourth text data", children.get(0).getChild("fourth").getText());
     }
@@ -1368,7 +1368,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         spinDown(ctx);
         
         Document doc = getFileContents(ctx);
-        List<Element> children = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        List<Element> children = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
         
         assertEquals("Should have reverted data", "third text data", children.get(0).getChild("third").getText());
     }

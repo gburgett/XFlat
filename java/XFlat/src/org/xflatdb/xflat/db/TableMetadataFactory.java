@@ -24,6 +24,7 @@ import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.xflatdb.xflat.DatabaseConfig;
 import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
@@ -34,7 +35,7 @@ import org.xflatdb.xflat.util.DocumentFileWrapper;
  */
 public class TableMetadataFactory {
     
-    private XFlatDatabase db;
+    private LocalTransactionalDatabase db;
     private DatabaseConfig dbConfig;
     private DocumentFileWrapper wrapper;
     
@@ -43,7 +44,7 @@ public class TableMetadataFactory {
      * @param db The XFlatDatabase from which dependencies are retrieved when engines are provided.
      * @param metadataDirectory The metadata directory to which the factory should read and save table metadata.
      */
-    public TableMetadataFactory(XFlatDatabase db, File metadataDirectory){
+    public TableMetadataFactory(LocalTransactionalDatabase db, File metadataDirectory){
         this(db, db.getConfig(), new DocumentFileWrapper(metadataDirectory));
     }
     
@@ -53,7 +54,7 @@ public class TableMetadataFactory {
      * @param config The XFlat Database configuration.
      * @param wrapper A Wrapper around the metadata directory allowing the factory to read and save table metadata.
      */
-    TableMetadataFactory(XFlatDatabase db, DatabaseConfig config, DocumentFileWrapper wrapper){
+    TableMetadataFactory(LocalTransactionalDatabase db, DatabaseConfig config, DocumentFileWrapper wrapper){
         this.db = db;
         this.dbConfig= config;
         this.wrapper = wrapper;
@@ -108,13 +109,13 @@ public class TableMetadataFactory {
         
         if(doc == null){
             //no need for config or ID generator
-            ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
+            ret.engineMetadata = new Element("engine", XFlatConstants.xFlatNs);
         }
         else{
             //load engine
-            ret.engineMetadata = doc.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
+            ret.engineMetadata = doc.getRootElement().getChild("engine", XFlatConstants.xFlatNs);
             if(ret.engineMetadata == null){
-                ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
+                ret.engineMetadata = new Element("engine", XFlatConstants.xFlatNs);
             }
         }
         
@@ -185,7 +186,7 @@ public class TableMetadataFactory {
             }
         }
 
-        ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
+        ret.engineMetadata = new Element("engine", XFlatConstants.xFlatNs);
         
         return ret;
     }
@@ -193,7 +194,7 @@ public class TableMetadataFactory {
     private TableMetadata makeTableMetadataFromDocument(String name, File engineFile, Document metadata, TableConfig config, Class<?> idType){
         TableMetadata ret = new TableMetadata(name, db, engineFile);
         if(config == null){
-            Element c = metadata.getRootElement().getChild("config", XFlatDatabase.xFlatNs);
+            Element c = metadata.getRootElement().getChild("config", XFlatConstants.xFlatNs);
             try {
                 config = TableConfig.FromElementConverter.convert(c);
             } catch (ConversionException ex) {
@@ -206,9 +207,9 @@ public class TableMetadataFactory {
         
         //load ID generator
         Class<? extends IdGenerator> generatorClass = null;
-        Element g = metadata.getRootElement().getChild("generator", XFlatDatabase.xFlatNs);
+        Element g = metadata.getRootElement().getChild("generator", XFlatConstants.xFlatNs);
         if(g != null){
-            String gClassStr = g.getAttributeValue("class", XFlatDatabase.xFlatNs);
+            String gClassStr = g.getAttributeValue("class", XFlatConstants.xFlatNs);
             if(gClassStr != null){
                 try {
                     generatorClass = (Class<? extends IdGenerator>) TableMetadata.class.getClassLoader().loadClass(gClassStr);
@@ -226,9 +227,9 @@ public class TableMetadataFactory {
         ret.idGenerator.loadState(g);
 
         //load engine
-        ret.engineMetadata = metadata.getRootElement().getChild("engine", XFlatDatabase.xFlatNs);
+        ret.engineMetadata = metadata.getRootElement().getChild("engine", XFlatConstants.xFlatNs);
         if(ret.engineMetadata == null){
-            ret.engineMetadata = new Element("engine", XFlatDatabase.xFlatNs);
+            ret.engineMetadata = new Element("engine", XFlatConstants.xFlatNs);
         }
         
         return ret;
@@ -241,7 +242,7 @@ public class TableMetadataFactory {
      */
     public void saveTableMetadata(TableMetadata metadata) throws IOException {
         Document doc = new Document();
-        doc.setRootElement(new Element("metadata", XFlatDatabase.xFlatNs));
+        doc.setRootElement(new Element("metadata", XFlatConstants.xFlatNs));
         
         //save config
         if(metadata.config != null){
@@ -256,8 +257,8 @@ public class TableMetadataFactory {
         
         //save generator
         if(metadata.idGenerator != null){
-            Element g= new Element("generator", XFlatDatabase.xFlatNs);
-            g.setAttribute("class", metadata.idGenerator.getClass().getName(), XFlatDatabase.xFlatNs);
+            Element g= new Element("generator", XFlatConstants.xFlatNs);
+            g.setAttribute("class", metadata.idGenerator.getClass().getName(), XFlatConstants.xFlatNs);
             metadata.idGenerator.saveState(g);
 
             doc.getRootElement().addContent(g);

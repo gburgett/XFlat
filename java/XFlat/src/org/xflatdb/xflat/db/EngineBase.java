@@ -28,6 +28,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jdom2.Element;
 import org.xflatdb.xflat.EngineStateException;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.db.EngineBase.RowData;
@@ -412,7 +413,7 @@ public abstract class EngineBase implements Engine {
      * @return The ID attached to the row
      */
     protected String getId(Element row) {
-        return row.getAttributeValue("id", XFlatDatabase.xFlatNs);
+        return row.getAttributeValue("id", XFlatConstants.xFlatNs);
     }
     
     /**
@@ -421,7 +422,7 @@ public abstract class EngineBase implements Engine {
      * @param id The new value of the ID.
      */
     protected void setId(Element row, String id){
-        row.setAttribute("id", id, XFlatDatabase.xFlatNs);
+        row.setAttribute("id", id, XFlatConstants.xFlatNs);
     }
     
     //<editor-fold desc="transactions">
@@ -672,8 +673,8 @@ public abstract class EngineBase implements Engine {
         public RowData(long txId, Element data, String id){
             if(data != null){            
                 this.data = data;
-                this.rowElement = new Element("row", XFlatDatabase.xFlatNs)
-                        .setAttribute("id", id, XFlatDatabase.xFlatNs)
+                this.rowElement = new Element("row", XFlatConstants.xFlatNs)
+                        .setAttribute("id", id, XFlatConstants.xFlatNs)
                         .setContent(data);
             }
             this.transactionId = txId;

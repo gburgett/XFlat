@@ -41,6 +41,7 @@ import org.xflatdb.xflat.DatabaseConfig;
 import org.xflatdb.xflat.KeyValueTable;
 import org.xflatdb.xflat.Table;
 import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.ConversionService;
@@ -56,12 +57,21 @@ import org.xflatdb.xflat.util.Action1;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
 
 /**
- * The base class for classes that manage tables and conversion services.
+ * This database implementation manages a local directory of tables.
+ * Within the directory, each table is represented by an XML file.  If the table
+ * is sharded, it is represented as a subdirectory, in which each shard is represented
+ * as an XML file.
+ * <p/>
+ * This implementation supports the following requirements:<br/>
+ * <pre>
+ * "transactional" : true | [ A, C, I, D ]
+ * "local" : true
+ * "threadsafe" : true
+ * </pre>
  * @author gordon
  */
-public class XFlatDatabase implements Database {
+public class LocalTransactionalDatabase implements Database {
     
-    public static Namespace xFlatNs = Namespace.getNamespace("db", "http://www.xflatdb.org/xflat/db");
     
     //<editor-fold desc="dependencies">
     private ScheduledExecutorService executorService;
@@ -139,7 +149,7 @@ public class XFlatDatabase implements Database {
                 @Override
                 public void run() {
                     try {
-                        XFlatDatabase.this.shutdown(1000);
+                        LocalTransactionalDatabase.this.shutdown(1000);
                     } catch (TimeoutException ex) {
                         log.warn("Timed out while shutting down database " + directory);
                     }
@@ -203,7 +213,7 @@ public class XFlatDatabase implements Database {
      * Creates a new database in the given directory.
      * @param directory The flat-file directory in which tables should be stored.
      */
-    public XFlatDatabase(File directory){
+    public LocalTransactionalDatabase(File directory){
         this(directory, null);
     }
     
@@ -213,7 +223,7 @@ public class XFlatDatabase implements Database {
      * @param executorService The executor service to use for all database-related
      * tasks.  If null, the database will create one in Initialize.
      */
-    public XFlatDatabase(File directory, ScheduledExecutorService executorService){
+    public LocalTransactionalDatabase(File directory, ScheduledExecutorService executorService){
         this.directory = directory;
         
         this.conversionService = new DefaultConversionService();
@@ -236,7 +246,7 @@ public class XFlatDatabase implements Database {
      * resources and abandon all running tasks.  This shutdown hook will be removed
      * when {@link #shutdown() } is called.
      */
-    public void Initialize(){
+    public void initialize(){
         if(!this.state.compareAndSet(DatabaseState.Uninitialized, DatabaseState.Initializing)){
             return;
         }
@@ -400,7 +410,7 @@ public class XFlatDatabase implements Database {
                 //we're good here.
                 continue;
             }
-            Element cfg = existing.getRootElement().getChild("config", XFlatDatabase.xFlatNs);
+            Element cfg = existing.getRootElement().getChild("config", XFlatConstants.xFlatNs);
             if(cfg == null){
                 //still good
                 continue;
@@ -512,7 +522,7 @@ public class XFlatDatabase implements Database {
         if(name == null || name.startsWith("xflat_")){
             throw new IllegalArgumentException("Table name cannot be null or start with 'xflat_': " + name);
         }
-        if(type != null){
+        if(type != null && !Element.class.equals(type)){
             if(!this.getConversionService().canConvert(type, Element.class) ||
                     !this.getConversionService().canConvert(Element.class, type)){
 
@@ -539,7 +549,7 @@ public class XFlatDatabase implements Database {
         if(table == null){
             TableConfig tblConfig = this.tableConfigs.get(name);
             Class<?> idType = String.class;
-            if(type != null){
+            if(type != null && !Element.class.equals(type)){
                 IdAccessor accessor = IdAccessor.forClass(type);
                 if(accessor != null && accessor.hasId()){
                     idType = accessor.getIdType();

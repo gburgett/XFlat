@@ -31,9 +31,9 @@ import org.jdom2.Element;
 import org.jdom2.filter.AttributeFilter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.ConversionService;
-import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.util.XPathExpressionEqualityMatcher;
 
 /**
@@ -326,7 +326,7 @@ public class XPathQuery {
      * Currently this is the expression "@db:id".
      * 
      */
-    public static final XPathExpression<Attribute> Id = XPathFactory.instance().compile("@db:id", new AttributeFilter(), null, XFlatDatabase.xFlatNs);
+    public static final XPathExpression<Attribute> Id = XPathFactory.instance().compile("@db:id", new AttributeFilter(), null, XFlatConstants.xFlatNs);
     //</editor-fold>
     
     //<editor-fold desc="builders">

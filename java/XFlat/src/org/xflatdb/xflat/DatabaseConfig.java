@@ -25,7 +25,7 @@ import org.xflatdb.xflat.db.IdGenerator;
 import org.xflatdb.xflat.db.BigIntIdGenerator;
 import org.xflatdb.xflat.db.TimestampIdGenerator;
 import org.xflatdb.xflat.db.UuidIdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.db.LocalTransactionalDatabase;
 
 /**
  * The Configuration for a new XFlat Database.  

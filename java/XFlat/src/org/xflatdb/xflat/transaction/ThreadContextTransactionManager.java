@@ -37,7 +37,7 @@ import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.Converter;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineTransactionManager;
-import org.xflatdb.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.db.LocalTransactionalDatabase;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
 
 /**
@@ -363,7 +363,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     }
 
     @Override
-    public void recover(XFlatDatabase db) {
+    public void recover(LocalTransactionalDatabase db) {
         //open the journal
         
         try {

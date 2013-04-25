@@ -28,6 +28,7 @@ import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
 import org.jdom2.Attribute;
 import org.jdom2.Element;
+import org.xflatdb.xflat.XFlatConstants;
 
 /**
  * This is the simple Table implementation for tables of JDOM Elements.
@@ -246,7 +247,7 @@ public class ElementTable extends TableBase implements Table<Element> {
     
     
     private String getId(Element element){
-        Attribute a = element.getAttribute("id", XFlatDatabase.xFlatNs);
+        Attribute a = element.getAttribute("id", XFlatConstants.xFlatNs);
         if(a != null){
             return a.getValue();
         }
@@ -255,7 +256,7 @@ public class ElementTable extends TableBase implements Table<Element> {
     }
     
     private void setId(String id, Element e){
-        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
+        e.setAttribute("id", id, XFlatConstants.xFlatNs);
     }
     
     private String generateNewId(){

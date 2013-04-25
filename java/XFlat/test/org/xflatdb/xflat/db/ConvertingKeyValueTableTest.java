@@ -18,25 +18,23 @@ package org.xflatdb.xflat.db;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import org.hamcrest.Matchers;
+import org.jdom2.Element;
+import org.jdom2.xpath.XPathFactory;
+import org.junit.After;
+import static org.junit.Assert.*;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.*;
 import org.xflatdb.xflat.Cursor;
-import org.xflatdb.xflat.KeyNotFoundException;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.DefaultConversionService;
 import org.xflatdb.xflat.convert.converters.JDOMConverters;
 import org.xflatdb.xflat.convert.converters.StringConverters;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
-import org.hamcrest.Matchers;
-import org.jdom2.Element;
-import org.jdom2.xpath.XPathFactory;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import static org.junit.Assert.*;
-import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.*;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.xflatdb.xflat.transaction.TransactionManager;
 import org.xflatdb.xflat.transaction.TransactionOptions;
 import org.xflatdb.xflat.transaction.TransactionScope;
@@ -96,11 +94,11 @@ public class ConvertingKeyValueTableTest {
     }
 
     private String getId(Element data){
-        return data.getAttributeValue("id", XFlatDatabase.xFlatNs);
+        return data.getAttributeValue("id", XFlatConstants.xFlatNs);
     }
     
     private void setId(Element e, String id){
-        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
+        e.setAttribute("id", id, XFlatConstants.xFlatNs);
     }
     
     @Test

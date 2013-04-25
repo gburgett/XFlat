@@ -15,15 +15,9 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.db.ConvertingTable;
-import org.xflatdb.xflat.db.EngineProvider;
-import org.xflatdb.xflat.db.IdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
-import org.xflatdb.xflat.db.Engine;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.KeyNotFoundException;
 import org.xflatdb.xflat.convert.ConversionService;
@@ -43,6 +37,7 @@ import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.*;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.xflatdb.xflat.XFlatConstants;
 import test.Bar;
 import test.Foo;
 
@@ -111,11 +106,11 @@ public class ConvertingTableTest {
     }
 
     private String getId(Element data){
-        return data.getAttributeValue("id", XFlatDatabase.xFlatNs);
+        return data.getAttributeValue("id", XFlatConstants.xFlatNs);
     }
     
     private void setId(Element e, String id){
-        e.setAttribute("id", id, XFlatDatabase.xFlatNs);
+        e.setAttribute("id", id, XFlatConstants.xFlatNs);
     }
     
     @Test

@@ -29,11 +29,11 @@ import org.xflatdb.xflat.Cursor;
 import org.xflatdb.xflat.DuplicateKeyException;
 import org.xflatdb.xflat.KeyNotFoundException;
 import org.xflatdb.xflat.ShardsetConfig;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.Engine;
 import org.xflatdb.xflat.db.EngineAction;
 import org.xflatdb.xflat.db.ShardedEngineBase;
-import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.EmptyCursor;
 import org.xflatdb.xflat.query.Interval;
 import org.xflatdb.xflat.query.IntervalComparator;
@@ -62,7 +62,7 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
         super(file, tableName, config);
         
         if((config.getShardPropertySelector().getExpression() == null ? XPathQuery.Id.getExpression() != null : !config.getShardPropertySelector().getExpression().equals(XPathQuery.Id.getExpression())) ||
-                config.getShardPropertySelector().getNamespace("db") != XFlatDatabase.xFlatNs){
+                config.getShardPropertySelector().getNamespace("db") != XFlatConstants.xFlatNs){
             throw new XFlatException("IdShardedEngine must be sharded by the expression '@db:id' where db is the XFlat Namespace");
         }
     }

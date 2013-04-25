@@ -28,7 +28,7 @@ import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.Table;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.db.BigIntIdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.db.LocalTransactionalDatabase;
 import org.xflatdb.xflat.query.NumericIntervalProvider;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.jdom2.Element;
@@ -56,9 +56,9 @@ public class IdShardedEngineIntegrationTests {
         }
     }
     
-    private XFlatDatabase getDatabase(String testName){
+    private LocalTransactionalDatabase getDatabase(String testName){
         File dbDir = new File(workspace, testName);
-        XFlatDatabase ret = new XFlatDatabase(dbDir);
+        LocalTransactionalDatabase ret = new LocalTransactionalDatabase(dbDir);
         
         ret.configureTable(tbl, new TableConfig()
                                     .withIdGenerator(BigIntIdGenerator.class)
@@ -76,9 +76,9 @@ public class IdShardedEngineIntegrationTests {
         String testName = "testInsertRetrieve_SingleShard_OneFileCreated";
         System.out.println(testName);
         
-        XFlatDatabase db = getDatabase(testName);
+        LocalTransactionalDatabase db = getDatabase(testName);
         
-        db.Initialize();
+        db.initialize();
         
         Table<Foo> table = db.getTable(Foo.class, tbl);
         
@@ -107,9 +107,9 @@ public class IdShardedEngineIntegrationTests {
         String testName = "testInsertRetrieve_MultipleShards_MultipleFilesCreated";
         System.out.println(testName);
         
-        XFlatDatabase db = getDatabase(testName);
+        LocalTransactionalDatabase db = getDatabase(testName);
         
-        db.Initialize();
+        db.initialize();
         
         Table<Foo> table = db.getTable(Foo.class, tbl);
         
@@ -159,13 +159,13 @@ public class IdShardedEngineIntegrationTests {
         
         System.out.println(testName);
         
-        XFlatDatabase db = getDatabase(testName);
+        LocalTransactionalDatabase db = getDatabase(testName);
         
         db.configureTable(tbl, new TableConfig()
                                     .withIdGenerator(TimestampIdGenerator.class)
                                     .sharded(ShardsetConfig.by(XPathQuery.Id, Long.class, NumericIntervalProvider.forLong(2, 100))));
         
-        db.Initialize();
+        db.initialize();
         
         Table<FooLongId> table = db.getTable(FooLongId.class, tbl);
         

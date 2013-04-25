@@ -56,9 +56,9 @@ public class MultithreadedDbIntegrationTests {
         }
     }
     
-    private XFlatDatabase getDatabase(String testName){
+    private LocalTransactionalDatabase getDatabase(String testName){
         File dbDir = new File(workspace, testName);
-        XFlatDatabase ret = new XFlatDatabase(dbDir);
+        LocalTransactionalDatabase ret = new LocalTransactionalDatabase(dbDir);
         
         return ret;
     }
@@ -99,12 +99,12 @@ public class MultithreadedDbIntegrationTests {
         System.out.println("HeavyRead_OneUpdate_AfterInsertAllGetNewValue");
         
         final AtomicBoolean finished = new AtomicBoolean(false);
-        final XFlatDatabase db = getDatabase("HeavyRead_OneUpdate_AfterInsertAllGetNewValue");
+        final LocalTransactionalDatabase db = getDatabase("HeavyRead_OneUpdate_AfterInsertAllGetNewValue");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.Initialize();
+        db.initialize();
         try{
             
         final Foo oldFoo = new Foo();
@@ -193,12 +193,12 @@ public class MultithreadedDbIntegrationTests {
         System.out.println("HeavyWrite_OneReader_AllReadsInOrder");
         
         final AtomicBoolean finished = new AtomicBoolean(false);
-        final XFlatDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
+        final LocalTransactionalDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.Initialize();
+        db.initialize();
         try{
             final AtomicInteger counter = new AtomicInteger(0);
             final AtomicInteger idStarter = new AtomicInteger(0);
@@ -288,12 +288,12 @@ public class MultithreadedDbIntegrationTests {
         System.out.println("testTransactionalWrites_InOwnThread_MaintainsIsolation");
         
         final AtomicBoolean finished = new AtomicBoolean(false);
-        final XFlatDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
+        final LocalTransactionalDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
-        db.Initialize();
+        db.initialize();
         try{
             final AtomicInteger counter = new AtomicInteger(0);
             final AtomicInteger idStarter = new AtomicInteger(0);

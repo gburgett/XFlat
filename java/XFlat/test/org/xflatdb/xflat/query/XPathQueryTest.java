@@ -15,13 +15,10 @@
 */
 package org.xflatdb.xflat.query;
 
-import org.xflatdb.xflat.query.IntervalSet;
-import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.convert.DefaultConversionService;
 import org.xflatdb.xflat.convert.converters.JDOMConverters;
 import org.xflatdb.xflat.convert.converters.StringConverters;
-import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.XPathQuery.QueryType;
 import org.xflatdb.xflat.util.ComparableComparator;
 import org.jdom2.Element;
@@ -30,6 +27,7 @@ import org.jdom2.xpath.XPathFactory;
 import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
+import org.xflatdb.xflat.XFlatConstants;
 import test.Foo;
 
 /**
@@ -348,8 +346,8 @@ public class XPathQueryTest {
         System.out.println("testEq_Id_MatchesRowId");
         
         //setup data
-        Element row = new Element("row", XFlatDatabase.xFlatNs);
-        row.setAttribute("id", "17", XFlatDatabase.xFlatNs);
+        Element row = new Element("row", XFlatConstants.xFlatNs);
+        row.setAttribute("id", "17", XFlatConstants.xFlatNs);
         
         row.addContent(new Element("data").setText("textData"));
         
@@ -884,7 +882,7 @@ public class XPathQueryTest {
         XPathQuery query = XPathQuery.any();
         
         //act
-        boolean matches = query.getRowMatcher().matches(new Element("row", XFlatDatabase.xFlatNs));
+        boolean matches = query.getRowMatcher().matches(new Element("row", XFlatConstants.xFlatNs));
         
         //assert
         assertTrue(matches);
@@ -898,7 +896,7 @@ public class XPathQueryTest {
         
         //act
         boolean matches = query.getRowMatcher().matches(
-                    new Element("row", XFlatDatabase.xFlatNs)
+                    new Element("row", XFlatConstants.xFlatNs)
                         .addContent(new Element("data").setAttribute("val", "value").setText("some data"))
                         .addContent("some more text")
                 );

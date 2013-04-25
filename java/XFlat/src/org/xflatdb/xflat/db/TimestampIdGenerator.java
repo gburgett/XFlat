@@ -20,6 +20,7 @@ import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jdom2.Element;
+import org.xflatdb.xflat.XFlatConstants;
 
 /**
  * An ID Generator that generates timestamp based IDs.
@@ -138,12 +139,12 @@ public class TimestampIdGenerator extends IdGenerator {
     
     @Override
     public void saveState(Element state){
-        state.setAttribute("maxId", Long.toString(this.lastDate.get()), XFlatDatabase.xFlatNs);
+        state.setAttribute("maxId", Long.toString(this.lastDate.get()), XFlatConstants.xFlatNs);
     }
     
     @Override
     public void loadState(Element state){
-        String maxId = state.getAttributeValue("maxId", XFlatDatabase.xFlatNs);
+        String maxId = state.getAttributeValue("maxId", XFlatConstants.xFlatNs);
         this.lastDate.set(Long.parseLong(maxId));
     }
 }

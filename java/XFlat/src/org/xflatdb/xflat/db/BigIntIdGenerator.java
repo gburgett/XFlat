@@ -17,6 +17,7 @@ package org.xflatdb.xflat.db;
 
 import java.util.concurrent.atomic.AtomicLong;
 import org.jdom2.Element;
+import org.xflatdb.xflat.XFlatConstants;
 
 /**
  * An IdGenerator which generates incrementing integer IDs.  This ID generator
@@ -125,7 +126,7 @@ public class BigIntIdGenerator extends IdGenerator {
      */
     @Override
     public void saveState(Element state){
-        state.setAttribute("maxId", Long.toString(this.lastId.get()), XFlatDatabase.xFlatNs);
+        state.setAttribute("maxId", Long.toString(this.lastId.get()), XFlatConstants.xFlatNs);
     }
     
     /**
@@ -134,7 +135,7 @@ public class BigIntIdGenerator extends IdGenerator {
      */
     @Override
     public void loadState(Element state){
-        String maxId = state.getAttributeValue("maxId", XFlatDatabase.xFlatNs);
+        String maxId = state.getAttributeValue("maxId", XFlatConstants.xFlatNs);
         this.lastId.set(Long.parseLong(maxId));
     }
     

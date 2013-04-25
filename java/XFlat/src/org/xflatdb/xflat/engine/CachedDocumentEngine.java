@@ -41,7 +41,7 @@ import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.Engine;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineState;
-import org.xflatdb.xflat.db.XFlatDatabase;
+import org.xflatdb.xflat.db.LocalTransactionalDatabase;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
 import org.xflatdb.xflat.transaction.Isolation;
@@ -52,6 +52,7 @@ import org.hamcrest.Matcher;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.transaction.TransactionOptions;
 
 /**
@@ -656,7 +657,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                 if(file.exists()){
                     try {
                         Document doc = this.file.readFile();
-                        List<Element> rowList = doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+                        List<Element> rowList = doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
 
                         for(int i = rowList.size() - 1; i >= 0; i--){
                             Element row = rowList.get(i);
@@ -675,7 +676,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                                 long txId = 0;
                                 long commitId = 0;
 
-                                String a = data.getAttributeValue("tx", XFlatDatabase.xFlatNs);
+                                String a = data.getAttributeValue("tx", XFlatConstants.xFlatNs);
                                 if(a != null && !"".equals(a)){
                                     try{
                                         txId = Long.parseLong(a, TRANSACTION_ID_RADIX);
@@ -683,7 +684,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                                         //just leave it as 0.
                                     }
                                 }
-                                a = data.getAttributeValue("commit", XFlatDatabase.xFlatNs);
+                                a = data.getAttributeValue("commit", XFlatConstants.xFlatNs);
                                 if(a != null && !"".equals(a)){
                                     try{
                                         commitId = Long.parseLong(a, TRANSACTION_ID_RADIX);
@@ -692,7 +693,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                                     }
                                 }
 
-                                if("delete".equals(data.getName()) && XFlatDatabase.xFlatNs.equals(data.getNamespace())){
+                                if("delete".equals(data.getName()) && XFlatConstants.xFlatNs.equals(data.getNamespace())){
                                     //it's a delete marker
                                     data = null;
                                 }
@@ -986,8 +987,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             
             
             Document doc = new Document();
-            Element root = new Element("table", XFlatDatabase.xFlatNs)
-                    .setAttribute("name", this.getTableName(), XFlatDatabase.xFlatNs);
+            Element root = new Element("table", XFlatConstants.xFlatNs)
+                    .setAttribute("name", this.getTableName(), XFlatConstants.xFlatNs);
             doc.setRootElement(root);
             
             for(Row row : this.cache.values()){
@@ -1008,22 +1009,22 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                             continue;
                         
                         if(rowEl == null){
-                            rowEl = new Element("row", XFlatDatabase.xFlatNs);
+                            rowEl = new Element("row", XFlatConstants.xFlatNs);
                             setId(rowEl, row.rowId);
                         }
                         
                         Element dataEl;
                         if(rData.data == null){
                             //the data was deleted - make sure we mark that on the row
-                            dataEl = new Element("delete", XFlatDatabase.xFlatNs);
+                            dataEl = new Element("delete", XFlatConstants.xFlatNs);
                         }
                         else{
                             dataEl = rData.data.clone();
                             nonDeleteData++;
                         }
                         
-                        dataEl.setAttribute("tx", Long.toString(rData.transactionId, TRANSACTION_ID_RADIX), XFlatDatabase.xFlatNs);
-                        dataEl.setAttribute("commit", Long.toString(rData.commitId, TRANSACTION_ID_RADIX), XFlatDatabase.xFlatNs);
+                        dataEl.setAttribute("tx", Long.toString(rData.transactionId, TRANSACTION_ID_RADIX), XFlatConstants.xFlatNs);
+                        dataEl.setAttribute("commit", Long.toString(rData.commitId, TRANSACTION_ID_RADIX), XFlatConstants.xFlatNs);
 
                         rowEl.addContent(dataEl);
                     }

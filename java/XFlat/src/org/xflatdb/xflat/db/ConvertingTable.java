@@ -34,6 +34,7 @@ import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
 import org.jdom2.Element;
 import org.jdom2.xpath.XPathExpression;
+import org.xflatdb.xflat.XFlatConstants;
 
 /**
  * A table implementation that converts objects to elements
@@ -83,7 +84,7 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
         
     //<editor-fold desc="helpers">
     private String getId(Element rowData){
-        return rowData.getAttributeValue("id", XFlatDatabase.xFlatNs);
+        return rowData.getAttributeValue("id", XFlatConstants.xFlatNs);
     }
     
     private String getId(T data){
@@ -109,7 +110,7 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
     }
     
     private void setId(Element rowData, String sId){
-        rowData.setAttribute("id", sId, XFlatDatabase.xFlatNs);
+        rowData.setAttribute("id", sId, XFlatConstants.xFlatNs);
     }
         
     private Element convert(T data, String id){

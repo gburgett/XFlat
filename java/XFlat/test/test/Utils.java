@@ -17,9 +17,9 @@ package test;
 
 import java.io.File;
 import java.util.List;
-import org.xflatdb.xflat.db.XFlatDatabase;
 import org.jdom2.Document;
 import org.jdom2.Element;
+import org.xflatdb.xflat.XFlatConstants;
 
 /**
  *
@@ -42,14 +42,14 @@ public class Utils {
     
     public static Document makeDocument(String tableName, Element... rowData){
         Document ret = new Document();
-        Element root = new Element("table", XFlatDatabase.xFlatNs)
-                .setAttribute("name", tableName, XFlatDatabase.xFlatNs);
+        Element root = new Element("table", XFlatConstants.xFlatNs)
+                .setAttribute("name", tableName, XFlatConstants.xFlatNs);
         ret.setRootElement(root);   
         
         int i = 0;
         for(Element e : rowData){
-            root.addContent(new Element("row", XFlatDatabase.xFlatNs)
-                    .setAttribute("id", Integer.toString(i++), XFlatDatabase.xFlatNs)
+            root.addContent(new Element("row", XFlatConstants.xFlatNs)
+                    .setAttribute("id", Integer.toString(i++), XFlatConstants.xFlatNs)
                     .setContent(e));
         }
         
@@ -57,7 +57,7 @@ public class Utils {
     }
     
     public static List<Element> getRows(Document doc){
-        return doc.getRootElement().getChildren("row", XFlatDatabase.xFlatNs);
+        return doc.getRootElement().getChildren("row", XFlatConstants.xFlatNs);
     }
     
 }
