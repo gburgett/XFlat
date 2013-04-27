@@ -16,6 +16,7 @@
 package org.xflatdb.xflat.db;
 
 import java.io.File;
+import org.jdom2.Element;
 import org.xflatdb.xflat.TableConfig;
 
 /**
@@ -30,7 +31,9 @@ public interface EngineFactory {
      * needed.
      * @param tableName The name of the table for which an engine is needed.
      * @param config The TableConfig for the table.
+     * @param savedData This is a per-table XML DOM element which is persisted by
+     * the database in order to save additional state data for the Engine Factory.
      * @return An appropriate engine for the given file. 
      */
-    public EngineBase newEngine(File file, String tableName, TableConfig config);
+    public EngineBase newEngine(File file, String tableName, TableConfig config, Element savedData);
 }

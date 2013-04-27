@@ -25,6 +25,7 @@ import org.jdom2.Element;
 import org.jdom2.xpath.XPathExpression;
 import org.xflatdb.xflat.EngineStateException;
 import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.PojoConverter;
 import org.xflatdb.xflat.db.EngineBase.SpinDownEvent;
@@ -189,7 +190,12 @@ public class TableMetadata implements EngineProvider {
     
     private EngineBase makeNewEngine(File file){
         
-        EngineBase ret = db.getEngineFactory().newEngine(file, name, config);
+        Element savedData = this.engineMetadata.getChild("factory", XFlatConstants.xFlatNs);
+        if(savedData == null){
+            savedData = new Element("factory", XFlatConstants.xFlatNs);
+            this.engineMetadata.addContent(savedData);
+        }
+        EngineBase ret = db.getEngineFactory().newEngine(file, name, config, savedData);
 
         ret.setConversionService(db.getConversionService());
         ret.setExecutorService(db.getExecutorService());

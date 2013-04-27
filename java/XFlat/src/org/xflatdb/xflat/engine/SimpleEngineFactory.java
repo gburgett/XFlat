@@ -17,6 +17,7 @@ package org.xflatdb.xflat.engine;
 
 import java.io.File;
 import org.hamcrest.Matcher;
+import org.jdom2.Element;
 import org.xflatdb.xflat.TableConfig;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.EngineBase;
@@ -42,7 +43,7 @@ public class SimpleEngineFactory implements EngineFactory {
      * @return A new engine implementation.
      */
     @Override
-    public EngineBase newEngine(File file, String tableName, TableConfig config) {
+    public EngineBase newEngine(File file, String tableName, TableConfig config, Element savedData) {
         if(config.getShardsetConfig() != null){
             if(idPropertyMatcher.matches(config.getShardsetConfig().getShardPropertySelector())){
                 return new IdShardedEngine(file, tableName, config.getShardsetConfig());
