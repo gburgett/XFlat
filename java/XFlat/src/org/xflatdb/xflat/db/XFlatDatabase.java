@@ -57,7 +57,9 @@ import org.xflatdb.xflat.util.Action1;
 import org.xflatdb.xflat.util.DocumentFileWrapper;
 
 /**
- * This database implementation manages a local directory of tables.
+ * This database implementation manages a local directory of tables.  It is the 
+ * main database implementation inside XFlat.
+ * <p/>
  * Within the directory, each table is represented by an XML file.  If the table
  * is sharded, it is represented as a subdirectory, in which each shard is represented
  * as an XML file.
@@ -70,7 +72,7 @@ import org.xflatdb.xflat.util.DocumentFileWrapper;
  * </pre>
  * @author gordon
  */
-public class LocalTransactionalDatabase implements Database {
+public class XFlatDatabase implements Database {
     
     
     //<editor-fold desc="dependencies">
@@ -149,7 +151,7 @@ public class LocalTransactionalDatabase implements Database {
                 @Override
                 public void run() {
                     try {
-                        LocalTransactionalDatabase.this.shutdown(1000);
+                        XFlatDatabase.this.shutdown(1000);
                     } catch (TimeoutException ex) {
                         log.warn("Timed out while shutting down database " + directory);
                     }
@@ -213,7 +215,7 @@ public class LocalTransactionalDatabase implements Database {
      * Creates a new database in the given directory.
      * @param directory The flat-file directory in which tables should be stored.
      */
-    public LocalTransactionalDatabase(File directory){
+    public XFlatDatabase(File directory){
         this(directory, null);
     }
     
@@ -223,7 +225,7 @@ public class LocalTransactionalDatabase implements Database {
      * @param executorService The executor service to use for all database-related
      * tasks.  If null, the database will create one in Initialize.
      */
-    public LocalTransactionalDatabase(File directory, ScheduledExecutorService executorService){
+    public XFlatDatabase(File directory, ScheduledExecutorService executorService){
         this.directory = directory;
         
         this.conversionService = new DefaultConversionService();

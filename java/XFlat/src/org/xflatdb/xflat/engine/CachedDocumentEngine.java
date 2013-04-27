@@ -41,7 +41,7 @@ import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.Engine;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineState;
-import org.xflatdb.xflat.db.LocalTransactionalDatabase;
+import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
 import org.xflatdb.xflat.transaction.Isolation;

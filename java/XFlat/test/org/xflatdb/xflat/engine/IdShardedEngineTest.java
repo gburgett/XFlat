@@ -43,7 +43,7 @@ import org.xflatdb.xflat.db.EngineFactory;
 import org.xflatdb.xflat.db.EngineTransactionManager;
 import org.xflatdb.xflat.db.ShardedEngineTestsBase;
 import org.xflatdb.xflat.db.TableMetadataFactory;
-import org.xflatdb.xflat.db.LocalTransactionalDatabase;
+import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.Interval;
 import org.xflatdb.xflat.query.IntervalProvider;
 import org.xflatdb.xflat.query.NumericIntervalProvider;
@@ -67,7 +67,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
                 final Map<String, Document> docs = new ConcurrentHashMap<>();
         ctx.additionalContext.put("docs", docs);
         
-        LocalTransactionalDatabase db = new LocalTransactionalDatabase(workspace, ctx.executorService){
+        XFlatDatabase db = new XFlatDatabase(workspace, ctx.executorService){
             //override to always return the executor service set on the context
             @Override
             protected ScheduledExecutorService getExecutorService(){
@@ -164,7 +164,7 @@ public class IdShardedEngineTest extends ShardedEngineTestsBase<IdShardedEngine>
 
         File file = (File)ctx.additionalContext.get("file");
         IntervalProvider provider = (IntervalProvider)ctx.additionalContext.get("rangeProvider");
-        LocalTransactionalDatabase db = (LocalTransactionalDatabase)ctx.additionalContext.get("db");
+        XFlatDatabase db = (XFlatDatabase)ctx.additionalContext.get("db");
         
         ShardsetConfig cfg = ShardsetConfig.byId(Integer.class, provider);
         

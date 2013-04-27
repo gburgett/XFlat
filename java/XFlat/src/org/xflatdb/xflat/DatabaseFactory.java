@@ -161,14 +161,33 @@ public class DatabaseFactory {
         }
         
         /**
-         * Sets the requirements of the database to be instantiated.  The given
-         * requirements overwrite any existing requirements.
+         * Adds requirements of the database to be instantiated.
          * @param requirements The requirements to use
          * @return A new DatabaseBuilder with the given requirements
          */
         public DatabaseBuilder withRequirements(Map<String, Object> requirements){
             DatabaseBuilder ret = new DatabaseBuilder(this);
-            ret.requirements = Collections.unmodifiableMap(new HashMap<>(requirements));
+            Map<String, Object> reqs = new HashMap<>(ret.requirements);
+            reqs.putAll(requirements);
+            ret.requirements = Collections.unmodifiableMap(reqs);
+            return ret;
+        }
+        
+        /**
+         * Adds requirements of the database to be instantiated.  The requirements
+         * are given as keys only, their values are assumed to be boolean true.
+         * <p/>
+         * This is a convenience for withRequirement(key, true)
+         * @param requirements The set of requirements which should be "true"
+         * @return A new DatabaseBuilder with the given requirements
+         */
+        public DatabaseBuilder withRequirements(String... requirements){
+            DatabaseBuilder ret = new DatabaseBuilder(this);
+            Map<String, Object> reqs = new HashMap<>(ret.requirements);
+            for(String s : requirements){
+                reqs.put(s, true);
+            }
+            ret.requirements = Collections.unmodifiableMap(reqs);
             return ret;
         }
         

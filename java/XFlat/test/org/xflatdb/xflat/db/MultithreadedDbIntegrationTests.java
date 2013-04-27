@@ -56,9 +56,9 @@ public class MultithreadedDbIntegrationTests {
         }
     }
     
-    private LocalTransactionalDatabase getDatabase(String testName){
+    private XFlatDatabase getDatabase(String testName){
         File dbDir = new File(workspace, testName);
-        LocalTransactionalDatabase ret = new LocalTransactionalDatabase(dbDir);
+        XFlatDatabase ret = new XFlatDatabase(dbDir);
         
         return ret;
     }
@@ -99,7 +99,7 @@ public class MultithreadedDbIntegrationTests {
         System.out.println("HeavyRead_OneUpdate_AfterInsertAllGetNewValue");
         
         final AtomicBoolean finished = new AtomicBoolean(false);
-        final LocalTransactionalDatabase db = getDatabase("HeavyRead_OneUpdate_AfterInsertAllGetNewValue");
+        final XFlatDatabase db = getDatabase("HeavyRead_OneUpdate_AfterInsertAllGetNewValue");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -193,7 +193,7 @@ public class MultithreadedDbIntegrationTests {
         System.out.println("HeavyWrite_OneReader_AllReadsInOrder");
         
         final AtomicBoolean finished = new AtomicBoolean(false);
-        final LocalTransactionalDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
+        final XFlatDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -288,7 +288,7 @@ public class MultithreadedDbIntegrationTests {
         System.out.println("testTransactionalWrites_InOwnThread_MaintainsIsolation");
         
         final AtomicBoolean finished = new AtomicBoolean(false);
-        final LocalTransactionalDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
+        final XFlatDatabase db = getDatabase("HeavyWrite_OneReader_AllReadsInOrder");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());

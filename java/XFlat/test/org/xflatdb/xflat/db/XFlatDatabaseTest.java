@@ -15,7 +15,7 @@
 */
 package org.xflatdb.xflat.db;
 
-import org.xflatdb.xflat.db.LocalTransactionalDatabase;
+import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.db.EngineFactory;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.TableConfig;
@@ -65,7 +65,7 @@ public class XFlatDatabaseTest {
         when(factory.newEngine(any(File.class), anyString(), any(TableConfig.class)))
             .thenReturn(mEngine);
         
-        LocalTransactionalDatabase db = new LocalTransactionalDatabase(workspace);
+        XFlatDatabase db = new XFlatDatabase(workspace);
         db.setEngineFactory(factory);
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
@@ -101,7 +101,7 @@ public class XFlatDatabaseTest {
             .thenReturn(mEngine)
             .thenReturn(null);
         
-        LocalTransactionalDatabase db = new LocalTransactionalDatabase(workspace);
+        XFlatDatabase db = new XFlatDatabase(workspace);
         db.setEngineFactory(factory);
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
@@ -143,7 +143,7 @@ public class XFlatDatabaseTest {
             .thenReturn(mEngine2)
             .thenReturn(null);
         
-        LocalTransactionalDatabase db = new LocalTransactionalDatabase(workspace);
+        XFlatDatabase db = new XFlatDatabase(workspace);
         db.setEngineFactory(factory);
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());

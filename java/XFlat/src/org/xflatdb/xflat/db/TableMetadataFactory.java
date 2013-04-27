@@ -35,7 +35,7 @@ import org.xflatdb.xflat.util.DocumentFileWrapper;
  */
 public class TableMetadataFactory {
     
-    private LocalTransactionalDatabase db;
+    private XFlatDatabase db;
     private DatabaseConfig dbConfig;
     private DocumentFileWrapper wrapper;
     
@@ -44,7 +44,7 @@ public class TableMetadataFactory {
      * @param db The XFlatDatabase from which dependencies are retrieved when engines are provided.
      * @param metadataDirectory The metadata directory to which the factory should read and save table metadata.
      */
-    public TableMetadataFactory(LocalTransactionalDatabase db, File metadataDirectory){
+    public TableMetadataFactory(XFlatDatabase db, File metadataDirectory){
         this(db, db.getConfig(), new DocumentFileWrapper(metadataDirectory));
     }
     
@@ -54,7 +54,7 @@ public class TableMetadataFactory {
      * @param config The XFlat Database configuration.
      * @param wrapper A Wrapper around the metadata directory allowing the factory to read and save table metadata.
      */
-    TableMetadataFactory(LocalTransactionalDatabase db, DatabaseConfig config, DocumentFileWrapper wrapper){
+    TableMetadataFactory(XFlatDatabase db, DatabaseConfig config, DocumentFileWrapper wrapper){
         this.db = db;
         this.dbConfig= config;
         this.wrapper = wrapper;

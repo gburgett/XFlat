@@ -150,7 +150,7 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
      * @param db The database that initiated the recovery.  It is used to spin
      * up the tables that any partially-committed transactions were bound to.
      */
-    public abstract void recover(LocalTransactionalDatabase db);
+    public abstract void recover(XFlatDatabase db);
     
     /**
      * Closes any resources in use by this transaction manager in preparation

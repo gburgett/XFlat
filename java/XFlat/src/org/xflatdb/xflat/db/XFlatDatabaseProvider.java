@@ -26,11 +26,11 @@ import org.xflatdb.xflat.DatabaseProvider;
 import org.xflatdb.xflat.TableConfig;
 
 /**
- * A DatabaseProvider which activates instances of {@link LocalTransactionalDatabase}.
+ * A DatabaseProvider which activates instances of {@link XFlatDatabase}.
  * 
  * @author gordon
  */
-public class LocalTransactionalDatabaseProvider implements DatabaseProvider {
+public class XFlatDatabaseProvider implements DatabaseProvider {
 
     @Override
     public boolean canSatisfy(URI uri, Map<String, Object> requirements) {
@@ -76,7 +76,7 @@ public class LocalTransactionalDatabaseProvider implements DatabaseProvider {
 
     @Override
     public Database construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs, Map<String, Object> requirements) {
-        LocalTransactionalDatabase ret = new LocalTransactionalDatabase(new File(uri));
+        XFlatDatabase ret = new XFlatDatabase(new File(uri));
         
         ret.setConfig(config);
         for(Map.Entry<String, TableConfig> cfg : tableConfigs.entrySet()){

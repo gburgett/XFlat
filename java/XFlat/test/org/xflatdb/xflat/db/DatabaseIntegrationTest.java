@@ -67,9 +67,9 @@ public class DatabaseIntegrationTest {
         return new DocumentFileWrapper(doc).readFile();
     }
     
-    private LocalTransactionalDatabase getDatabase(String testName){
+    private XFlatDatabase getDatabase(String testName){
         File dbDir = new File(workspace, testName);
-        LocalTransactionalDatabase ret = new LocalTransactionalDatabase(dbDir);
+        XFlatDatabase ret = new XFlatDatabase(dbDir);
         
         return ret;
     }
@@ -78,7 +78,7 @@ public class DatabaseIntegrationTest {
     public void testInsertAndRetrieve_Foo() throws Exception {
         System.out.println("testInsertAndRetrieve_Foo");
         
-        LocalTransactionalDatabase db = getDatabase("InsertAndRetrieveFoo");
+        XFlatDatabase db = getDatabase("InsertAndRetrieveFoo");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -114,7 +114,7 @@ public class DatabaseIntegrationTest {
     public void testInsertAndDelete_Foo() throws Exception {
         System.out.println("testInsertAndDelete_Foo");
         
-        LocalTransactionalDatabase db = getDatabase("InsertAndDeleteFoo");
+        XFlatDatabase db = getDatabase("InsertAndDeleteFoo");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -149,7 +149,7 @@ public class DatabaseIntegrationTest {
     public void testInsertMany_QueriesAll() throws Exception {
         System.out.println("testInsertMany_QueriesAll");
         
-        LocalTransactionalDatabase db = getDatabase("InsertMany_QueriesAll");
+        XFlatDatabase db = getDatabase("InsertMany_QueriesAll");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -198,7 +198,7 @@ public class DatabaseIntegrationTest {
     public void testInsertMany_DeleteMatching() throws Exception {
         System.out.println("testInsertMany_DeleteMatching");
         
-        LocalTransactionalDatabase db = getDatabase("InsertMany_DeleteMatching");
+        XFlatDatabase db = getDatabase("InsertMany_DeleteMatching");
         
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -255,7 +255,7 @@ public class DatabaseIntegrationTest {
     public void testInsert_Resume_Read() throws Exception {
         System.out.println("testInsert_Resume_Read");
         
-        LocalTransactionalDatabase db = getDatabase("Insert_Resume_Read");
+        XFlatDatabase db = getDatabase("Insert_Resume_Read");
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
@@ -297,7 +297,7 @@ public class DatabaseIntegrationTest {
     public void testInsert_Resume_ValidatesConfig() throws Exception {
         System.out.println("testInsert_Resume_ValidatesConfig");
         
-        LocalTransactionalDatabase db = getDatabase("Insert_Resume_Validate");
+        XFlatDatabase db = getDatabase("Insert_Resume_Validate");
         db.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         db.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
         
@@ -340,7 +340,7 @@ public class DatabaseIntegrationTest {
     @Test
     public void testInsert_Baz_UsesJaxbConversionService() throws Exception {
         System.out.println("testInsert_Baz_UsesJaxbConversionService");
-        LocalTransactionalDatabase db = getDatabase("Insert_Baz_UsesJaxb");
+        XFlatDatabase db = getDatabase("Insert_Baz_UsesJaxb");
                 
         db.initialize();
         try{
@@ -381,7 +381,7 @@ public class DatabaseIntegrationTest {
     public void testAdd_Baz_NewBazAdded() throws Exception {
         System.out.println("testAdd_Baz_NewBazAdded");
         
-        LocalTransactionalDatabase db = getDatabase("Add_Baz_NewBazAdded");
+        XFlatDatabase db = getDatabase("Add_Baz_NewBazAdded");
 
         db.initialize();
         try{
@@ -418,7 +418,7 @@ public class DatabaseIntegrationTest {
     public void testSet_Baz_ReplacesOld() throws Exception {
         System.out.println("testSet_Baz_ReplacesOld");
         
-        LocalTransactionalDatabase db = getDatabase("Set_Baz_ReplacesOld");
+        XFlatDatabase db = getDatabase("Set_Baz_ReplacesOld");
                 
         db.initialize();
         try{
@@ -454,7 +454,7 @@ public class DatabaseIntegrationTest {
     public void testPut_Baz_ReplacesOld() throws Exception {
         System.out.println("testPut_Baz_ReplacesOld");
         
-         LocalTransactionalDatabase db = getDatabase("Put_Baz_ReplacesOld");
+         XFlatDatabase db = getDatabase("Put_Baz_ReplacesOld");
                 
         db.initialize();
         try{
