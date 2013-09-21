@@ -18,64 +18,25 @@ package org.xflatdb.xflat.db;
 import java.io.File;
 import java.net.URI;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.xflatdb.xflat.Database;
+import org.xflatdb.xflat.DatabaseBuilder.DatabaseProvider;
 import org.xflatdb.xflat.DatabaseConfig;
-import org.xflatdb.xflat.DatabaseProvider;
 import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatConfigurationException;
 
 /**
  * A DatabaseProvider which activates instances of {@link XFlatDatabase}.
  * 
  * @author gordon
  */
-public class XFlatDatabaseProvider implements DatabaseProvider {
+class XFlatDatabaseProvider implements DatabaseProvider<XFlatDatabase> {
 
     @Override
-    public boolean canSatisfy(URI uri, Map<String, Object> requirements) {
-        //only local files
+    public XFlatDatabase construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs, Map<String, Object> engineReqs) {
         if(!"file".equals(uri.getScheme())){
-            return false;
+            throw new XFlatConfigurationException("XFlatDatabase can only manage local directories");
         }
         
-        for(Map.Entry<String, Object> entry : requirements.entrySet()){
-            if("transactional".equalsIgnoreCase(entry.getKey())){
-                if(!checkTransactional(entry.getValue().toString())){
-                    return false;
-                }
-            }
-            else if("local".equalsIgnoreCase(entry.getKey())){
-                if(!Boolean.valueOf(entry.getValue().toString()))
-                    return false;
-            }
-            else if("threadsafe".equalsIgnoreCase(entry.getKey())){
-                if(!Boolean.valueOf(entry.getValue().toString()))
-                    return false;
-            }
-            else{
-                //an unknown requirement
-                return false;
-            }
-        }
-        
-        //satisfied all requirements
-        return true;
-    }
-    
-    private Pattern acidRegex = Pattern.compile("^[ACIDacid,.\\s]*$");
-    private boolean checkTransactional(String value){
-        if(Boolean.valueOf(value))
-            return true;
-        
-        //could be a string specifying "ACID" properties,
-        //in which case we satisfy all of A, C, I, and D.
-        Matcher m = acidRegex.matcher(value);
-        return m.find();
-    }
-
-    @Override
-    public Database construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs, Map<String, Object> requirements) {
         XFlatDatabase ret = new XFlatDatabase(new File(uri));
         
         ret.setConfig(config);
@@ -84,6 +45,7 @@ public class XFlatDatabaseProvider implements DatabaseProvider {
         }
         
         ret.initialize();
+        
         return ret;
     }
     

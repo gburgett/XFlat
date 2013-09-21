@@ -58,11 +58,12 @@ public class IdShardedEngineIntegrationTests {
     
     private XFlatDatabase getDatabase(String testName){
         File dbDir = new File(workspace, testName);
-        XFlatDatabase ret = new XFlatDatabase(dbDir);
-        
-        ret.configureTable(tbl, new TableConfig()
-                                    .withIdGenerator(BigIntIdGenerator.class)
-                                    .sharded(ShardsetConfig.by(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
+        XFlatDatabase ret = (XFlatDatabase)XFlatDatabase.Build(dbDir)
+            .withTableConfig(tbl, 
+                TableConfig.DEFAULT
+                .withIdGenerator(BigIntIdGenerator.class)
+                .sharded(ShardsetConfig.by(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))))
+            .create();
         
         ret.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
         ret.getConversionService().addConverter(Element.class, Foo.class, new Foo.FromElementConverter());
@@ -77,8 +78,6 @@ public class IdShardedEngineIntegrationTests {
         System.out.println(testName);
         
         XFlatDatabase db = getDatabase(testName);
-        
-        db.initialize();
         
         Table<Foo> table = db.getTable(Foo.class, tbl);
         
@@ -109,7 +108,6 @@ public class IdShardedEngineIntegrationTests {
         
         XFlatDatabase db = getDatabase(testName);
         
-        db.initialize();
         
         Table<Foo> table = db.getTable(Foo.class, tbl);
         
@@ -165,7 +163,6 @@ public class IdShardedEngineIntegrationTests {
                                     .withIdGenerator(TimestampIdGenerator.class)
                                     .sharded(ShardsetConfig.by(XPathQuery.Id, Long.class, NumericIntervalProvider.forLong(2, 100))));
         
-        db.initialize();
         
         Table<FooLongId> table = db.getTable(FooLongId.class, tbl);
         

@@ -29,14 +29,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jdom2.Document;
 import org.jdom2.Element;
-import org.jdom2.Namespace;
 import org.xflatdb.xflat.Database;
+import org.xflatdb.xflat.DatabaseBuilder;
 import org.xflatdb.xflat.DatabaseConfig;
 import org.xflatdb.xflat.KeyValueTable;
 import org.xflatdb.xflat.Table;
@@ -211,11 +209,13 @@ public class XFlatDatabase implements Database {
         }
     }
     
+    //<editor-fold desc="construction">
+    
     /**
      * Creates a new database in the given directory.
      * @param directory The flat-file directory in which tables should be stored.
      */
-    public XFlatDatabase(File directory){
+    XFlatDatabase(File directory){
         this(directory, null);
     }
     
@@ -225,7 +225,7 @@ public class XFlatDatabase implements Database {
      * @param executorService The executor service to use for all database-related
      * tasks.  If null, the database will create one in Initialize.
      */
-    public XFlatDatabase(File directory, ScheduledExecutorService executorService){
+    protected XFlatDatabase(File directory, ScheduledExecutorService executorService){
         this.directory = directory;
         
         this.conversionService = new DefaultConversionService();
@@ -241,6 +241,18 @@ public class XFlatDatabase implements Database {
     }
     
     /**
+     * Builds a new XFlatDatabase around the given file.  The returned builder
+     * can be used to configure the database.
+     * @param file The directory to be managed by the XFlatDatabase.
+     * @return A DatabaseBuilder which constructs instances of XFlatDatabase.
+     */
+    public static DatabaseBuilder<XFlatDatabase> Build(File file){
+        return new DatabaseBuilder<>(file.toURI(), new XFlatDatabaseProvider());
+    }
+    
+    //</editor-fold>
+    
+    /**
      * Initializes the database.  Once initialized the database can provide tables
      * and operate on underlying data.
      * <p/>
@@ -248,7 +260,7 @@ public class XFlatDatabase implements Database {
      * resources and abandon all running tasks.  This shutdown hook will be removed
      * when {@link #shutdown() } is called.
      */
-    public void initialize(){
+    void initialize(){
         if(!this.state.compareAndSet(DatabaseState.Uninitialized, DatabaseState.Initializing)){
             return;
         }
