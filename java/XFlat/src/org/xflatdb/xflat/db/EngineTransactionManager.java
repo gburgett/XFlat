@@ -117,8 +117,12 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
             //bitshifting current time millis still gets us at least to the year 10,000 before it overflows.
             id = System.currentTimeMillis() << 16;
             last = lastId.get();
-            if((last & 0xFFFFFFFFFFFF0000l) == (id & 0xFFFFFFFFFFFF0000l)){
-                //the last ID was at the same millisecond as our new ID, need to use uniquifier.
+            long lastTs = (last & 0xFFFFFFFFFFFF0000l);
+            if(lastTs >= id){
+                //the last timestamp was at the same millisecond as our new ID, need to use uniquifier.
+                //last timestamp could also be after our new ID, this is because System.currentTimeMillis() is not absolutely
+                //synchronized across all threads.
+                
                 int u = (int)(last & 0xFFFFl) + 1;
                 if(u > 0xFFFF){
                     try {
@@ -127,11 +131,13 @@ public abstract class EngineTransactionManager implements TransactionManager, Au
                     } catch (InterruptedException ex) {
                         //don't care
                     }
+                    
                     //try again, hopefully currentTimeMillis rolled over.
+                    last = -1; //clear it out so that we fail the compare and set                 
                     continue;
                 }
                 
-                id = id | u;
+                id = lastTs | u;
             }
         }while(!lastId.compareAndSet(last, id));
         

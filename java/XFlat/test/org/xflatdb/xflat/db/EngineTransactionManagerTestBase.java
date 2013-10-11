@@ -173,12 +173,14 @@ public abstract class EngineTransactionManagerTestBase {
         {
             final Set<List<Long>> ids = Collections.synchronizedSet(new HashSet<List<Long>>());
 
+            final int iterations = 10000;
+            
             Runnable r = new Runnable(){
                 @Override
                 public void run() {
-                    List<Long> idList = new ArrayList<>(500);
+                    List<Long> idList = new ArrayList<>(iterations);
 
-                    for(int i = 0; i < 500; i++){
+                    for(int i = 0; i < iterations; i++){
                         idList.add(instance.transactionlessCommitId());
                     }
 
@@ -186,39 +188,52 @@ public abstract class EngineTransactionManagerTestBase {
                 }
             };
 
-            Thread th1 = new Thread(r);
-            Thread th2 = new Thread(r);
-            Thread th3 = new Thread(r);
+            int cores = Runtime.getRuntime().availableProcessors();
+            if(cores < 2)
+                cores = 2; //need to get at least some multithreading going
+            System.out.println(String.format("Running with %d cores", cores));
+            int threads = cores - 1;
+            
+            List<Thread> threadList = new ArrayList<>();
+            
+            for(int i = 0; i < threads; i++){
+                threadList.add(new Thread(r));
+            }            
 
             long start = instance.transactionlessCommitId();
 
-            th1.start();
-            th2.start();
-            th3.start();
+            for(int i = 0; i < threads; i++){
+                threadList.get(i).start();
+            }
             r.run();
 
-            th1.join();
-            th2.join();
-            th3.join();
+            for(int i = 0; i < threads; i++){
+                threadList.get(i).join();
+            }
 
             long end = instance.transactionlessCommitId();
 
 
             int maxUniquifier = 0;
 
-            Set<Long> finalIds = new HashSet<>();
-            for(List<Long> idList : ids){
-                for(Long l : idList){
-                    assertTrue("Duplicate IDs generated", finalIds.add(l));
-                    assertThat("id not greater than start", l, Matchers.greaterThan(start));
-                    assertThat("id not less than end", l, Matchers.lessThan(end));
+            try{
+                Set<Long> finalIds = new HashSet<>();
+                for(List<Long> idList : ids){
+                    for(Long l : idList){
+                        if(!finalIds.add(l)){
+                            fail("Duplicate IDs generated: " + Long.toHexString(l) + " (" + l + ")");
+                        }
+                        assertThat("id not greater than start", l, Matchers.greaterThan(start));
+                        assertThat("id not less than end", l, Matchers.lessThan(end));
 
-                    int i = (int)(l.longValue() & 0xFFFFL);
-                    maxUniquifier = i > maxUniquifier ? i : maxUniquifier;
+                        int i = (int)(l.longValue() & 0xFFFFL);
+                        maxUniquifier = i > maxUniquifier ? i : maxUniquifier;
+                    }
                 }
             }
-
-            System.out.println("Max uniquifier: " + maxUniquifier);
+            finally {
+                System.out.println("Max uniquifier: " + Integer.toHexString(maxUniquifier));
+            }
         }
     }
 
