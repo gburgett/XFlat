@@ -31,31 +31,39 @@ public interface Table<T> {
     /**
      * Inserts an object as a row in the database.
      * @param row The value to insert as XML.
+     * @throws DuplicateKeyException if the row already exists
+     * @throws XFlatException if some other error occurs
      */
     public void insert(T row)
-            throws DuplicateKeyException;
+            throws DuplicateKeyException, XFlatException;
     
     //READ
     /**
      * Finds one value by ID
      * @param id The ID of the value to find
      * @return The row value, or null if the row does not exist.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public T find(Object id);
+    public T find(Object id)
+            throws XFlatException;
     
     /**
      * Finds the first value matching the Xpath query.
      * @param query The query to match.
      * @return the value of the matched row, or null if no row was matched.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public T findOne(XPathQuery query);
+    public T findOne(XPathQuery query)
+            throws XFlatException;
     
     /**
      * Gets a cursor over all the values matching the Xpath query.
      * @param query The query to match.
      * @return A cursor over each matching row.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public Cursor<T> find(XPathQuery query);
+    public Cursor<T> find(XPathQuery query)
+            throws XFlatException;
     
     /**
      * Gets a list of all the values matching the Xpath query.
@@ -63,33 +71,43 @@ public interface Table<T> {
      * but without the hassle of a cursor.
      * @param query The query to match.
      * @return A list of all the matching values.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public List<T> findAll(XPathQuery query);
+    public List<T> findAll(XPathQuery query)
+            throws XFlatException;
     
     //UPDATE
     /**
      * Replaces a value with the new value by ID.  This is the same as "Save"
      * in some other document databases.
      * @param newValue The new value to replace the old value.
+     * @throws KeyNotFoundException if the ID of the newValue is null or 
+     * no row with that ID exists in the database
+     * @throws XFlatException if some IO or other error occurs
      */
     public void replace(T newValue)
-            throws KeyNotFoundException;
+            throws KeyNotFoundException, XFlatException;
     
     /**
      * Replaces the first value matched by the query with the new value.
+     * This is similar to an Update operation with a whole-document replace.
      * @param query The query to match.
      * @param newValue The new value to replace the row.
      * @return true if the query matched any rows, false otherwise.  If false,
      * the new value was not inserted.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public boolean replaceOne(XPathQuery query, T newValue);
+    public boolean replaceOne(XPathQuery query, T newValue)
+            throws XFlatException;
     
     /**
      * Updates or inserts the row by ID.
      * @param newValue The new value to replace or insert.
      * @return false if an existing row was updated, true if a row was inserted.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public boolean upsert(T newValue);
+    public boolean upsert(T newValue)
+            throws XFlatException;
     
     /**
      * Applies an update to the data in a given row.
@@ -98,31 +116,37 @@ public interface Table<T> {
      * @return true if the update actually applied, false if the row was found
      * but the update did not select an existing document element.
      * @throws KeyNotFoundException if the row does not exist.
+     * @throws XFlatException if some IO or other error occurs
      */
     public boolean update(Object id, XPathUpdate update)
-            throws KeyNotFoundException;
+            throws KeyNotFoundException, XFlatException;
     
     /**
      * Applies an update to all data matching a given query.
      * @param query The query to match.
      * @param update The update to apply to each matching row.
      * @return the number of rows that were updated.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public int update(XPathQuery query, XPathUpdate update);
+    public int update(XPathQuery query, XPathUpdate update)
+            throws XFlatException;
     
     
     //DELETE
     /**
      * Deletes the row with the given ID.
      * @param id The ID of the row to delete.
+     * @throws XFlatException if some IO or other error occurs
      */
     public void delete(Object id)
-            throws KeyNotFoundException;
+            throws KeyNotFoundException, XFlatException;
     
     /**
      * Deletes all rows matching the given query.
      * @param query The query selecting elements to delete.
      * @return the number of rows that were deleted.
+     * @throws XFlatException if some IO or other error occurs
      */
-    public int deleteAll(XPathQuery query);
+    public int deleteAll(XPathQuery query)
+            throws XFlatException;
 }

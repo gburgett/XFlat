@@ -52,7 +52,6 @@ public class ConvertingKeyValueTableTest {
     
     ConversionService conversionService;
     Engine engine;
-    TransactionManager transactionManager;
     
     private XPathFactory xpath;
     
@@ -72,7 +71,6 @@ public class ConvertingKeyValueTableTest {
                 return engine;
             }
         });
-        fooInstance.setTransactionService(transactionManager);
         
         return fooInstance;
     };
@@ -84,7 +82,6 @@ public class ConvertingKeyValueTableTest {
         JDOMConverters.registerTo(conversionService);
         
         engine = mock(Engine.class);
-        transactionManager = mock(TransactionManager.class);
         
         xpath = XPathFactory.instance();
     }
@@ -146,18 +143,12 @@ public class ConvertingKeyValueTableTest {
         Foo foo = new Foo();
         foo.fooInt = 17;
         
-        TransactionScope mockTxScope = mock(TransactionScope.class);
-        when(transactionManager.openTransaction(any(TransactionOptions.class)))
-                .thenReturn(mockTxScope);
-                
-        
         //ACT
         Foo old = getInstance().put("foo", foo);
         
         //ASSERT
         assertNull(old);
         
-        verify(mockTxScope).commit();
         
         ArgumentCaptor<Element> dataCaptor = ArgumentCaptor.forClass(Element.class);
         verify(engine).insertRow(argThat(Matchers.equalTo("foo")), dataCaptor.capture());
@@ -174,14 +165,12 @@ public class ConvertingKeyValueTableTest {
         
         Foo foo = new Foo();
         foo.fooInt = 17;
-        
-        TransactionScope mockTxScope = mock(TransactionScope.class);
-        when(transactionManager.openTransaction(any(TransactionOptions.class)))
-                .thenReturn(mockTxScope);
-                
+                        
+        Element inEngine = new Element("Foo").setContent( new Element("fooInt").setText("16"));
         when(engine.readRow("foo"))
-                .thenReturn(new Element("Foo").setContent( new Element("fooInt").setText("16")));
-        
+                .thenReturn(inEngine);
+        when(engine.replaceRow(eq("foo"), any(Element.class)))
+                .thenReturn(inEngine);
         
         //ACT
         Foo old = getInstance().put("foo", foo);
@@ -190,7 +179,6 @@ public class ConvertingKeyValueTableTest {
         assertNotNull(old);
         assertEquals(16, old.fooInt);
         
-        verify(mockTxScope).commit();
         
         ArgumentCaptor<Element> dataCaptor = ArgumentCaptor.forClass(Element.class);
         verify(engine).replaceRow(argThat(Matchers.equalTo("foo")), dataCaptor.capture());

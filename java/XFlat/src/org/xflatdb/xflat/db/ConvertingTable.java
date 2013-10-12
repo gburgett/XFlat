@@ -204,9 +204,9 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
         final String id = getOrGenerateId(row);
         final Element e = convert(row, id);
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, DuplicateKeyException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws DuplicateKeyException {
                 engine.insertRow(id, e);
                 return null;
             }
@@ -301,9 +301,9 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
         }
         
         final Element data = convert(newValue, id);
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws KeyNotFoundException {
                 engine.replaceRow(id, data);
                 return null;
             }
@@ -342,9 +342,9 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
         final String id = getId(existing);
         setId(data, id);
         try{
-            this.doWithEngine(new EngineAction(){
+            this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
                 @Override
-                public Object act(Engine engine) {
+                public Object act(Engine engine) throws KeyNotFoundException {
                     engine.replaceRow(id, data);
                     return null;
                 }
@@ -379,9 +379,9 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
         }
         final String sId = this.getIdGenerator().idToString(id);
         
-        return this.doWithEngine(new EngineAction<Boolean>(){
+        return this.doWithEngine(new EngineActionEx<Boolean, KeyNotFoundException>(){
             @Override
-            public Boolean act(Engine engine) {
+            public Boolean act(Engine engine) throws KeyNotFoundException {
                 return engine.update(sId, update);
             }
         });
@@ -406,9 +406,9 @@ public class ConvertingTable<T> extends TableBase implements Table<T> {
         }
         final String sId = this.getIdGenerator().idToString(id);
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws KeyNotFoundException {
                 engine.deleteRow(sId);
                 return null;
             }

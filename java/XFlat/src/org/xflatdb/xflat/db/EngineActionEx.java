@@ -15,13 +15,15 @@
 */
 package org.xflatdb.xflat.db;
 
+import org.xflatdb.xflat.XFlatDataException;
 
 /**
  * Represents an action that a table can perform with an engine.
  * @param <T>
  */
-public interface EngineAction<T> {
+public interface EngineActionEx<T, TEx extends XFlatDataException> {
 
-    public T act(Engine engine);
+    public T act(Engine engine)
+            throws TEx;
     
 }

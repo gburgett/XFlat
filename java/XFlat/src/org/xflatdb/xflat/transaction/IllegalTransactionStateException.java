@@ -20,7 +20,7 @@ package org.xflatdb.xflat.transaction;
  * has already been resolved.
  * @author Gordon
  */
-public class IllegalTransactionStateException extends TransactionException {
+public class IllegalTransactionStateException extends TransactionStateException {
     
     /**
      * Constructs an instance of

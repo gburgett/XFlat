@@ -495,7 +495,6 @@ public class XFlatDatabase implements Database {
         
         ConvertingKeyValueTable ret = new ConvertingKeyValueTable(name);
         ret.setConversionService(conversionService);
-        ret.setTransactionService(transactionManager);
         ret.setEngineProvider(table);
         ret.setLoadPojoMapperAction(new Action1<ConvertingKeyValueTable>(){
             @Override

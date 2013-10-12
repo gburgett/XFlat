@@ -88,12 +88,12 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
     }
 
     @Override
-    public TransactionScope openTransaction() {
+    public TransactionScope openTransaction() throws TransactionPropagationException {
         return openTransaction(TransactionOptions.DEFAULT);
     }
 
     @Override
-    public TransactionScope openTransaction(TransactionOptions options) {
+    public TransactionScope openTransaction(TransactionOptions options) throws TransactionPropagationException {
         
         AmbientThreadedTransactionScope ret;
         long contextId = getContextId();
@@ -261,7 +261,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         }
     }
     
-    private synchronized void commit(AmbientThreadedTransactionScope tx){
+    private synchronized void commit(AmbientThreadedTransactionScope tx) throws TransactionException {
         //journal the entry so we can recover if catastrophic failure occurs
         TransactionJournalEntry entry = new TransactionJournalEntry();
         entry.txId = tx.id;
@@ -292,12 +292,13 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                     log.trace(String.format("committing transaction %d to table %s", tx.id, e.getTableName()));
                 e.commit(tx.getTransaction(), tx.getOptions());
             }
-        }catch(Exception ex){
+        }
+        catch(Exception ex){
             try{
                 //uncommit
                 tx.commitId = -1;
                 tx.revert();
-            }catch(TransactionException ex2){
+            }catch(XFlatException ex2){
                 throw new TransactionException("Unable to commit, and another error occured during revert: " + ex2.getMessage(), ex);
             }
             
@@ -332,14 +333,14 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         committedTransactions.put(tx.id, tx);
     }
     
-    private void revert(Iterable<EngineBase> boundEngines, long txId, boolean isRecovering){
+    private void revert(Iterable<EngineBase> boundEngines, long txId, boolean isRecovering) {
         Set<String> failedReverts = null;
-        Exception last = null;
+        RuntimeException last = null;
         for(EngineBase e : boundEngines){
             
             try{
                 e.revert(txId, isRecovering);
-            }catch(Exception ex){
+            }catch(RuntimeException ex){
                 LogFactory.getLog(getClass()).error(ex);
                 if(failedReverts == null)
                     failedReverts = new HashSet<>();
@@ -352,7 +353,8 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             for(String s : failedReverts){
                 msg.append(s).append(", ");
             }
-            throw new TransactionException(msg.toString(), last);
+            //the exceptions we caught were all runtime exceptions, so we are going to throw a runtime exception
+            throw new XFlatException(msg.toString(), last);
         }
     }
 
@@ -400,7 +402,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 //save the journal after each successful revert
                 this.journalWrapper.writeFile(transactionJournal);
             }
-        }catch(TransactionException | IOException ex){
+        }catch(XFlatException | IOException ex){
             throw new XFlatException("Unable to recover", ex);
         }
     }
@@ -592,7 +594,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             fireEvent(TransactionEventObject.COMMITTED);
         }
         
-        void completeWrappingScope(WrappingTransactionScope scope){
+        void completeWrappingScope(WrappingTransactionScope scope) throws TransactionException {
             if(uncommittedScopes.remove(scope) && uncommittedScopes.isEmpty()){
                 //all wrapping transaction scopes have completed, we can commit
                 doCommit();
@@ -628,7 +630,7 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
             fireEvent(TransactionEventObject.REVERTED);
         }
 
-        protected void doRevert(){            
+        protected void doRevert() {            
             ThreadContextTransactionManager.this.revert(this.boundEngines, this.id, false);
         }
         
@@ -680,13 +682,13 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
                 
         @Override
         public void commit() throws TransactionException {
-            throw new TransactionException("Cannot commit a transaction opened with propagation " + 
+            throw new IllegalTransactionStateException("Cannot commit a transaction opened with propagation " + 
                     "NEVER or NOT_SUPPORTED");
         }
 
         @Override
         public void revert() {
-            throw new TransactionException("Cannot revert a transaction opened with propagation " + 
+            throw new IllegalTransactionStateException("Cannot revert a transaction opened with propagation " + 
                     "NEVER or NOT_SUPPORTED");
         }
         
@@ -713,13 +715,13 @@ public class ThreadContextTransactionManager extends EngineTransactionManager {
         
         @Override
         public void commit() throws TransactionException {
-            throw new TransactionException("Cannot commit a transaction opened with propagation " + 
+            throw new IllegalTransactionStateException("Cannot commit a transaction opened with propagation " + 
                     "NEVER or NOT_SUPPORTED");
         }
 
         @Override
         public void revert() {
-            throw new TransactionException("Cannot revert a transaction opened with propagation " + 
+            throw new IllegalTransactionStateException("Cannot revert a transaction opened with propagation " + 
                     "NEVER or NOT_SUPPORTED");
         }
 

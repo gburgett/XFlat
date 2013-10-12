@@ -13,25 +13,30 @@
 *	See the License for the specific language governing permissions and
 *	limitations under the License.
 */
-package org.xflatdb.xflat.transaction;
+package org.xflatdb.xflat;
 
 /**
- * The base class for all exceptions that are related to transactions.
- * @author Gordon
+ * Thrown when an operation violates some constraint of the underlying data store.
+ * These exceptions are indicative of some problem with the data being manipulated,
+ * rather than a configuration or IO error
+ * @author gordon
  */
-public class TransactionException extends Exception {
+public class XFlatDataException extends Exception {
+
+    /**
+     * Creates a new instance of
+     * <code>XFlatDataException</code> without detail message.
+     */
+    public XFlatDataException(String msg, Throwable cause) {
+    }
 
     /**
      * Constructs an instance of
-     * <code>TransactionException</code> with the specified detail message.
+     * <code>XFlatDataException</code> with the specified detail message.
      *
      * @param msg the detail message.
      */
-    public TransactionException(String msg, Throwable inner) {
-        super(msg, inner);
-    }
-    
-    public TransactionException(String msg) {
+    public XFlatDataException(String msg) {
         super(msg);
     }
 }

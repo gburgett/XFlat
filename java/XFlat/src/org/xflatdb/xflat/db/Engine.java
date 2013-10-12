@@ -73,7 +73,7 @@ public interface Engine {
      * @param data The data that replaces the old data.
      * @throws KeyNotFoundException if the row does not exist.
      */
-    public void replaceRow(String id, Element data)
+    public Element replaceRow(String id, Element data)
             throws KeyNotFoundException;
     
     /**

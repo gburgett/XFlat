@@ -41,7 +41,6 @@ import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.Engine;
 import org.xflatdb.xflat.db.EngineBase;
 import org.xflatdb.xflat.db.EngineState;
-import org.xflatdb.xflat.db.XFlatDatabase;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
 import org.xflatdb.xflat.transaction.Isolation;
@@ -53,7 +52,9 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.xflatdb.xflat.XFlatConstants;
+import org.xflatdb.xflat.transaction.TransactionException;
 import org.xflatdb.xflat.transaction.TransactionOptions;
+import org.xflatdb.xflat.transaction.TransactionStateException;
 
 /**
  * This is an engine that caches the entire table in memory as a JDOM {@link Document}.
@@ -97,7 +98,7 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     
     //<editor-fold desc="interface methods">
     @Override
-    public void insertRow(String id, Element data) throws DuplicateKeyException {
+    public void insertRow(String id, Element data) throws XFlatException, DuplicateKeyException {
         Transaction tx = ensureWriteReady();
         try{
             
@@ -181,9 +182,10 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     }
 
     @Override
-    public void replaceRow(String id, Element data) throws KeyNotFoundException {
+    public Element replaceRow(String id, Element data) throws KeyNotFoundException {
         Transaction tx = ensureWriteReady();
         try{
+            RowData ret;
             long txId = getTxId(tx);
 
             Row row = this.cache.get(id);
@@ -192,8 +194,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
             }
 
             synchronized(row){
-                RowData toReplace = row.chooseMostRecentCommitted(tx, txId);
-                if(toReplace == null || toReplace.data == null){
+                ret = row.chooseMostRecentCommitted(tx, txId);
+                if(ret == null || ret.data == null){
                     throw new KeyNotFoundException(id);
                 }
 
@@ -202,6 +204,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
                     //transactionless means auto-commit
                     newData.commitId = txId;
                 }
+                
+                
                 row.rowData.put(txId, newData);
                 if(tx != null || this.getTransactionManager().anyOpenTransactions())
                     this.uncommittedRows.put(id, row);
@@ -209,7 +213,8 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
 
             setLastActivity(System.currentTimeMillis());
             dumpCache();
-        
+            
+            return ret.data;
         }finally{
             writeComplete();
         }
@@ -546,14 +551,16 @@ public class CachedDocumentEngine extends EngineBase implements Engine {
     private AtomicLong currentlyCommitting = new AtomicLong(-1);
     
     @Override
-    public void commit(Transaction tx, TransactionOptions options){
+    public void commit(Transaction tx, TransactionOptions options)
+            throws TransactionException
+    {
         super.commit(tx, options);
         
         synchronized(syncRoot){
             if(!currentlyCommitting.compareAndSet(-1, tx.getTransactionId())){
                 //see if this transaction is completely finished committing, or if it reverted
                 if(this.getTransactionManager().isTransactionCommitted(tx.getTransactionId()) == -1){
-                    throw new IllegalStateException("Cannot commit two transactions simultaneously");
+                    throw new TransactionStateException("Cannot commit two transactions simultaneously");
                 }
                 else{
                     //the transaction successfully committed, we can move on.

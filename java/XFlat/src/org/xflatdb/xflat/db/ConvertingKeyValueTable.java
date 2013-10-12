@@ -29,9 +29,6 @@ import org.xflatdb.xflat.convert.ConversionNotSupportedException;
 import org.xflatdb.xflat.convert.ConversionService;
 import org.xflatdb.xflat.query.XPathQuery;
 import org.xflatdb.xflat.query.XPathUpdate;
-import org.xflatdb.xflat.transaction.TransactionManager;
-import org.xflatdb.xflat.transaction.TransactionOptions;
-import org.xflatdb.xflat.transaction.TransactionScope;
 import org.xflatdb.xflat.util.Action1;
 
 /**
@@ -45,15 +42,7 @@ public class ConvertingKeyValueTable extends TableBase implements KeyValueTable 
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
-    
-    private TransactionManager transactionService;
-    /**
-     * Injects the transactionService service.
-     */
-    public void setTransactionService(TransactionManager transactionService){
-        this.transactionService = transactionService;
-    }
-    
+        
     private Action1 loadPojoMapperAction = new Action1<ConvertingKeyValueTable>(){
         @Override
         public void apply(ConvertingKeyValueTable val) {            
@@ -111,9 +100,9 @@ public class ConvertingKeyValueTable extends TableBase implements KeyValueTable 
     public <T> void add(final String key, T row) throws DuplicateKeyException {
         final Element e = convert(row, key);
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, DuplicateKeyException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws DuplicateKeyException {
                 engine.insertRow(key, e);
                 return null;
             }
@@ -140,27 +129,32 @@ public class ConvertingKeyValueTable extends TableBase implements KeyValueTable 
         
         Element inRow;
         
-        //since this is a two step process, must execute in transaction.
-        //This transaction can be non-durable, since non-transactional table operations
-        //do not guarantee durability.
-        try(TransactionScope tx = this.transactionService.openTransaction(TransactionOptions.DEFAULT.withDurability(false))){
-            
-            inRow = this.doWithEngine(new EngineAction<Element>(){
-                @Override
-                public Element act(Engine engine) {
+        inRow = this.doWithEngine(new EngineAction<Element>(){
+            @Override
+            public Element act(Engine engine) {
+                
+                while(true){
                     Element inRow = engine.readRow(key);       
-                    
-                    if(inRow == null)
-                        engine.insertRow(key, data);
-                    else
-                        engine.replaceRow(key, data);
-                    
-                    return inRow;
+
+                    if(inRow == null){
+                        try {
+                            engine.insertRow(key, data);
+                            return inRow;
+                        } catch (DuplicateKeyException ex) {
+                            //try again by re-reading the row
+                        }
+                    }
+                    else{
+                        try {
+                            return engine.replaceRow(key, data);
+                        } catch (KeyNotFoundException ex) {
+                            //try again from reading the row
+                        }
+                    }
                 }
-            });
-            
-            tx.commit(); 
-        }
+            }
+        });
+
         
         if(inRow == null)
             return null;
@@ -247,9 +241,9 @@ public class ConvertingKeyValueTable extends TableBase implements KeyValueTable 
     public <T> void replace(final String key, T newValue) throws KeyNotFoundException {
         final Element data = convert(newValue, key);
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws KeyNotFoundException {
                 engine.replaceRow(key, data);
                 return null;
             }
@@ -258,9 +252,9 @@ public class ConvertingKeyValueTable extends TableBase implements KeyValueTable 
 
     @Override
     public boolean update(final String key, final XPathUpdate update) throws KeyNotFoundException {
-        return this.doWithEngine(new EngineAction<Boolean>(){
+        return this.doWithEngine(new EngineActionEx<Boolean, KeyNotFoundException>(){
             @Override
-            public Boolean act(Engine engine) {
+            public Boolean act(Engine engine) throws KeyNotFoundException {
                 return engine.update(key, update);
             }
         });
@@ -268,9 +262,9 @@ public class ConvertingKeyValueTable extends TableBase implements KeyValueTable 
 
     @Override
     public void delete(final String key) throws KeyNotFoundException {
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws KeyNotFoundException {
                 engine.deleteRow(key);
                 return null;
             }

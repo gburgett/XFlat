@@ -35,6 +35,7 @@ import org.xflatdb.xflat.db.EngineBase.RowData;
 import org.xflatdb.xflat.transaction.Transaction;
 import org.xflatdb.xflat.transaction.TransactionException;
 import org.xflatdb.xflat.transaction.TransactionOptions;
+import org.xflatdb.xflat.transaction.TransactionStateException;
 
 /**
  * The base class for Engine objects.  The Database uses the functionality
@@ -228,7 +229,7 @@ public abstract class EngineBase implements Engine {
      * If the engine is spinning down then we throw because engines are read-only
      * when spinning down.
      */
-    protected Transaction ensureWriteReady(){
+    protected Transaction ensureWriteReady() throws TransactionStateException {
         //check if there is a write lock on the table
         long tblLock = tableLock.get();
         if(tblLock != -1 && tblLock != Thread.currentThread().getId()){
@@ -248,13 +249,13 @@ public abstract class EngineBase implements Engine {
         Transaction tx = this.transactionManager.getTransaction();
         if(tx != null){
             if(tx.isReadOnly()){
-                throw new TransactionException("Cannot write in a read-only transaction");
+                throw new TransactionStateException("Cannot write in a read-only transaction");
             }
             if(tx.isCommitted()){
-                throw new TransactionException("Cannot write in an already committed transaction");
+                throw new TransactionStateException("Cannot write in an already committed transaction");
             }
             if(tx.isReverted()){
-                throw new TransactionException("Cannot write in an already reverted transaction");
+                throw new TransactionStateException("Cannot write in an already reverted transaction");
             }
         }
         
@@ -440,9 +441,11 @@ public abstract class EngineBase implements Engine {
      * After this method returns, the data should be stored in non-volatile storage.
      * @param tx 
      */
-    public void commit(Transaction tx, TransactionOptions options){
+    public void commit(Transaction tx, TransactionOptions options) 
+            throws TransactionException, TransactionStateException
+    {
         if(tx.isCommitted() || tx.isReverted()){
-            throw new UnsupportedOperationException("Cannot commit an already finished transaction.");
+            throw new TransactionStateException("Cannot commit an already finished transaction.");
         }
     }
     

@@ -19,7 +19,7 @@ package org.xflatdb.xflat.transaction;
  *
  * @author Gordon
  */
-public class TransactionPropagationException extends TransactionException {
+public class TransactionPropagationException extends TransactionStateException {
 
     /**
      * Creates a new instance of

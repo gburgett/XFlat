@@ -16,6 +16,7 @@
 package org.xflatdb.xflat.db;
 
 import org.xflatdb.xflat.EngineStateException;
+import org.xflatdb.xflat.XFlatDataException;
 
 /**
  * The base class for implementations of {@link org.xflatdb.xflat.Table}.
@@ -84,7 +85,32 @@ public abstract class TableBase {
      * @param action The action to perform.
      * @return The value returned by the action.
      */
-    protected <T> T doWithEngine(EngineAction<T> action){
+    protected <T, TEx extends XFlatDataException> T doWithEngine(EngineActionEx<T, TEx> action)
+            throws TEx
+    {
+        try{
+            return action.act(this.engineProvider.provideEngine());
+        }
+        catch(EngineStateException ex){
+            //The engine we got may have been just spun down by another thread,
+            //try again with a new engine and if it happens again let it throw
+            return action.act(this.engineProvider.provideEngine());
+        }
+    }
+    
+    
+    /**
+     * Performs an action with an engine obtained from the EngineProvider.
+     * Also wraps the action in some special engine error handling.
+     * <p/>
+     * Beware that the action may be executed multiple times depending on the retry
+     * logic of this method.
+     * @param <T> The return type of the action.
+     * @param action The action to perform.
+     * @return The value returned by the action.
+     */
+    protected <T> T doWithEngine(EngineAction<T> action)
+    {
         try{
             return action.act(this.engineProvider.provideEngine());
         }

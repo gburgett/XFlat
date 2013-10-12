@@ -639,8 +639,6 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
                 
         TestContext ctx = getContext();
         
-        
-        
         prepFileContents(ctx, null);
         spinUp(ctx);
         
@@ -683,9 +681,12 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
         Element rowData = new Element("data").setText("some text data");
         
         //ACT
-        ctx.instance.replaceRow("0", rowData);
+        Element replaced = ctx.instance.replaceRow("0", rowData);
 
         //ASSERT
+        assertEquals("Should have returned old data", "other", replaced.getName());
+        assertEquals("Should have returned old data", "other text data", replaced.getText());
+        
         Element fromEngine = ctx.instance.readRow("0");
         assertEquals("Should have updated in engine", "data", fromEngine.getName());
         assertEquals("Should have updated in engine", "some text data", fromEngine.getText());
@@ -1676,7 +1677,7 @@ public abstract class EngineTestsBase<TEngine extends EngineBase> {
             }
 
             @Override
-            public void replaceRow(String id, Element data) throws KeyNotFoundException {
+            public Element replaceRow(String id, Element data) throws KeyNotFoundException {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 

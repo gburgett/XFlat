@@ -19,7 +19,7 @@ package org.xflatdb.xflat;
  * An XflatException thrown when a given ID is expected to be present but is not.
  * @author gordon
  */
-public class KeyNotFoundException extends XFlatException {
+public class KeyNotFoundException extends XFlatDataException {
 
     /**
      * Creates a new instance of

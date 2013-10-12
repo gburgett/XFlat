@@ -53,9 +53,9 @@ public class ElementTable extends TableBase implements Table<Element> {
         final Element cData = data.clone(); 
         final String sId = id;
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, DuplicateKeyException>(){
                 @Override
-                public Object act(Engine engine) {
+                public Object act(Engine engine) throws DuplicateKeyException {
                     engine.insertRow(sId, cData);
                     return null;
                 }
@@ -127,9 +127,9 @@ public class ElementTable extends TableBase implements Table<Element> {
         //always clone incoming data
         final Element data = newValue.clone(); 
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws KeyNotFoundException {
                 engine.replaceRow(id, data);
                 return null;
             }
@@ -150,9 +150,9 @@ public class ElementTable extends TableBase implements Table<Element> {
         final Element newValue = origValue.clone(); 
 
         try{            
-            this.doWithEngine(new EngineAction(){
+            this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
                 @Override
-                public Object act(Engine engine) {
+                public Object act(Engine engine) throws KeyNotFoundException {
                     engine.replaceRow(id, newValue);
                     return null;
                 }
@@ -173,19 +173,25 @@ public class ElementTable extends TableBase implements Table<Element> {
 
         final String id = getId(newValue);
         if(id == null){
-            final String nId = generateNewId();
-            setId(nId, newValue);
-            
-            
-            this.doWithEngine(new EngineAction(){
-                @Override
-                public Object act(Engine engine) {
-                    engine.insertRow(nId, data);
-                    return null;
+            while(true){
+                final String nId = generateNewId();
+                setId(nId, newValue);
+
+                try{
+                    this.doWithEngine(new EngineActionEx<Object, DuplicateKeyException>(){
+                        @Override
+                        public Object act(Engine engine) throws DuplicateKeyException {
+                            engine.insertRow(nId, data);
+                            return null;
+                        }
+                    });
+                    //inserted, return true
+                    return true;
                 }
-            });
-            //inserted, return true
-            return true;
+                catch(DuplicateKeyException ex){
+                    //somehow our "new" ID already existed - try again
+                }
+            }
         }
         else{
             return this.doWithEngine(new EngineAction<Boolean>(){
@@ -200,9 +206,9 @@ public class ElementTable extends TableBase implements Table<Element> {
     @Override
     public boolean update(Object id, final XPathUpdate update) throws KeyNotFoundException {
         final String sId = getId(id);
-        return this.doWithEngine(new EngineAction<Boolean>(){
+        return this.doWithEngine(new EngineActionEx<Boolean, KeyNotFoundException>(){
             @Override
-            public Boolean act(Engine engine) {
+            public Boolean act(Engine engine) throws KeyNotFoundException {
                 return engine.update(sId, update);
             }
         });
@@ -226,9 +232,9 @@ public class ElementTable extends TableBase implements Table<Element> {
         
         final String sId = getId(id);
         
-        this.doWithEngine(new EngineAction(){
+        this.doWithEngine(new EngineActionEx<Object, KeyNotFoundException>(){
             @Override
-            public Object act(Engine engine) {
+            public Object act(Engine engine) throws KeyNotFoundException {
                 engine.deleteRow(sId);
                 return null;
             }

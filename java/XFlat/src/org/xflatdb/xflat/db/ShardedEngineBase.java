@@ -27,6 +27,7 @@ import org.jdom2.Element;
 import org.xflatdb.xflat.EngineStateException;
 import org.xflatdb.xflat.ShardsetConfig;
 import org.xflatdb.xflat.TableConfig;
+import org.xflatdb.xflat.XFlatDataException;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.query.Interval;
@@ -213,6 +214,35 @@ public abstract class ShardedEngineBase<T> extends EngineBase {
             return action.act(getEngine(range));
         }
     }
+    
+    /**
+     * Performs an action with the appropriate engine for the given shard interval.
+     * The shard interval must be one that is provided by the IntervalProvider
+     * for this sharded engine, which maps to a shard file on disk.
+     * 
+     * @param <U> The generic type of the value to return.
+     * @param range The shard interval mapping to a shard file on disk.
+     * @param action The action to perform once the engine is provided.
+     * @return The value returned by the action.
+     */
+    protected <U, TEx extends XFlatDataException> U doWithEngine(Interval<T> range, EngineActionEx<U, TEx> action)
+            throws TEx
+    {
+        
+        EngineState state = getState();
+        if(state == EngineState.Uninitialized || state == EngineState.SpunDown){
+            throw new XFlatException("Attempt to read or write to an engine in an uninitialized state");
+        }
+        
+        try{
+            return action.act(getEngine(range));
+        }
+        catch(EngineStateException ex){
+            //try one more time with a potentially new engine, if we still fail then let it go
+            return action.act(getEngine(range));
+        }
+    }
+    
     
     /**
      * Executed by the recurring update task every 500 ms in order to clean up

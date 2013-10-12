@@ -19,7 +19,7 @@ package org.xflatdb.xflat;
  * An XflatException thrown when a unique ID is duplicated in a table.
  * @author gordon
  */
-public class DuplicateKeyException extends XFlatException {
+public class DuplicateKeyException extends XFlatDataException {
 
     /**
      * Creates a new instance of

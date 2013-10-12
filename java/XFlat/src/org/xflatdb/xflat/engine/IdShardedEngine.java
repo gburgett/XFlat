@@ -33,6 +33,7 @@ import org.xflatdb.xflat.XFlatConstants;
 import org.xflatdb.xflat.XFlatException;
 import org.xflatdb.xflat.db.Engine;
 import org.xflatdb.xflat.db.EngineAction;
+import org.xflatdb.xflat.db.EngineActionEx;
 import org.xflatdb.xflat.db.ShardedEngineBase;
 import org.xflatdb.xflat.query.EmptyCursor;
 import org.xflatdb.xflat.query.Interval;
@@ -103,9 +104,9 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     public void insertRow(final String id, final Element data) throws DuplicateKeyException {
         ensureWriteReady();
         try{
-            doWithEngine(getInterval(id), new EngineAction(){
+            doWithEngine(getInterval(id), new EngineActionEx<Object, DuplicateKeyException>(){
                 @Override
-                public Object act(Engine engine) {
+                public Object act(Engine engine) throws DuplicateKeyException {
                     engine.insertRow(id, data);
                     return null;
                 }
@@ -154,14 +155,13 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     }
 
     @Override
-    public void replaceRow(final String id, final Element data) throws KeyNotFoundException {
+    public Element replaceRow(final String id, final Element data) throws KeyNotFoundException {
         ensureWriteReady();
         try{
-            doWithEngine(getInterval(id), new EngineAction(){
+            return doWithEngine(getInterval(id), new EngineActionEx<Element, KeyNotFoundException>(){
                 @Override
-                public Object act(Engine engine) {
-                    engine.replaceRow(id, data);
-                    return null;
+                public Element act(Engine engine) throws KeyNotFoundException {
+                    return engine.replaceRow(id, data);
                 }
             });
         }finally{
@@ -173,9 +173,9 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     public boolean update(final String id, final XPathUpdate update) throws KeyNotFoundException {
         ensureWriteReady();
         try{
-            return doWithEngine(getInterval(id), new EngineAction<Boolean>(){
+            return doWithEngine(getInterval(id), new EngineActionEx<Boolean, KeyNotFoundException>(){
                 @Override
-                public Boolean act(Engine engine) {
+                public Boolean act(Engine engine) throws KeyNotFoundException {
                     return engine.update(id, update);
                 }
             });
@@ -228,9 +228,9 @@ public class IdShardedEngine<T> extends ShardedEngineBase<T> {
     public void deleteRow(final String id) throws KeyNotFoundException {
         ensureWriteReady();
         try{
-            doWithEngine(getInterval(id), new EngineAction(){
+            doWithEngine(getInterval(id), new EngineActionEx<Object, KeyNotFoundException>(){
                 @Override
-                public Object act(Engine engine) {
+                public Object act(Engine engine) throws KeyNotFoundException {
                     engine.deleteRow(id);
                     return null;
                 }
