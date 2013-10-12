@@ -56,7 +56,7 @@ public class DatabaseBuilder<T extends Database>{
      * @param requirements The requirements to use
      * @return A new DatabaseBuilder with the given requirements
      */
-    public DatabaseBuilder withRequirements(Map<String, Object> requirements){
+    public DatabaseBuilder<T> withRequirements(Map<String, Object> requirements){
         DatabaseBuilder ret = new DatabaseBuilder(this);
         Map<String, Object> reqs = new HashMap<>(ret.requirements);
         reqs.putAll(requirements);
@@ -72,7 +72,7 @@ public class DatabaseBuilder<T extends Database>{
      * @param requirements The set of requirements which should be "true"
      * @return A new DatabaseBuilder with the given requirements
      */
-    public DatabaseBuilder withRequirements(String... requirements){
+    public DatabaseBuilder<T> withRequirements(String... requirements){
         DatabaseBuilder ret = new DatabaseBuilder(this);
         Map<String, Object> reqs = new HashMap<>(ret.requirements);
         for(String s : requirements){
@@ -88,7 +88,7 @@ public class DatabaseBuilder<T extends Database>{
      * @param value the value of the requirement.
      * @return A new DatabaseBuilder with the given requirement
      */
-    public DatabaseBuilder withRequirement(String name, Object value){
+    public DatabaseBuilder<T> withRequirement(String name, Object value){
         DatabaseBuilder ret = new DatabaseBuilder(this);
         Map<String, Object> reqs = new HashMap<>(ret.requirements);
         reqs.put(name, value);
@@ -102,7 +102,7 @@ public class DatabaseBuilder<T extends Database>{
      * @param config The configuration to use.
      * @return A new DatabaseBuilder with the given configuration.
      */
-    public DatabaseBuilder withDatabaseConfig(DatabaseConfig config){
+    public DatabaseBuilder<T> withDatabaseConfig(DatabaseConfig config){
         DatabaseBuilder ret = new DatabaseBuilder(this);
         ret.config = config;
         return ret;
@@ -115,7 +115,7 @@ public class DatabaseBuilder<T extends Database>{
      * @param config The configuration for the table.
      * @return A new DatabaseBuilder with the given configuration.
      */
-    public DatabaseBuilder withTableConfig(String tableName, TableConfig config){
+    public DatabaseBuilder<T> withTableConfig(String tableName, TableConfig config){
         DatabaseBuilder ret = new DatabaseBuilder(this);
         Map<String, TableConfig> cfgs = new HashMap<>(ret.tableConfigs);
         cfgs.put(tableName, config);
