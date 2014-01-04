@@ -1,8 +1,6 @@
 *.class
 
-/java/XFlat/nbproject/private/
-/java/XFlat/build/
-/java/XFlat/dist/
-/java/XFlat/integrationtests
+target/
+/enginetests
+/integrationtests
 
-/java/XFlat/MANIFEST.MF
