@@ -16,15 +16,20 @@
   </licenses>
   <scm>
     <url>https://github.com/gburgett/XFlat</url>
-    <connection>git@github.com:gburgett/XFlat.git</connection>
+    <connection>scm:git:git@github.com:gburgett/XFlat.git</connection>
   </scm>
   <developers>
     <developer>
       <id>gburgett</id>
       <name>Gordon Burgett</name>
       <email>gordon.burgett@gmail.com</email>
+	  <timezone>-6</timezone>
     </developer>
   </developers>
+  <organization>
+	<name>XFlat</name>
+	<url>http://xflatdb.org/</url>	
+  </organization>
   <dependencies>
     <dependency>
 	  <groupId>commons-logging</groupId>
@@ -84,6 +89,16 @@
       <scope>runtime</scope>
     </dependency>
   </dependencies>
+  <pluginRepositories>
+		<pluginRepository>
+		  <id>sonatype-releases</id>
+		  <url>http://oss.sonatype.org/content/repositories/releases</url>
+		</pluginRepository>
+		<pluginRepository>
+		  <id>clojars.org</id>
+		  <url>http://clojars.org/repo</url>
+		</pluginRepository>
+	</pluginRepositories>
   <build>
 	<plugins>
 	  <plugin>
@@ -93,6 +108,37 @@
         <configuration>
           <source>1.7</source>
           <target>1.7</target>
+        </configuration>
+      </plugin>
+	   <plugin>
+        <groupId>com.code54.mojo</groupId>
+        <artifactId>buildversion-plugin</artifactId>
+        <version>1.0.3</version>
+        <executions>
+          <execution>
+            <goals><goal>set-properties</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+	  <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.4</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <addDefaultSpecificationEntries/>
+            </manifest>
+            <manifestEntries>
+			  <Specification-Title>${project.name}</Specification-Title>
+			  <Specification-Version>${build-tag}</Specification-Version>
+			  <Specification-Vendor>${project.organization.name}</Specification-Vendor>
+              <Implementation-Title>${project.name}</Implementation-Title>
+			  <Implementation-Version>${build-version}</Implementation-Version>
+			  <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
+			  <Implementation-Vendor>${project.organization.name}</Implementation-Vendor>
+            </manifestEntries>
+          </archive>
         </configuration>
       </plugin>
 	</plugins>
