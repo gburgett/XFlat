@@ -40,6 +40,5 @@ public class VersionTest {
         assertEquals("Maven version is not equal to commit version, please check the POM",
                 Version.VERSION, Version.VERSION_MAVEN);
         
-        fail("The test case is a prototype");
     }//end testVersion_Exists_EqualToMavenVersion
 }

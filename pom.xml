@@ -4,7 +4,7 @@
   <artifactId>xflat</artifactId>
   <packaging>jar</packaging>
   <name>XFlatDB</name>
-  <version>0.9</version>
+  <version>0.9-SNAPSHOT</version>
   <description>A lightweight embedded no-sql document database, representing documents as XML in flat .XML files.</description>
   <url>http://xflatdb.org/</url>
   <parent>
@@ -118,48 +118,48 @@
 	<plugins>
 	  <plugin>
 		<groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.1</version>
-                <configuration>
-                  <source>1.7</source>
-                  <target>1.7</target>
-                </configuration>
-          </plugin>
+		<artifactId>maven-compiler-plugin</artifactId>
+		<version>3.1</version>
+		<configuration>
+		  <source>1.7</source>
+		  <target>1.7</target>
+		</configuration>
+	  </plugin>
 	  <plugin>
-            <groupId>com.code54.mojo</groupId>
-            <artifactId>buildversion-plugin</artifactId>
-            <version>1.0.3</version>
-            <executions>
-              <execution>
-                <goals><goal>set-properties</goal></goals>
-              </execution>
-            </executions>
-          </plugin>
+		<groupId>com.code54.mojo</groupId>
+		<artifactId>buildversion-plugin</artifactId>
+		<version>1.0.3</version>
+		<executions>
+		  <execution>
+			<goals><goal>set-properties</goal></goals>
+		  </execution>
+		</executions>
+	  </plugin>
 	  <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>2.4</version>
-            <configuration>
-              <archive>
-                <manifest>
-                  <addDefaultSpecificationEntries/>
-                </manifest>
-                <manifestEntries>
-                              <Specification-Title>${project.name}</Specification-Title>
-                              <Specification-Version>${build-tag}</Specification-Version>
-                              <Specification-Vendor>${project.organization.name}</Specification-Vendor>
-                  <Implementation-Title>${project.name}</Implementation-Title>
-                              <Implementation-Version>${build-version}</Implementation-Version>
-                              <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
-                              <Implementation-Vendor>${project.organization.name}</Implementation-Vendor>
-                              <Build-Commit>${}</Build-Commit>
-                </manifestEntries>
-              </archive>
-            </configuration>
-          </plugin>
+		<groupId>org.apache.maven.plugins</groupId>
+		<artifactId>maven-jar-plugin</artifactId>
+		<version>2.4</version>
+		<configuration>
+		  <archive>
+			<manifest>
+			  <addDefaultSpecificationEntries/>
+			</manifest>
+			<manifestEntries>
+			  <Specification-Title>${project.name}</Specification-Title>
+			  <Specification-Version>${build-tag}</Specification-Version>
+			  <Specification-Vendor>${project.organization.name}</Specification-Vendor>
+			  <Implementation-Title>${project.name}</Implementation-Title>
+			  <Implementation-Version>${build-version}</Implementation-Version>
+			  <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
+			  <Implementation-Vendor>${project.organization.name}</Implementation-Vendor>
+			</manifestEntries>
+		  </archive>
+		</configuration>
+	  </plugin>
 	  <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
+			<version>1.4</version>
             <executions>
               <execution>
                 <id>sign-artifacts</id>
@@ -173,6 +173,7 @@
 	  <plugin>
 		  <groupId>org.apache.maven.plugins</groupId>
 		  <artifactId>maven-source-plugin</artifactId>
+		  <version>2.2.1</version>
 		  <executions>
 			<execution>
 			  <id>attach-sources</id>
@@ -185,6 +186,7 @@
 	  <plugin>
 		  <groupId>org.apache.maven.plugins</groupId>
 		  <artifactId>maven-javadoc-plugin</artifactId>
+		  <version>2.9.1</version>
 		  <executions>
 			<execution>
 			  <id>attach-javadocs</id>
