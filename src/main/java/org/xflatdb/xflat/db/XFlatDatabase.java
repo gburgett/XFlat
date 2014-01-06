@@ -267,6 +267,15 @@ public class XFlatDatabase implements Database {
         
         try
         {
+            String hello = String.format("Starting up XFlat database, version %s", 
+                    org.xflatdb.xflat.Version.VERSION);
+            if(org.xflatdb.xflat.Version.BUILD_REVISION > 0){
+                hello += String.format("\r\n        development revision %d (%s)", 
+                        org.xflatdb.xflat.Version.BUILD_REVISION,
+                        org.xflatdb.xflat.Version.BUILD_COMMIT.substring(0, 7));
+            }
+            log.info(hello);
+            
             if(!this.directory.exists())
                 this.directory.mkdirs();
         
