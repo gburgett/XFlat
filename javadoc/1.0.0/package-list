@@ -1,9 +1,0 @@
-org.jdom2.jaxb
-org.xflatdb.xflat
-org.xflatdb.xflat.convert
-org.xflatdb.xflat.convert.converters
-org.xflatdb.xflat.db
-org.xflatdb.xflat.engine
-org.xflatdb.xflat.query
-org.xflatdb.xflat.transaction
-org.xflatdb.xflat.util
