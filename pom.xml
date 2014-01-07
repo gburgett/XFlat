@@ -4,7 +4,7 @@
   <artifactId>xflat</artifactId>
   <packaging>jar</packaging>
   <name>XFlatDB</name>
-  <version>0.9-SNAPSHOT</version>
+  <version>0.9</version>
   <description>A lightweight embedded no-sql document database, representing documents as XML in flat .XML files.</description>
   <url>http://xflatdb.org/</url>
   <parent>
