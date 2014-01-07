@@ -35,12 +35,12 @@ mkdir -p releases/$version
 mv -f target/xflat-*.jar releases/$version/.
 
 # push the release branch
-git push origin release
+git push origin release --tags
 
 # re-merge into master
 git checkout master
 git merge release
-git push master
+git push origin
 
 # read -e -p "Deploy the artifacts to Maven Central? (y/n)" -i "n" deploy
 # if [[ $deploy == "y" ]] then
