@@ -1,4 +1,3 @@
-#!bin/sh
 set -e
 set -u
 
@@ -33,6 +32,7 @@ mvn package
 # move the packaged files into the release folder
 mkdir -p releases/$version
 mv -f target/xflat-*.jar releases/$version/.
+mv -f pom.xml releases/$version/.
 
 # push the release branch
 git push origin release --tags
@@ -41,12 +41,3 @@ git push origin release --tags
 git checkout master
 git merge release
 git push origin
-
-# read -e -p "Deploy the artifacts to Maven Central? (y/n)" -i "n" deploy
-# if [[ $deploy == "y" ]] then
-	# gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=ossrh-test-1.2.pom -Dfile=ossrh-test-1.2.jar
-	# gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=ossrh-test-1.2.pom -Dfile=ossrh-test-1.2-sources.jar -Dclassifier=sources
-	# gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=ossrh-test-1.2.pom -Dfile=ossrh-test-1.2-javadoc.jar -Dclassifier=javadoc
-# else
-	# echo 
-# fi
