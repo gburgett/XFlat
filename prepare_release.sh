@@ -14,9 +14,12 @@ case $current in
 esac
 
 # merge from QA into release
+git reset --hard head
 git clean -fdx
 git checkout release
 git merge --no-ff QA
+
+echo `git status`
 
 # update the version number and tag the release version
 mvn versions:set -DnewVersion=$version -DgenerateBackupPoms=false
