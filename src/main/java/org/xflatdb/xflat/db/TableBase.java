@@ -55,7 +55,6 @@ public abstract class TableBase {
     private EngineProvider engineProvider;
     /**
      * Creates a new Table for the given table type and name.
-     * @param tableType The type of the objects in this table.
      * @param tableName The name of the table.
      */
     protected TableBase(String tableName){

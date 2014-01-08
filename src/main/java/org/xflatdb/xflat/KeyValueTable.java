@@ -82,7 +82,7 @@ public interface KeyValueTable {
     
     /**
      * Gets a list of all the values matching the Xpath query.
-     * This is the same as {@link #find(org.xflatdb.xflat.query.XPathQuery) }
+     * This is the same as {@link #find(org.xflatdb.xflat.query.XPathQuery, Class) }
      * but without the hassle of a cursor.
      * @param query The query to match.
      * @param clazz The type as which the value should be deserialized.

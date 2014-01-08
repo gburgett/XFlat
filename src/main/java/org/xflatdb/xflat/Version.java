@@ -23,7 +23,7 @@ import java.util.Date;
 import java.util.Properties;
 
 /**
- *
+ * Constants relating the current version of XFlat
  * @author gordon
  */
 public class Version {
@@ -33,16 +33,15 @@ public class Version {
     public static final String VERSION;
     /**
      * The version of the binaries according to Maven.
-     * This should always be the same as {@link VERSION}, if it is not
+     * This should always be the same as {@link #VERSION}, if it is not
      * then the binaries were incorrectly built.
      */
     public static final String VERSION_MAVEN;
     
     /**
      * The version assigned to the build.
-     * For release builds this should always be the same as {@link VERSION}.  Development
-     * or snapshot builds will have appended the revision since the last official release
-     * and the commitish.
+     * For release builds this should be (VERSION)-0-g(commitish).  Development
+     * or snapshot builds will have a revision greater than zero.
      */
     public static final String BUILD_VERSION;
     

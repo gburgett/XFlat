@@ -20,7 +20,6 @@ import org.jdom2.Element;
 import org.xflatdb.xflat.convert.ConversionException;
 import org.xflatdb.xflat.convert.Converter;
 import org.xflatdb.xflat.db.IdGenerator;
-import org.xflatdb.xflat.db.XFlatDatabase;
 
 /**
  * Represents the configuration of one table. 

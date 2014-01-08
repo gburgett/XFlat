@@ -27,8 +27,6 @@ public class DatabaseBuilder<T extends Database>{
 
     private URI location; 
 
-    private Map<String, Object> requirements;
-
     private DatabaseConfig config;
 
     private Map<String, TableConfig> tableConfigs;
@@ -37,7 +35,6 @@ public class DatabaseBuilder<T extends Database>{
 
     public DatabaseBuilder(URI location, DatabaseProvider<T> provider){
         this.location = location;
-        this.requirements = Collections.EMPTY_MAP;
         this.config = DatabaseConfig.DEFAULT;
         this.tableConfigs = Collections.EMPTY_MAP;
         this.provider = provider;
@@ -45,55 +42,9 @@ public class DatabaseBuilder<T extends Database>{
 
     private DatabaseBuilder(DatabaseBuilder other){
         this.location = other.location;
-        this.requirements = other.requirements;
         this.config = other.config;
         this.tableConfigs = other.tableConfigs;
         this.provider = other.provider;
-    }
-
-    /**
-     * Adds requirements of the database to be instantiated.
-     * @param requirements The requirements to use
-     * @return A new DatabaseBuilder with the given requirements
-     */
-    public DatabaseBuilder<T> withRequirements(Map<String, Object> requirements){
-        DatabaseBuilder ret = new DatabaseBuilder(this);
-        Map<String, Object> reqs = new HashMap<>(ret.requirements);
-        reqs.putAll(requirements);
-        ret.requirements = Collections.unmodifiableMap(reqs);
-        return ret;
-    }
-
-    /**
-     * Adds requirements of the database to be instantiated.  The requirements
-     * are given as keys only, their values are assumed to be boolean true.
-     * <p/>
-     * This is a convenience for withRequirement(key, true)
-     * @param requirements The set of requirements which should be "true"
-     * @return A new DatabaseBuilder with the given requirements
-     */
-    public DatabaseBuilder<T> withRequirements(String... requirements){
-        DatabaseBuilder ret = new DatabaseBuilder(this);
-        Map<String, Object> reqs = new HashMap<>(ret.requirements);
-        for(String s : requirements){
-            reqs.put(s, true);
-        }
-        ret.requirements = Collections.unmodifiableMap(reqs);
-        return ret;
-    }
-
-    /**
-     * Adds a requirement of the database to be instantiated.
-     * @param name the named key of the requirement.
-     * @param value the value of the requirement.
-     * @return A new DatabaseBuilder with the given requirement
-     */
-    public DatabaseBuilder<T> withRequirement(String name, Object value){
-        DatabaseBuilder ret = new DatabaseBuilder(this);
-        Map<String, Object> reqs = new HashMap<>(ret.requirements);
-        reqs.put(name, value);
-        ret.requirements = Collections.unmodifiableMap(reqs);
-        return ret;
     }
 
     /**
@@ -132,7 +83,7 @@ public class DatabaseBuilder<T extends Database>{
      */
     public T create() throws XFlatConfigurationException{
         try{
-            return provider.construct(location, config, tableConfigs, requirements);
+            return provider.construct(location, config, tableConfigs);
         }
         catch(XFlatConfigurationException ex){
             throw ex;
@@ -142,8 +93,23 @@ public class DatabaseBuilder<T extends Database>{
         }
     }
 
+    /**
+     * Implementations of this interface construct a database with the appropriate
+     * configurations, and initialize them.
+     * @param <T> The type of database to construct.
+     */
     public interface DatabaseProvider<T extends Database>{
-        public T construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs, Map<String, Object> engineReqs);
+        /**
+         * Constructs a database given a location for the database and appropriate
+         * configurations.
+         * @param uri The location to be managed by this database.
+         * @param config The configuration to be used for this database.
+         * @param tableConfigs A set of configurations for individual tables.
+         * @return A newly constructed and initialized database, ready for use.
+         * @throws XFlatConfigurationException if any of the configuration elements
+         * are invalid.
+         */
+        public T construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs);
     }
 }
 

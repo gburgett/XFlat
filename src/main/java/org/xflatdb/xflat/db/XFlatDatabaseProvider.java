@@ -32,7 +32,7 @@ import org.xflatdb.xflat.XFlatConfigurationException;
 class XFlatDatabaseProvider implements DatabaseProvider<XFlatDatabase> {
 
     @Override
-    public XFlatDatabase construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs, Map<String, Object> engineReqs) {
+    public XFlatDatabase construct(URI uri, DatabaseConfig config, Map<String, TableConfig> tableConfigs) {
         if(!"file".equals(uri.getScheme())){
             throw new XFlatConfigurationException("XFlatDatabase can only manage local directories");
         }

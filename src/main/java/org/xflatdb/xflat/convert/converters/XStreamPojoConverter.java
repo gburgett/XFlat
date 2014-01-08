@@ -38,7 +38,7 @@ public class XStreamPojoConverter implements PojoConverter {
     private final XStream xstream;
     /**
      * Gets the XStream instance that performs the POJO mapping.
-     * @return 
+     * @return The XStream instance initialized with the POJO converter.
      */
     public XStream getXStream(){
         return xstream;

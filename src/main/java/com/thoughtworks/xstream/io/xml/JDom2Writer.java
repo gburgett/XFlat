@@ -22,8 +22,10 @@ import org.jdom2.Element;
 import org.jdom2.JDOMFactory;
 
 /**
- *
- * @author Gordon
+ * An XStream document writer which writes XML data into a JDOM2 Document.
+ * This provides the link between XStream and JDOM so that XStream can read
+ * and write JDOM documents.
+ * @author Gordon Burgett
  */
 public class JDom2Writer extends AbstractDocumentWriter {
     private final JDOMFactory documentFactory;
@@ -85,7 +87,7 @@ public class JDom2Writer extends AbstractDocumentWriter {
     
     /**
      * Casts the top level nodes as a list of JDOM2 elements.
-     * @return 
+     * @return A list of the top level nodes
      */
     @Override
     public List<Element> getTopLevelNodes(){

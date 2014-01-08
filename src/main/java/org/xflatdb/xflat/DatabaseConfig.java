@@ -75,7 +75,9 @@ public class DatabaseConfig {
      * {@link PojoConverter}.
      * <p/>
      * The database will load this class using its {@link ClassLoader} in order
-     * to convert pojos.
+     * to convert pojos.  This is kept as a string because the POJO converter
+     * class may not need to be loaded, so you can exclude the JARs from the
+     * classpath if you desire.
      * @return The binary name of the class which will be loaded in order to
      * automatically map POJOs for conversion to XML.
      */
@@ -157,7 +159,7 @@ public class DatabaseConfig {
      * @param className
      * @return A new instance with the pojoConverterClass property set.
      */
-    public DatabaseConfig setPojoConverterClass(String className){
+    public DatabaseConfig withPojoConverterClass(String className){
         DatabaseConfig ret = new DatabaseConfig(this);
         ret.pojoConverterClass = className;
         return ret;
@@ -176,7 +178,7 @@ public class DatabaseConfig {
      * @param tableConfig The default table config to use.
      * @return A new instance with the defaultTableConfig property set.
      */
-    public DatabaseConfig setDefaultTableConfig(TableConfig tableConfig){
+    public DatabaseConfig withDefaultTableConfig(TableConfig tableConfig){
         DatabaseConfig ret = new DatabaseConfig(this);
         ret.defaultTableConfig = tableConfig;
         return ret;

@@ -44,8 +44,6 @@ public @interface Id {
      * This tells XFlat that this expression is equivalent to {@link XPathQuery#Id}, so that XFlat can
      * apply optimizations based on ID if it encounters this expression in a query.<br/>
      * This must be the exact same expression used in queries in order for XFlat to match it.
-     * <p/>
-     * If this is not set, the {@link PojoConverter} will be invoked to take a "best guess".
      * @return The string value of the raw XPath selecting the ID in a query.
      */
     String value() default "";
@@ -56,7 +54,7 @@ public @interface Id {
      * a namespace, this must declare the namespace.<br/>
      * Example:<br/>
      * <pre>
-     * xmlns:a="http://www.example.com/ns"
+     * {@code @Id(value="foo/@t:id", namespaces={"xmlns:t='http://www.example.com/ns'"})}
      * </pre>
      * 
      * @return An array of namespaces used in the XPath expression.

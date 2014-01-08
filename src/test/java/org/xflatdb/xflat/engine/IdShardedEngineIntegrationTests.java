@@ -57,12 +57,15 @@ public class IdShardedEngineIntegrationTests {
     }
     
     private XFlatDatabase getDatabase(String testName){
+        return getDatabase(testName, TableConfig.DEFAULT
+                .withIdGenerator(BigIntIdGenerator.class)
+                .sharded(ShardsetConfig.by(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))));
+    }
+    
+    private XFlatDatabase getDatabase(String testName, TableConfig config){
         File dbDir = new File(workspace, testName);
         XFlatDatabase ret = (XFlatDatabase)XFlatDatabase.Build(dbDir)
-            .withTableConfig(tbl, 
-                TableConfig.DEFAULT
-                .withIdGenerator(BigIntIdGenerator.class)
-                .sharded(ShardsetConfig.by(XPathQuery.Id, Integer.class, NumericIntervalProvider.forInteger(2, 100))))
+            .withTableConfig(tbl, config)
             .create();
         
         ret.getConversionService().addConverter(Foo.class, Element.class, new Foo.ToElementConverter());
@@ -157,9 +160,7 @@ public class IdShardedEngineIntegrationTests {
         
         System.out.println(testName);
         
-        XFlatDatabase db = getDatabase(testName);
-        
-        db.configureTable(tbl, new TableConfig()
+        XFlatDatabase db = getDatabase(testName, new TableConfig()
                                     .withIdGenerator(TimestampIdGenerator.class)
                                     .sharded(ShardsetConfig.by(XPathQuery.Id, Long.class, NumericIntervalProvider.forLong(2, 100))));
         

@@ -176,7 +176,7 @@ public class XFlatDatabase implements Database {
      * @param tableName The name of the table to configure.
      * @param config The configuration to apply.
      */
-    public void configureTable(String tableName, TableConfig config){
+    void configureTable(String tableName, TableConfig config){
         if(this.state.get() != DatabaseState.Uninitialized){
             throw new XFlatException("Cannot configure table after initialization");
         }
@@ -191,7 +191,6 @@ public class XFlatDatabase implements Database {
     /**
      * Gets the PojoConverter that has been used to extend the database's conversion service.
      * This overrides any PojoConverter that was defined in the Database Configuration.
-     * @param converter The converter that should extend the database's conversion service.
      */
     public PojoConverter getPojoConverter(){
         return pojoConverter;
@@ -624,7 +623,7 @@ public class XFlatDatabase implements Database {
      */
     public enum DatabaseState{
         /**
-         * The state of a database before the {@link #Initialize() } method is
+         * The state of a database before the {@link XFlatDatabase#initialize() } method is
          * called.
          */
         Uninitialized,
