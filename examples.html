@@ -60,12 +60,6 @@ System.out.println("Stored foo in table Foo with ID " + myFoo.getId());
 Foo myFoo2 = fooTable.find(myFoo.getId());
 //myFoo2 is a new instance with the same data as myFoo
 {% endhighlight %}
-
-{% highlight java %}
-//initialize with default config
-Database myDatabase = XFlatDatabase.Build(dir).create();
-{% endhighlight %}
-
   
 <p>Insert an instance of <code>Foo</code> with a pre-set ID</p>
 
