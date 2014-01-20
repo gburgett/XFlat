@@ -111,7 +111,7 @@
 			<directory>src/main/java/resources</directory>
 			<filtering>true</filtering>
 			<includes>
-			  <include>*.properties</include>
+			  <include>**/*.properties</include>
 			</includes>
 		  </resource>
           </resources>

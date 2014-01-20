@@ -66,7 +66,7 @@ public class Version {
     
     static {
         Properties props = new Properties();
-        try(InputStream is = Version.class.getClassLoader().getResourceAsStream("version.properties")){
+        try(InputStream is = Version.class.getClassLoader().getResourceAsStream("org/xflatdb/xflat/version.properties")){
             assert(is != null);
             props.load(is);
         }
